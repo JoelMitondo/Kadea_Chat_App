@@ -72,6 +72,7 @@
     "edge-iconify": "^2.0.2",
     "edge.js": "^6.5.1",
     "luxon": "^3.7.2",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "tailwindcss": "^4.3.3"
   },
