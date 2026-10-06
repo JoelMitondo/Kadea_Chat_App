@@ -6,7 +6,7 @@ export default class extends BaseSchema {
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-      table.enum('type', ['Publique', 'Privee']).notNullable()
+      table.enum('type', ['Publique', 'Privee']).notNullable().defaultTo('privé')
       table.string('description').nullable()
       table.timestamp('created_at')
       table.timestamp('updated_at')

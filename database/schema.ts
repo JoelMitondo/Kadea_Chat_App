@@ -56,6 +56,23 @@ export class ConversationSchema extends BaseModel {
   declare updatedAt: DateTime
 }
 
+export class InscriptionSchema extends BaseModel {
+  static $columns = ['birthDate', 'createdAt', 'email', 'fullName', 'id', 'updatedAt'] as const
+  $columns = InscriptionSchema.$columns
+  @column.date()
+  declare birthDate: DateTime | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime | null
+  @column()
+  declare email: string
+  @column()
+  declare fullName: string
+  @column({ isPrimary: true })
+  declare id: number
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+}
+
 export class MessageAttachmentSchema extends BaseModel {
   static $columns = ['createdAt', 'fileName', 'filePath', 'fileSize', 'id', 'messageId', 'mimeType', 'updatedAt'] as const
   $columns = MessageAttachmentSchema.$columns
@@ -112,7 +129,7 @@ export class MessageStatusSchema extends BaseModel {
 }
 
 export class MessageTypeSchema extends BaseModel {
-  static $columns = ['createdAt', 'description', 'id', 'label', 'updatedAt'] as const
+  static $columns = ['createdAt', 'description', 'id', 'type', 'updatedAt'] as const
   $columns = MessageTypeSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime | null
@@ -121,7 +138,7 @@ export class MessageTypeSchema extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
   @column()
-  declare label: string
+  declare type: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
 }
@@ -199,9 +216,9 @@ export class UserSchema extends BaseModel {
   @column()
   declare email: string
   @column.dateTime()
-  declare emailVerifiedAt: DateTime | null
+  declare emailVerifiedAt: DateTime
   @column()
-  declare fullName: string | null
+  declare fullName: string
   @column({ isPrimary: true })
   declare id: number
   @column()

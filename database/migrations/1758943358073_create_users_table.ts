@@ -7,9 +7,9 @@ export default class extends BaseSchema {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id').notNullable()
 
-      table.string('full_name').nullable()
+      table.string('full_name').notNullable()
       table.string('email', 254).notNullable().unique()
-      table.timestamp('email_verified_at', { useTz: true }).nullable()
+      table.timestamp('email_verified_at', { useTz: true }).notNullable()
       table.string('password').notNullable()
 
       table.string('avatar_url').nullable()
