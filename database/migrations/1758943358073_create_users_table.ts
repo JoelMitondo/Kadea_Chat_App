@@ -9,7 +9,7 @@ export default class extends BaseSchema {
 
       table.string('full_name').notNullable()
       table.string('email', 254).notNullable().unique()
-      table.timestamp('email_verified_at', { useTz: true }).notNullable()
+      table.timestamp('email_verified_at').notNullable()
       table.string('password').notNullable()
 
       table.string('avatar_url').nullable()

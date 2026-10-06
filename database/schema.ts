@@ -57,14 +57,18 @@ export class ConversationSchema extends BaseModel {
 }
 
 export class InscriptionSchema extends BaseModel {
-  static $columns = ['birthDate', 'createdAt', 'email', 'fullName', 'id', 'updatedAt'] as const
+  static $columns = ['birthDate', 'codeAleatoire', 'createdAt', 'email', 'expiredAt', 'fullName', 'id', 'updatedAt'] as const
   $columns = InscriptionSchema.$columns
   @column.date()
   declare birthDate: DateTime | null
+  @column()
+  declare codeAleatoire: string
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime | null
   @column()
   declare email: string
+  @column.dateTime()
+  declare expiredAt: DateTime | null
   @column()
   declare fullName: string
   @column({ isPrimary: true })

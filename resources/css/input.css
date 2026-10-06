@@ -1,2 +1,204 @@
 @import "tailwindcss";
 /* npx @tailwindcss/cli -i ./resources/css/input.css -o ./resources/css/output.css --watch
+
+/* ==========================================================
+   Kadea Chat — Design tokens (Tailwind CSS v4, CLI)
+   Palette issue du logo : Azure #22ACF7 · Navy #012E81 · Violet #A257EF · Corail #FD6773
+   Mode clair / sombre via <html data-theme="light|dark">
+   ========================================================== */
+@import "tailwindcss";
+@source "../views/**/*.edge";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* 1. Échelles brutes : bg-azure-500, text-navy-800, etc. */
+@theme {
+  /* Azure — couleur de marque (bulle, « Chat ») */
+  --color-azure-50: #EBF7FF;
+  --color-azure-100: #D6EFFF;
+  --color-azure-200: #B0E1FE;
+  --color-azure-300: #7ACEFC;
+  --color-azure-400: #44BAFA;
+  --color-azure-500: #22ACF7;
+  --color-azure-600: #0E8EDB;
+  --color-azure-700: #0B72B3;
+  --color-azure-800: #0F5C90;
+  --color-azure-900: #124E77;
+  --color-azure-950: #0C314D;
+  /* Navy — encre de marque (« Kadea ») */
+  --color-navy-50: #EEF3FD;
+  --color-navy-100: #DCE7FB;
+  --color-navy-200: #BDD1F8;
+  --color-navy-300: #92B1F1;
+  --color-navy-400: #5F88E6;
+  --color-navy-500: #3A64D2;
+  --color-navy-600: #214AB5;
+  --color-navy-700: #10399A;
+  --color-navy-800: #012E81;
+  --color-navy-900: #08265F;
+  --color-navy-950: #05173B;
+  /* Violet — groupes & saisie (silhouette centrale) */
+  --color-violet-50: #F6F0FF;
+  --color-violet-100: #EDE1FE;
+  --color-violet-200: #DCC6FD;
+  --color-violet-300: #C4A0FA;
+  --color-violet-400: #B079F5;
+  --color-violet-500: #A257EF;
+  --color-violet-600: #8845E8;
+  --color-violet-700: #6D36D9;
+  --color-violet-800: #5629B0;
+  --color-violet-900: #3D2080;
+  --color-violet-950: #251350;
+  /* Corail — accent chaud (silhouette droite) */
+  --color-coral-50: #FFF1F2;
+  --color-coral-100: #FFE1E4;
+  --color-coral-200: #FFC8CE;
+  --color-coral-300: #FFA2AC;
+  --color-coral-400: #FE7F8B;
+  --color-coral-500: #FD6773;
+  --color-coral-600: #EE4558;
+  --color-coral-700: #CB2D45;
+  --color-coral-800: #A82640;
+  --color-coral-900: #8A243B;
+  --color-coral-950: #4B0F1F;
+  /* Neutral — gris bleutés (surfaces, textes, bordures) */
+  --color-neutral-50: #F6F8FC;
+  --color-neutral-100: #EEF1F7;
+  --color-neutral-200: #E1E6F0;
+  --color-neutral-300: #CBD3E1;
+  --color-neutral-400: #98A3B8;
+  --color-neutral-500: #6B778E;
+  --color-neutral-600: #4A5772;
+  --color-neutral-700: #333F5A;
+  --color-neutral-800: #232C45;
+  --color-neutral-900: #161D31;
+  --color-neutral-950: #0C111E;
+  --color-brand-indigo: #3728C3; /* fin du dégradé du logo */
+}
+
+/* 2. Rôles sémantiques : valeurs par thème */
+:root {
+  --kc-canvas: #F6F8FC;
+  --kc-surface: #FFFFFF;
+  --kc-surface-2: #EEF1F7;
+  --kc-line: #E1E6F0;
+  --kc-line-strong: #CBD3E1;
+  --kc-fg: #161D31;
+  --kc-fg-muted: #4A5772;
+  --kc-fg-subtle: #5D6A82;
+  --kc-primary: #0B72B3;
+  --kc-primary-hover: #0F5C90;
+  --kc-on-primary: #FFFFFF;
+  --kc-primary-soft: #EBF7FF;
+  --kc-on-primary-soft: #0F5C90;
+  --kc-link: #0B72B3;
+  --kc-ring: #22ACF7;
+  --kc-accent: #CB2D45;
+  --kc-on-accent: #FFFFFF;
+  --kc-accent-soft: #FFF1F2;
+  --kc-on-accent-soft: #A82640;
+  --kc-group: #6D36D9;
+  --kc-group-soft: #F6F0FF;
+  --kc-success: #0E7049;
+  --kc-success-soft: #E8F8F0;
+  --kc-warning: #9A5B06;
+  --kc-warning-soft: #FFF6E5;
+  --kc-danger: #C2283A;
+  --kc-danger-soft: #FDECEE;
+  --kc-bubble-out: #0B72B3;
+  --kc-on-bubble-out: #FFFFFF;
+  --kc-bubble-in: #FFFFFF;
+  --kc-on-bubble-in: #161D31;
+  --kc-bubble-line: #E1E6F0;
+  --kc-online: #1FB878;
+  --kc-typing: #A257EF;
+  --kc-tick-read: #0E8EDB;
+  --kc-gradient: linear-gradient(135deg, #22ACF7 0%, #3728C3 45%, #A257EF 72%, #FD6773 100%);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --kc-canvas: #0C111E;
+  --kc-surface: #161D31;
+  --kc-surface-2: #232C45;
+  --kc-line: #232C45;
+  --kc-line-strong: #333F5A;
+  --kc-fg: #EEF1F7;
+  --kc-fg-muted: #98A3B8;
+  --kc-fg-subtle: #8591A8;
+  --kc-primary: #22ACF7;
+  --kc-primary-hover: #44BAFA;
+  --kc-on-primary: #05173B;
+  --kc-primary-soft: #0C314D;
+  --kc-on-primary-soft: #B0E1FE;
+  --kc-link: #44BAFA;
+  --kc-ring: #44BAFA;
+  --kc-accent: #FD6773;
+  --kc-on-accent: #4B0F1F;
+  --kc-accent-soft: #3A1219;
+  --kc-on-accent-soft: #FFC8CE;
+  --kc-group: #B079F5;
+  --kc-group-soft: #251350;
+  --kc-success: #2DD48F;
+  --kc-success-soft: #0E2A22;
+  --kc-warning: #F5A524;
+  --kc-warning-soft: #33250A;
+  --kc-danger: #FF7580;
+  --kc-danger-soft: #3A1219;
+  --kc-bubble-out: #0F5C90;
+  --kc-on-bubble-out: #FFFFFF;
+  --kc-bubble-in: #232C45;
+  --kc-on-bubble-in: #EEF1F7;
+  --kc-bubble-line: #333F5A;
+  --kc-online: #2DD48F;
+  --kc-typing: #B079F5;
+  --kc-tick-read: #44BAFA;
+  color-scheme: dark;
+}
+
+/* 3. Exposition à Tailwind : bg-canvas, text-fg, border-line, bg-bubble-out… (aucun préfixe dark: requis) */
+@theme inline {
+  --color-canvas: var(--kc-canvas);
+  --color-surface: var(--kc-surface);
+  --color-surface-2: var(--kc-surface-2);
+  --color-line: var(--kc-line);
+  --color-line-strong: var(--kc-line-strong);
+  --color-fg: var(--kc-fg);
+  --color-fg-muted: var(--kc-fg-muted);
+  --color-fg-subtle: var(--kc-fg-subtle);
+  --color-primary: var(--kc-primary);
+  --color-primary-hover: var(--kc-primary-hover);
+  --color-on-primary: var(--kc-on-primary);
+  --color-primary-soft: var(--kc-primary-soft);
+  --color-on-primary-soft: var(--kc-on-primary-soft);
+  --color-link: var(--kc-link);
+  --color-ring: var(--kc-ring);
+  --color-accent: var(--kc-accent);
+  --color-on-accent: var(--kc-on-accent);
+  --color-accent-soft: var(--kc-accent-soft);
+  --color-on-accent-soft: var(--kc-on-accent-soft);
+  --color-group: var(--kc-group);
+  --color-group-soft: var(--kc-group-soft);
+  --color-success: var(--kc-success);
+  --color-success-soft: var(--kc-success-soft);
+  --color-warning: var(--kc-warning);
+  --color-warning-soft: var(--kc-warning-soft);
+  --color-danger: var(--kc-danger);
+  --color-danger-soft: var(--kc-danger-soft);
+  --color-bubble-out: var(--kc-bubble-out);
+  --color-on-bubble-out: var(--kc-on-bubble-out);
+  --color-bubble-in: var(--kc-bubble-in);
+  --color-on-bubble-in: var(--kc-on-bubble-in);
+  --color-bubble-line: var(--kc-bubble-line);
+  --color-online: var(--kc-online);
+  --color-typing: var(--kc-typing);
+  --color-tick-read: var(--kc-tick-read);
+}
+
+@utility bg-brand-gradient { background-image: var(--kc-gradient); }
+@utility text-brand-gradient { background-image: var(--kc-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+@layer base {
+  html { background: var(--kc-canvas); color: var(--kc-fg); }
+  :focus-visible { outline: 2px solid var(--kc-ring); outline-offset: 2px; }
+}

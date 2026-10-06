@@ -1,0 +1,137 @@
+import type { HttpContext } from '@adonisjs/core/http'
+import mail from '@adonisjs/mail/services/main'
+import { inscriptionValidator } from '#validators/inscription'
+import Inscription from '#models/inscription'
+import { DateTime } from 'luxon'
+
+export default class InscriptionsController {
+  async store({ request, response }: HttpContext) {
+    const payload = await request.validateUsing(inscriptionValidator)
+
+    const fullName = `${payload.first_name} ${payload.last_name}`
+    const inscriptionExpire = this.calculateExpirationDate()
+    const codeAleatoire = await this.generateAleatoireCode()
+
+    // 3. Vérification de la majorité
+    if (!this.isMajeur(payload.birth_date)) {
+      return response.badRequest({
+        error: 'Vous devez avoir au moins 18 ans pour vous inscrire',
+      })
+    }
+    const identite = await Inscription.create({
+      codeAleatoire: codeAleatoire,
+      fullName: fullName,
+      birthDate: payload.birth_date,
+      email: payload.email,
+      expiredAt: inscriptionExpire,
+    })
+
+    //on envoie maintenant un email de confirmation de email
+    try {
+      const baseUrl = `${request.protocol()}://${request.host()}`
+
+      // Remplacez 'utilisateurId' ou 'token' par l'identifiant réel de votre variable/enregistrement
+      const activationLink = `${baseUrl}/signup/${identite.codeAleatoire}`
+
+      // Formatage de la date d'expiration si c'est un objet Luxon DateTime ou Date
+      const dateExpirationFormattee =
+        typeof inscriptionExpire?.toFormat === 'function'
+          ? inscriptionExpire.toFormat('dd/MM/yyyy à HH:mm')
+          : inscriptionExpire
+
+      // Envoyer l'email via Brevo
+      await mail.send((message) => {
+        message
+          .to(payload.email) // Adresse dynamique depuis payload.email
+          .from('mitondomohindo@gmail.com', 'Kadea Chat')
+          .subject('Confirmation de votre adresse email - Kadea Chat').html(`
+        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+          <h2>Bonjour ${fullName},</h2>
+          
+          <p>Merci de vous être inscrit sur <strong>Kadea Chat</strong> ! Pour finaliser la création de votre compte, veuillez confirmer votre adresse email.</p>
+          
+          <p>Voici un récapitulatif de vos informations :</p>
+          <ul>
+            <li><strong>Nom complet :</strong> ${fullName}</li>
+            <li><strong>Adresse e-mail :</strong> ${payload.email}</li>
+            <li><strong>Date d'expiration du lien :</strong> ${dateExpirationFormattee}</li>
+          </ul>
+
+          <p>Cliquez sur le bouton ci-dessous pour confirmer votre email. Vous serez ensuite redirigé vers une page vous permettant de compléter les informations de votre profil :</p>
+          
+          <p style="text-align: center; margin: 25px 0;">
+            <a href="${activationLink}" style="background-color: #2e7d32; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+              Confirmer mon email
+            </a>
+          </p>
+
+          <p style="color: #c0392b; font-size: 0.9em;">
+            <strong>Attention :</strong> Ce lien d'activation expire dans <strong>48 heures</strong>. Passé ce délai, vous devrez refaire une demande de création de compte.
+          </p>
+
+          <br>
+          <p>Cordialement,<br><strong>L'équipe Kadea Chat</strong></p>
+        </div>
+      `)
+      })
+
+      return response.status(200).json({
+        success: true,
+        message: 'E-mail de confirmation envoyé avec succès !',
+      })
+    } catch (error) {
+      console.error("Erreur lors de l'envoi de l'e-mail :", error)
+      return response.status(500).json({
+        success: false,
+        message: "Échec de l'envoi de l'e-mail",
+      })
+    }
+  }
+  // Calcule la date d'expiration (Date actuelle + 2 jours)
+  private calculateExpirationDate(): DateTime {
+    // Récupère la date et l'heure actuelles du serveur backend
+    const now = DateTime.now()
+
+    // la date d'expiration après 48H
+    const expirationDate = now.plus({ days: 2 })
+
+    return expirationDate
+  }
+
+  private async generateAleatoireCode(): Promise<string> {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let isUnique = false
+    let finalCode = ''
+
+    // Boucle de sécurité pour s'assurer que le code généré n'existe pas déjà
+    while (!isUnique) {
+      let randomPart = ''
+      for (let i = 0; i < 25; i++) {
+        const randomIndex = Math.floor(Math.random() * characters.length)
+        randomPart += characters[randomIndex]
+      }
+
+      finalCode = `${randomPart}`
+
+      // Vérifie si le code existe déjà dans la table inscription
+      const existingCode = await Inscription.findBy('codeAleatoire', finalCode)
+
+      if (!existingCode) {
+        isUnique = true
+      }
+    }
+
+    return finalCode
+  }
+
+  private isMajeur(dateNaissance: DateTime): boolean {
+    // Récupère la date et l'heure actuelles du serveur backend
+    const now = DateTime.now()
+
+    // Calcule la date limite exacte : la date d'aujourd'hui moins 18 ans
+    const dateLimites18Ans = now.minus({ years: 18 })
+
+    // L'utilisateur est majeur si sa date de naissance est inférieure ou égale à la date limite
+    return dateNaissance <= dateLimites18Ans
+  }
+}
