@@ -18,10 +18,13 @@
   </script>
 
   <link rel="stylesheet" href="/resources/css/output.css">
+  <link rel="stylesheet" href="/resources/css/animate.css">
   <script type="module" src="/resources/js/auth/register.js" defer></script>
 </head>
 
 <body class="flex min-h-screen flex-col bg-canvas text-fg antialiased">
+  {{-- Le chargeur (affiché au chargement, puis géré par loader.js) --}}
+  @!component('components/loader')
 
   {{-- ===== EN-TÊTE : logo à gauche, bouton de thème à droite ===== --}}
   <header class="border-b border-line bg-surface">
@@ -80,6 +83,6 @@
       localStorage.setItem('theme', nouveauTheme)
     })
   </script>
-
+<script src="/resources/js/loader.js"></script>
 </body>
 </html>

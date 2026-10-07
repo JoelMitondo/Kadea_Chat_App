@@ -1,0 +1,40 @@
+/* ===== Animation du chargeur ===== */
+
+/* Une rotation complète */
+@keyframes kc-tourner {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Le logo grossit puis rétrécit */
+@keyframes kc-pulsation {
+  0%, 100% { transform: scale(0.9); }
+  50%      { transform: scale(1.12); }
+}
+
+/* Le texte s'éclaircit puis s'assombrit doucement */
+@keyframes kc-clignoter {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+/* Les trois gouttes tournent autour du centre du dessin (100, 100) */
+.kc-orbite-1,
+.kc-orbite-2,
+.kc-orbite-3 {
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+}
+
+.kc-orbite-1 { animation: kc-tourner 2.6s linear infinite; }
+.kc-orbite-2 { animation: kc-tourner 3.8s linear infinite reverse; } /* sens inverse */
+.kc-orbite-3 { animation: kc-tourner 5s linear infinite; }
+
+.kc-logo  { animation: kc-pulsation 1.8s ease-in-out infinite; }
+.kc-texte { animation: kc-clignoter 1.8s ease-in-out infinite; }
+
+/* Respect des personnes qui demandent moins de mouvement dans leur système */
+@media (prefers-reduced-motion: reduce) {
+  .kc-orbite-1, .kc-orbite-2, .kc-orbite-3 { animation-duration: 12s; }
+  .kc-logo, .kc-texte { animation: none; }
+}
