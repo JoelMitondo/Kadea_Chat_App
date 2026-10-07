@@ -70,6 +70,33 @@ export class ConversationSchema extends BaseModel {
   declare updatedAt: DateTime
 }
 
+export class ForgoPasswordSchema extends BaseModel {
+  static $columns = [
+    'codeAleatoire',
+    'createdAt',
+    'email',
+    'expiredAt',
+    'id',
+    'updatedAt',
+    'userId',
+  ] as const
+  $columns = ForgoPasswordSchema.$columns
+  @column()
+  declare codeAleatoire: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime | null
+  @column()
+  declare email: string
+  @column.dateTime()
+  declare expiredAt: DateTime | null
+  @column({ isPrimary: true })
+  declare id: number
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+  @column()
+  declare userId: number
+}
+
 export class InscriptionSchema extends BaseModel {
   static $columns = [
     'birthDate',

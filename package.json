@@ -69,6 +69,7 @@
     "@adonisjs/vite": "^6.0.2",
     "@tailwindcss/cli": "^4.3.3",
     "@vinejs/vine": "^4.4.0",
+    "argon2": "^0.45.1",
     "better-sqlite3": "^13.0.3",
     "edge-iconify": "^2.0.2",
     "edge.js": "^6.5.1",

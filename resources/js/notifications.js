@@ -1,7 +1,7 @@
 // ===== Notifications Kadea Chat =====
 
 // ----- Apparence de chaque type de notification -----
-var STYLES = {
+let STYLES = {
   succes: {
     titre: 'Succès',
     icone: '✓',
@@ -49,8 +49,8 @@ function fermerNotification(toast) {
 }
 
 function afficherNotification(type, message) {
-  var conteneur = document.getElementById('kc-toasts')
-  var modele = document.getElementById('kc-toast-modele')
+  let conteneur = document.getElementById('kc-toasts')
+  let modele = document.getElementById('kc-toast-modele')
 
   // Sécurité : si le composant n'est pas dans la page, on affiche une alerte simple
   if (conteneur === null || modele === null) {
@@ -58,13 +58,13 @@ function afficherNotification(type, message) {
     return
   }
 
-  var style = STYLES[type]
+  let style = STYLES[type]
 
   // On copie le modèle et on remplit les textes
   // (textContent est sûr : il n'interprète jamais de HTML venant du serveur)
-  var toast = modele.content.firstElementChild.cloneNode(true)
-  var icone = toast.querySelector('[data-toast-icone]')
-  var barre = toast.querySelector('[data-toast-barre]')
+  let toast = modele.content.firstElementChild.cloneNode(true)
+  let icone = toast.querySelector('[data-toast-icone]')
+  let barre = toast.querySelector('[data-toast-barre]')
 
   icone.textContent = style.icone
   icone.className += ' ' + style.classesIcone
@@ -91,7 +91,7 @@ function afficherNotification(type, message) {
   barre.style.transform = 'scaleX(0)'
 
   // Fermeture automatique après la durée prévue
-  var minuteur = setTimeout(function () {
+  let minuteur = setTimeout(function () {
     fermerNotification(toast)
   }, style.duree)
 
@@ -112,7 +112,7 @@ window.kcNotifier = {
 // ===== PARTIE 2 : afficher les messages envoyés par le serveur après une redirection =====
 
 document.addEventListener('DOMContentLoaded', function () {
-  var messages = document.querySelectorAll('[data-flash]')
+  let messages = document.querySelectorAll('[data-flash]')
 
   messages.forEach(function (element) {
     afficherNotification(element.dataset.flash, element.dataset.message)
@@ -136,7 +136,7 @@ function viderLesErreurs(formulaire) {
 }
 
 function afficherErreurSurChamp(formulaire, nomDuChamp, message) {
-  var champ = formulaire.querySelector('[name="' + nomDuChamp + '"]')
+  let champ = formulaire.querySelector('[name="' + nomDuChamp + '"]')
 
   // Le serveur parle d'un champ qui n'existe pas dans ce formulaire
   if (champ === null) { return false }
@@ -147,7 +147,7 @@ function afficherErreurSurChamp(formulaire, nomDuChamp, message) {
   champ.setAttribute('aria-invalid', 'true')
 
   // Message d'erreur sous le champ
-  var texte = document.createElement('p')
+  let texte = document.createElement('p')
   texte.className = 'kc-erreur-champ mt-1.5 text-sm text-danger'
   texte.textContent = message
   champ.insertAdjacentElement('afterend', texte)
@@ -179,7 +179,7 @@ function trouverMessage(donnees, messageParDefaut) {
 // Le "true" à la fin = la capture : notre code passe AVANT celui du chargeur,
 // ce qui évite d'afficher le chargeur plein écran si on gère déjà l'envoi.
 document.addEventListener('submit', async function (evenement) {
-  var formulaire = evenement.target
+  let formulaire = evenement.target
 
   // Seuls les formulaires qui portent l'attribut data-ajax sont concernés
   if (!formulaire.hasAttribute('data-ajax')) { return }
@@ -187,8 +187,8 @@ document.addEventListener('submit', async function (evenement) {
   // On empêche le comportement normal (changement de page)
   evenement.preventDefault()
 
-  var bouton = formulaire.querySelector('[type="submit"]')
-  var texteDuBouton = bouton.textContent
+  let bouton = formulaire.querySelector('[type="submit"]')
+  let texteDuBouton = bouton.textContent
 
   // On bloque le bouton pendant l'envoi pour éviter un double clic
   bouton.disabled = true
@@ -196,14 +196,14 @@ document.addEventListener('submit', async function (evenement) {
   viderLesErreurs(formulaire)
 
   try {
-    var reponse = await fetch(formulaire.action, {
+    let reponse = await fetch(formulaire.action, {
       method: formulaire.method.toUpperCase(),
       body: new FormData(formulaire),
       headers: { Accept: 'application/json' }, // on demande une réponse JSON, pas une page HTML
     })
 
     // On lit la réponse JSON (si elle est vide ou invalide, on continue avec un objet vide)
-    var donnees = {}
+    let donnees = {}
     try {
       donnees = await reponse.json()
     } catch (erreurLecture) {
@@ -213,7 +213,7 @@ document.addEventListener('submit', async function (evenement) {
     // ----- Cas 1 : succès -----
     if (reponse.ok) {
       // Priorité : message écrit dans le formulaire (data-success), puis message du serveur
-      var messageSucces = formulaire.dataset.success || donnees.message || 'Action réussie.'
+      let messageSucces = formulaire.dataset.success || donnees.message || 'Action réussie.'
       kcNotifier.succes(messageSucces)
 
       // Le formulaire est vidé, sauf si on ajoute l'attribut data-no-reset
@@ -222,7 +222,7 @@ document.addEventListener('submit', async function (evenement) {
       }
 
       // Redirection facultative après 1,5 seconde (attribut data-redirect="/login")
-      var adresse = formulaire.dataset.redirect
+      let adresse = formulaire.dataset.redirect
       if (adresse) {
         setTimeout(function () { window.location.href = adresse }, 1500)
       }
@@ -231,12 +231,12 @@ document.addEventListener('submit', async function (evenement) {
 
     // ----- Cas 2 : erreurs de validation (code 422) -----
     if (reponse.status === 422) {
-      var erreursSansChamp = []
-      var premierChampEnErreur = null
+      let erreursSansChamp = []
+      let premierChampEnErreur = null
 
-      var liste = donnees.errors || []
+      let liste = donnees.errors || []
       liste.forEach(function (erreur) {
-        var affichee = afficherErreurSurChamp(formulaire, erreur.field, erreur.message)
+        let affichee = afficherErreurSurChamp(formulaire, erreur.field, erreur.message)
 
         if (affichee && premierChampEnErreur === null) {
           premierChampEnErreur = formulaire.querySelector('[name="' + erreur.field + '"]')

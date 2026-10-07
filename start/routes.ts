@@ -18,11 +18,16 @@ router.get('register', [controllers.Inscriptions, 'show']).as('New_compte.regist
 
 router
   .group(() => {
-    router.get('signup/:code', [controllers.NewAccount, 'create'])
-    router.post('signup/:code', [controllers.NewAccount, 'store'])
+    router.get('signup/:id/:code', [controllers.NewAccount, 'create'])
+    router.post('signup/:id/:code', [controllers.NewAccount, 'store'])
 
     router.get('login', [controllers.Session, 'create'])
     router.post('login', [controllers.Session, 'store'])
+
+    router.get('forgoPassword', [controllers.ForgoPasswords, 'index'])
+    router.post('forgoPassword', [controllers.ForgoPasswords, 'storeForgoPassword'])
+    router.get('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'indexPageNewPassword'])
+    router.post('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'storeNewPasswoed'])
   })
   .use(middleware.guest())
 

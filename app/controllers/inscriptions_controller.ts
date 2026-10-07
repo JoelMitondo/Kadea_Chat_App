@@ -3,6 +3,8 @@ import mail from '@adonisjs/mail/services/main'
 import { inscriptionValidator } from '#validators/inscription'
 import Inscription from '#models/inscription'
 import { DateTime } from 'luxon'
+import { generateUniqueCode } from './../service/code_generation.ts'
+import hash from '@adonisjs/core/services/hash'
 
 export default class InscriptionsController {
   async show({ view }: HttpContext) {
@@ -13,7 +15,7 @@ export default class InscriptionsController {
 
     const fullName = `${payload.first_name} ${payload.last_name}`
     const inscriptionExpire = this.calculateExpirationDate()
-    const codeAleatoire = await this.generateAleatoireCode()
+    const codeAleatoire = await generateUniqueCode(Inscription)
 
     // 3. Vérification de la majorité
     if (!this.isMajeur(payload.birth_date)) {
@@ -22,7 +24,7 @@ export default class InscriptionsController {
       })
     }
     const identite = await Inscription.create({
-      codeAleatoire: codeAleatoire,
+      codeAleatoire: await hash.make(codeAleatoire),
       fullName: fullName,
       birthDate: payload.birth_date,
       email: payload.email,
@@ -33,7 +35,7 @@ export default class InscriptionsController {
     try {
       const baseUrl = `${request.protocol()}://${request.host()}`
 
-      const activationLink = `${baseUrl}/confirmation/${identite.codeAleatoire}`
+      const activationLink = `${baseUrl}/signup/${identite.id}/${identite.codeAleatoire}`
 
       // Formatage de la date d'expiration si c'est un objet Luxon DateTime ou Date
       const dateExpirationFormattee =
@@ -101,32 +103,6 @@ export default class InscriptionsController {
     const expirationDate = now.plus({ days: 2 })
 
     return expirationDate
-  }
-
-  private async generateAleatoireCode(): Promise<string> {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    let isUnique = false
-    let finalCode = ''
-
-    // Boucle de sécurité pour s'assurer que le code généré n'existe pas déjà
-    while (!isUnique) {
-      let randomPart = ''
-      for (let i = 0; i < 25; i++) {
-        const randomIndex = Math.floor(Math.random() * characters.length)
-        randomPart += characters[randomIndex]
-      }
-
-      finalCode = `${randomPart}`
-
-      // Vérifie si le code existe déjà dans la table inscription
-      const existingCode = await Inscription.findBy('codeAleatoire', finalCode)
-
-      if (!existingCode) {
-        isUnique = true
-      }
-    }
-
-    return finalCode
   }
 
   private isMajeur(dateNaissance: DateTime): boolean {
