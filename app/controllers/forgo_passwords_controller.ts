@@ -104,55 +104,53 @@ export default class ForgoPasswordsController {
     const inscription = await ForgoPassword.find(params.id)
 
     if (!inscription) {
-      return response.notFound('Lien de récupération invalide ou expiré.')
+      return response.badRequest('Lien de récupération invalide ou expiré.')
     }
-
+    if (inscription.expiredAt! < DateTime.now()) {
+      await inscription.delete()
+      return response.badRequest('Le lien de récupération a expiré.')
+    }
     const isValid = await hash.verify(inscription.codeAleatoire, params.code)
 
     if (!isValid) {
       return response.notFound('Lien de récupération invalide ou expiré.')
     }
     return view.render('pages/auth/updatePassword', {
-      code: params.id,
-      hash: params.code,
+      id: params.id,
+      code: params.code,
+      lienValide: true,
     })
   }
 
   async storeNewPassword({ request, response, auth, params }: HttpContext) {
-    // 1. Validation du nouveau mot de passe
     const payload = await request.validateUsing(newPassewordValidator)
 
-    // 2. Recherche de l'enregistrement de récupération
     const recuperation = await ForgoPassword.find(params.id)
 
     if (!recuperation) {
       return response.notFound('Lien de récupération invalide ou expiré.')
     }
 
-    // 3. Vérification de la validité du lien/code
     const isValid = await hash.verify(recuperation.codeAleatoire, params.code)
 
     if (!isValid) {
       return response.notFound('Lien de récupération invalide ou expiré.')
     }
 
-    // 4. Vérification de l'expiration du lien (optionnel mais conseillé)
     if (recuperation.expiredAt! < DateTime.now()) {
       await recuperation.delete()
       return response.badRequest('Le lien de récupération a expiré.')
     }
 
-    // 5. Récupération de l'utilisateur et mise à jour du mot de passe
+    //Récupération de l'utilisateur et mise à jour du mot de passe
     const user = await User.findOrFail(recuperation.userId)
     user.password = payload.password
     await user.save()
 
-    // 6. Nettoyage du jeton utilisé
+    //Nettoyage du jeton utilisé
     await recuperation.delete()
 
-    // 7. Connexion automatique et redirection
     await auth.use('web').login(user)
-
-    return response.redirect().toRoute('dashboard')
+    response.redirect().toRoute('dashboard')
   }
 }

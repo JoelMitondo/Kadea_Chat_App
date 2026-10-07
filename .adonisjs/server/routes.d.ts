@@ -11,8 +11,10 @@ export type ScannedRoutes = {
     'new_account.store': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
     'session.store': { paramsTuple?: []; params?: {} }
-    'forgo_passwords.index': { paramsTuple?: []; params?: {} }
-    'forgo_passwords.store_forgo_password': { paramsTuple?: []; params?: {} }
+    'forgotPassword.get': { paramsTuple?: []; params?: {} }
+    'forgoPassword.post': { paramsTuple?: []; params?: {} }
+    'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
+    'forgot_password.reset': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
     'session.destroy': { paramsTuple?: []; params?: {} }
   }
@@ -21,7 +23,8 @@ export type ScannedRoutes = {
     'New_compte.register': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
-    'forgo_passwords.index': { paramsTuple?: []; params?: {} }
+    'forgotPassword.get': { paramsTuple?: []; params?: {} }
+    'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
@@ -29,14 +32,16 @@ export type ScannedRoutes = {
     'New_compte.register': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
-    'forgo_passwords.index': { paramsTuple?: []; params?: {} }
+    'forgotPassword.get': { paramsTuple?: []; params?: {} }
+    'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'dashboard': { paramsTuple?: []; params?: {} }
   }
   POST: {
     'inscriptions.store': { paramsTuple?: []; params?: {} }
     'new_account.store': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.store': { paramsTuple?: []; params?: {} }
-    'forgo_passwords.store_forgo_password': { paramsTuple?: []; params?: {} }
+    'forgoPassword.post': { paramsTuple?: []; params?: {} }
+    'forgot_password.reset': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.destroy': { paramsTuple?: []; params?: {} }
   }
 }

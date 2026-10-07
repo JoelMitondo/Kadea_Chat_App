@@ -14,7 +14,7 @@ export default class InscriptionsController {
     const payload = await request.validateUsing(inscriptionValidator)
 
     const fullName = `${payload.first_name} ${payload.last_name}`
-    const inscriptionExpire = this.calculateExpirationDate()
+    const inscriptionExpire = DateTime.now().plus({ days: 2 })
     const codeAleatoire = await generateUniqueCode(Inscription)
 
     // 3. Vérification de la majorité
@@ -35,7 +35,7 @@ export default class InscriptionsController {
     try {
       const baseUrl = `${request.protocol()}://${request.host()}`
 
-      const activationLink = `${baseUrl}/signup/${identite.id}/${identite.codeAleatoire}`
+      const activationLink = `${baseUrl}/signup/${identite.id}/${codeAleatoire}`
 
       // Formatage de la date d'expiration si c'est un objet Luxon DateTime ou Date
       const dateExpirationFormattee =
@@ -93,16 +93,6 @@ export default class InscriptionsController {
         message: "Échec de l'envoi de l'e-mail",
       })
     }
-  }
-  // Calcule la date d'expiration (Date actuelle + 2 jours)
-  private calculateExpirationDate(): DateTime {
-    // Récupère la date et l'heure actuelles du serveur backend
-    const now = DateTime.now()
-
-    // la date d'expiration après 48H
-    const expirationDate = now.plus({ days: 2 })
-
-    return expirationDate
   }
 
   private isMajeur(dateNaissance: DateTime): boolean {

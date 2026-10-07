@@ -4,16 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  {{-- Le titre change selon la page (ex. "Créer un compte") --}}
-  <title>{{ $props.get('title', 'Kadea Chat') }}</title>
 
-  {{--
-    Ce petit script s'exécute AVANT l'affichage de la page.
-    Il applique le thème choisi (clair ou sombre) pour éviter un flash blanc.
-  --}}
+  <title>{{ $props.get('title', 'Agora Chat') }}</title>
+
+  {{-- script s'exécute avant l'affichage de la page.--}}
   <script>
-    var themeSauvegarde = localStorage.getItem('theme')
-    var themeDuSysteme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    let themeSauvegarde = localStorage.getItem('theme')
+    let themeDuSysteme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
     document.documentElement.dataset.theme = themeSauvegarde || themeDuSysteme
   </script>
 
@@ -27,7 +24,7 @@
   @!component('components/loader')
   @!component('components/toasts')
 
-  {{-- ===== EN-TÊTE : logo à gauche, bouton de thème à droite ===== --}}
+  {{-- logo à gauche, bouton de thème à droite --}}
   <header class="border-b border-line bg-surface">
     <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
 
@@ -74,11 +71,11 @@
 
   {{-- Script du bouton de thème --}}
   <script>
-    var bouton = document.getElementById('theme-toggle')
+    let bouton = document.getElementById('theme-toggle')
 
     bouton.addEventListener('click', function () {
-      var html = document.documentElement
-      var nouveauTheme = html.dataset.theme === 'dark' ? 'light' : 'dark'
+      let html = document.documentElement
+      let nouveauTheme = html.dataset.theme === 'dark' ? 'light' : 'dark'
 
       html.dataset.theme = nouveauTheme
       localStorage.setItem('theme', nouveauTheme)

@@ -43,7 +43,12 @@ export default class NewAccountController {
     if (!inscription) {
       return response.notFound("Lien d'inscription invalide ou expiré.")
     }
-
+    // Vérification de la date d'expiration
+    if (DateTime.now() > inscription.expiredAt!) {
+      // On nettoie la bdd
+      await inscription.delete()
+      return response.badRequest("Le lien d'inscription a expiré. Veuillez vous réinscrire.")
+    }
     const isValid = await hash.verify(inscription.codeAleatoire, params.code)
 
     if (!isValid) {

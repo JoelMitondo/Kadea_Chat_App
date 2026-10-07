@@ -24,10 +24,14 @@ router
     router.get('login', [controllers.Session, 'create'])
     router.post('login', [controllers.Session, 'store'])
 
-    router.get('forgoPassword', [controllers.ForgoPasswords, 'index'])
-    router.post('forgoPassword', [controllers.ForgoPasswords, 'storeForgoPassword'])
+    router.get('forgoPassword', [controllers.ForgoPasswords, 'index']).as('forgotPassword.get')
+    router
+      .post('forgoPassword', [controllers.ForgoPasswords, 'storeForgoPassword'])
+      .as('forgoPassword.post')
     router.get('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'indexPageNewPassword'])
-    router.post('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'storeNewPasswoed'])
+    router
+      .post('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'storeNewPassword'])
+      .as('forgot_password.reset')
   })
   .use(middleware.guest())
 
