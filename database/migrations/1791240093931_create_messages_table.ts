@@ -8,7 +8,7 @@ export default class extends BaseSchema {
       table.increments('id').primary()
       // Clés étrangères
       table
-        .integer('user_id')
+        .uuid('user_id')
         .unsigned()
         .references('id')
         .inTable('users')

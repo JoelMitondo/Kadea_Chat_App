@@ -9,7 +9,7 @@ export default class extends BaseSchema {
 
       // Clés étrangères
       table
-        .integer('user_id')
+        .uuid('user_id')
         .unsigned()
         .references('id')
         .inTable('users')

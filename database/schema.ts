@@ -8,19 +8,12 @@ import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
 export class BlockedUserSchema extends BaseModel {
-  static $columns = [
-    'blockedId',
-    'blockerId',
-    'createdAt',
-    'id',
-    'stillBlocked',
-    'updatedAt',
-  ] as const
+  static $columns = ['blockedId', 'blockerId', 'createdAt', 'id', 'stillBlocked', 'updatedAt'] as const
   $columns = BlockedUserSchema.$columns
   @column()
-  declare blockedId: number
+  declare blockedId: string
   @column()
-  declare blockerId: number
+  declare blockerId: string
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime | null
   @column({ isPrimary: true })
@@ -47,21 +40,14 @@ export class ConversationTypeSchema extends BaseModel {
 }
 
 export class ConversationSchema extends BaseModel {
-  static $columns = [
-    'conversationTypeId',
-    'createdAt',
-    'createdById',
-    'id',
-    'title',
-    'updatedAt',
-  ] as const
+  static $columns = ['conversationTypeId', 'createdAt', 'createdById', 'id', 'title', 'updatedAt'] as const
   $columns = ConversationSchema.$columns
   @column()
   declare conversationTypeId: number
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column()
-  declare createdById: number
+  declare createdById: string
   @column({ isPrimary: true })
   declare id: number
   @column()
@@ -71,15 +57,7 @@ export class ConversationSchema extends BaseModel {
 }
 
 export class ForgoPasswordSchema extends BaseModel {
-  static $columns = [
-    'codeAleatoire',
-    'createdAt',
-    'email',
-    'expiredAt',
-    'id',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['codeAleatoire', 'createdAt', 'email', 'expiredAt', 'id', 'updatedAt', 'userId'] as const
   $columns = ForgoPasswordSchema.$columns
   @column()
   declare codeAleatoire: string
@@ -94,20 +72,11 @@ export class ForgoPasswordSchema extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
   @column()
-  declare userId: number
+  declare userId: string
 }
 
 export class InscriptionSchema extends BaseModel {
-  static $columns = [
-    'birthDate',
-    'codeAleatoire',
-    'createdAt',
-    'email',
-    'expiredAt',
-    'fullName',
-    'id',
-    'updatedAt',
-  ] as const
+  static $columns = ['birthDate', 'codeAleatoire', 'createdAt', 'email', 'expiredAt', 'fullName', 'id', 'updatedAt'] as const
   $columns = InscriptionSchema.$columns
   @column.date()
   declare birthDate: DateTime | null
@@ -128,16 +97,7 @@ export class InscriptionSchema extends BaseModel {
 }
 
 export class MessageAttachmentSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'fileName',
-    'filePath',
-    'fileSize',
-    'id',
-    'messageId',
-    'mimeType',
-    'updatedAt',
-  ] as const
+  static $columns = ['createdAt', 'fileName', 'filePath', 'fileSize', 'id', 'messageId', 'mimeType', 'updatedAt'] as const
   $columns = MessageAttachmentSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -169,19 +129,11 @@ export class MessageRecipientSchema extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
   @column()
-  declare userId: number
+  declare userId: string
 }
 
 export class MessageStatusSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'id',
-    'isRead',
-    'messageId',
-    'status',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['createdAt', 'id', 'isRead', 'messageId', 'status', 'updatedAt', 'userId'] as const
   $columns = MessageStatusSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -196,7 +148,7 @@ export class MessageStatusSchema extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
   @column()
-  declare userId: number
+  declare userId: string
 }
 
 export class MessageTypeSchema extends BaseModel {
@@ -215,17 +167,7 @@ export class MessageTypeSchema extends BaseModel {
 }
 
 export class MessageSchema extends BaseModel {
-  static $columns = [
-    'content',
-    'conversationId',
-    'createdAt',
-    'deletedAt',
-    'id',
-    'isDeleted',
-    'messageTypeId',
-    'updatedAt',
-    'userId',
-  ] as const
+  static $columns = ['content', 'conversationId', 'createdAt', 'deletedAt', 'id', 'isDeleted', 'messageTypeId', 'updatedAt', 'userId'] as const
   $columns = MessageSchema.$columns
   @column()
   declare content: string | null
@@ -244,7 +186,7 @@ export class MessageSchema extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
   @column()
-  declare userId: number
+  declare userId: string
 }
 
 export class RoleConversationSchema extends BaseModel {
@@ -263,15 +205,7 @@ export class RoleConversationSchema extends BaseModel {
 }
 
 export class UserConversationSchema extends BaseModel {
-  static $columns = [
-    'conversationId',
-    'id',
-    'joinedAt',
-    'lastMessageId',
-    'removedAt',
-    'roleId',
-    'userId',
-  ] as const
+  static $columns = ['conversationId', 'id', 'joinedAt', 'lastMessageId', 'removedAt', 'roleId', 'userId'] as const
   $columns = UserConversationSchema.$columns
   @column()
   declare conversationId: number
@@ -286,26 +220,11 @@ export class UserConversationSchema extends BaseModel {
   @column()
   declare roleId: number
   @column()
-  declare userId: number
+  declare userId: string
 }
 
 export class UserSchema extends BaseModel {
-  static $columns = [
-    'avatarUrl',
-    'bio',
-    'birthDate',
-    'createdAt',
-    'deletedAt',
-    'email',
-    'emailVerifiedAt',
-    'fullName',
-    'id',
-    'isOnline',
-    'lastSeenAt',
-    'password',
-    'phoneNumber',
-    'updatedAt',
-  ] as const
+  static $columns = ['avatarUrl', 'bio', 'birthDate', 'createdAt', 'deletedAt', 'email', 'emailVerifiedAt', 'fullName', 'id', 'isOnline', 'lastSeenAt', 'password', 'phoneNumber', 'updatedAt'] as const
   $columns = UserSchema.$columns
   @column()
   declare avatarUrl: string | null
@@ -324,7 +243,7 @@ export class UserSchema extends BaseModel {
   @column()
   declare fullName: string
   @column({ isPrimary: true })
-  declare id: number
+  declare id: string
   @column()
   declare isOnline: boolean | null
   @column.dateTime()

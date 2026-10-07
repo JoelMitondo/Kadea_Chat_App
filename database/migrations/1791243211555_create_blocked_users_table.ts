@@ -9,7 +9,7 @@ export default class extends BaseSchema {
 
       // L'utilisateur qui initie le blocage
       table
-        .integer('blocker_id')
+        .uuid('blocker_id')
         .unsigned()
         .references('id')
         .inTable('users')
@@ -18,7 +18,7 @@ export default class extends BaseSchema {
 
       // L'utilisateur qui est bloqué
       table
-        .integer('blocked_id')
+        .uuid('blocked_id')
         .unsigned()
         .references('id')
         .inTable('users')
