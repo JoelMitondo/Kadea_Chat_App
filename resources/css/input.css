@@ -1,13 +1,7 @@
 @import "tailwindcss";
-/* npx @tailwindcss/cli -i ./resources/css/input.css -o ./resources/css/output.css --watch
-
-/* ==========================================================
-   Kadea Chat — Design tokens (Tailwind CSS v4, CLI)
-   Palette issue du logo : Azure #22ACF7 · Navy #012E81 · Violet #A257EF · Corail #FD6773
-   Mode clair / sombre via <html data-theme="light|dark">
-   ========================================================== */
-@import "tailwindcss";
+/* npx @tailwindcss/cli -i ./resources/css/input.css -o ./resources/css/output.css --watch */
 @source "../views/**/*.edge";
+@source "../js/**/*.js";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 

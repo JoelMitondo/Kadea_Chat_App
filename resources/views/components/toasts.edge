@@ -1,0 +1,50 @@
+{{-- Zone où s'empilent les notifications (en haut à droite, en haut sur téléphone) --}}
+<div
+  id="kc-toasts"
+  aria-live="polite"
+  class="pointer-events-none fixed inset-x-0 top-0 z-60 flex flex-col items-end p-4"
+></div>
+
+{{-- Modèle d'une notification : le script le copie à chaque fois qu'il faut en afficher une --}}
+<template id="kc-toast-modele">
+  <div class="pointer-events-auto mb-3 w-full overflow-hidden rounded-xl border border-line bg-surface shadow-lg transition-all duration-300 ease-out sm:w-96">
+
+    <div class="flex items-start gap-3 p-4">
+
+      {{-- Pastille avec l'icône (✓, ✕ ou i) --}}
+      <span data-toast-icone class="flex h-8 w-8 flex-none items-center justify-center rounded-full text-sm font-bold"></span>
+
+      {{-- Titre et message --}}
+      <div class="min-w-0 flex-1">
+        <p data-toast-titre class="text-sm font-semibold text-fg"></p>
+        <p data-toast-message class="mt-0.5 text-sm text-fg-muted"></p>
+      </div>
+
+      {{-- Bouton pour fermer --}}
+      <button
+        type="button"
+        data-toast-fermer
+        aria-label="Fermer la notification"
+        class="cursor-pointer rounded-md p-1 text-fg-subtle hover:bg-surface-2 hover:text-fg"
+      >✕</button>
+
+    </div>
+
+    {{-- Barre fine qui se vide pendant que la notification est affichée --}}
+    <div class="h-1 bg-surface-2">
+      <div data-toast-barre class="h-full origin-left"></div>
+    </div>
+
+  </div>
+</template>
+
+{{--
+  Messages envoyés par le serveur après une redirection.
+  Dans un contrôleur : session.flash('success', 'Message...') ou session.flash('error', 'Message...')
+--}}
+@if(flashMessages.has('success'))
+  <div data-flash="succes" data-message="{{ flashMessages.get('success') }}" hidden></div>
+@end
+@if(flashMessages.has('error'))
+  <div data-flash="erreur" data-message="{{ flashMessages.get('error') }}" hidden></div>
+@end

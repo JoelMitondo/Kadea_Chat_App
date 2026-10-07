@@ -9,7 +9,7 @@ const password = () => vine.string().minLength(8).maxLength(32)
 /**
  * Validator to use when performing self-signup
  */
-export const signupValidator = vine.create({
+export const confirmationCompteValidator = vine.create({
   password: password(),
   phone_number: vine.string().trim().optional(),
   avatar_url: vine

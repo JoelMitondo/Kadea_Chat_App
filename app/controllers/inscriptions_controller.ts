@@ -5,7 +5,10 @@ import Inscription from '#models/inscription'
 import { DateTime } from 'luxon'
 
 export default class InscriptionsController {
-  async store({ request, response }: HttpContext) {
+  async show({ view }: HttpContext) {
+    return view.render('pages/auth/register')
+  }
+  async store({ request, response, session }: HttpContext) {
     const payload = await request.validateUsing(inscriptionValidator)
 
     const fullName = `${payload.first_name} ${payload.last_name}`
@@ -30,8 +33,7 @@ export default class InscriptionsController {
     try {
       const baseUrl = `${request.protocol()}://${request.host()}`
 
-      // Remplacez 'utilisateurId' ou 'token' par l'identifiant réel de votre variable/enregistrement
-      const activationLink = `${baseUrl}/signup/${identite.codeAleatoire}`
+      const activationLink = `${baseUrl}/confirmation/${identite.codeAleatoire}`
 
       // Formatage de la date d'expiration si c'est un objet Luxon DateTime ou Date
       const dateExpirationFormattee =
@@ -75,10 +77,13 @@ export default class InscriptionsController {
       `)
       })
 
-      return response.status(200).json({
-        success: true,
-        message: 'E-mail de confirmation envoyé avec succès !',
-      })
+      // Envoi par le script : on répond en JSON (le message est celui de data-success)
+      if (request.accepts(['html', 'json']) === 'json') {
+        return response.created({ message: 'Compte créé.' })
+      }
+      // Envoi classique (sans JavaScript) : redirection avec un message
+      session.flash('success', 'Votre compte a été créé. Vérifiez votre e-mail.')
+      return response.redirect().toRoute('home')
     } catch (error) {
       console.error("Erreur lors de l'envoi de l'e-mail :", error)
       return response.status(500).json({

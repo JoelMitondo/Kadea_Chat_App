@@ -1,6 +1,6 @@
 import User from '#models/user'
 import Inscription from '#models/inscription'
-import { signupValidator } from '#validators/user'
+import { confirmationCompteValidator } from '#validators/user'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 export default class NewAccountController {
@@ -27,7 +27,7 @@ export default class NewAccountController {
    * Create a new user account and authenticate the user
    */
   async store({ request, response, auth, params }: HttpContext) {
-    const payload = await request.validateUsing(signupValidator)
+    const payload = await request.validateUsing(confirmationCompteValidator)
 
     const inscription = await Inscription.findByOrFail('codeAleatoire', params.code)
 

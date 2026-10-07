@@ -6,6 +6,7 @@ export type ScannedRoutes = {
   ALL: {
     'home': { paramsTuple?: []; params?: {} }
     'inscriptions.store': { paramsTuple?: []; params?: {} }
+    'New_compte.register': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue]; params: {'code': ParamValue} }
     'new_account.store': { paramsTuple: [ParamValue]; params: {'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
@@ -15,12 +16,14 @@ export type ScannedRoutes = {
   }
   GET: {
     'home': { paramsTuple?: []; params?: {} }
+    'New_compte.register': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue]; params: {'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
     'home': { paramsTuple?: []; params?: {} }
+    'New_compte.register': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue]; params: {'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
     'dashboard': { paramsTuple?: []; params?: {} }
