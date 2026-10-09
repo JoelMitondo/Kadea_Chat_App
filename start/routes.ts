@@ -28,7 +28,6 @@ router
 
 router
   .group(() => {
-    router.on('/messages').render('pages/message').as('messages')
     router.post('logout', [controllers.Session, 'destroy'])
   })
   .use(middleware.auth())
@@ -37,5 +36,7 @@ router
   .group(() => {
     router.get('/profile', [controllers.Profile, 'show']).as('profile')
     router.post('/profile', [controllers.Profile, 'update']).as('profile.update')
+
+    router.get('/messages', [controllers.Conversations, 'index']).as('messages')
   })
   .use(middleware.auth())

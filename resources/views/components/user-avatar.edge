@@ -1,0 +1,19 @@
+{{-- Avatar avec puce "en ligne" clignotante. Props : initials, src, online, size ('sm' ou rien) --}}
+@let(sizeClasses = $props.get('size') === 'sm' ? 'h-10 w-10' : 'h-12 w-12')
+
+<span class="relative flex flex-none {{ sizeClasses }}">
+  <span class="flex h-full w-full items-center justify-center rounded-full bg-primary-soft font-semibold text-on-primary-soft">
+    {{ $props.get('initials') }}
+  </span>
+
+  @if($props.get('src'))
+    <img src="{{ $props.get('src') }}" alt="" onerror="this.remove()" class="absolute inset-0 h-full w-full rounded-full object-cover">
+  @end
+
+  @if($props.get('online'))
+    <span class="absolute bottom-0 right-0 flex h-3 w-3" title="En ligne">
+      <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-online opacity-60"></span>
+      <span class="relative inline-flex h-3 w-3 rounded-full border-2 border-surface bg-online"></span>
+    </span>
+  @end
+</span>

@@ -1,0 +1,74 @@
+@if(chat)
+  <div id="chat-panel" data-conversation-id="{{ chat.id }}" class="flex h-full min-h-0 flex-1 flex-col">
+
+    {{-- ===== En-tête ===== --}}
+    <header class="flex flex-none items-center gap-3 border-b border-line bg-surface px-3 py-3 sm:px-4">
+
+      {{-- Bouton retour : visible UNIQUEMENT sur téléphone --}}
+      <button type="button" data-chat-back aria-label="Retour à la liste des conversations" class="flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full text-fg-muted hover:bg-surface-2 hover:text-fg md:hidden">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+      </button>
+
+      @!component('components/user-avatar', { initials: chat.other.initials, src: chat.other.avatarUrl, online: chat.other.isOnline, size: 'sm' })
+
+      <div class="min-w-0">
+        <p class="truncate font-semibold text-fg">{{ chat.other.name }}</p>
+        @if(chat.other.isOnline)
+          <p class="flex items-center gap-1.5 text-xs font-medium text-success">
+            <span class="h-2 w-2 animate-pulse rounded-full bg-online"></span>
+            En ligne
+          </p>
+        @else
+          <p class="text-xs text-fg-subtle">Hors ligne</p>
+        @end
+      </div>
+    </header>
+
+    {{-- ===== Messages ===== --}}
+    <div id="messages-list" class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-canvas px-3 py-4 sm:px-6">
+      @if(chat.messages.length === 0)
+        <p class="py-10 text-center text-sm text-fg-subtle">Aucun message. Dites bonjour 👋</p>
+      @end
+
+      @each((message, index) in chat.messages)
+        {{-- Un séparateur à chaque changement de jour --}}
+        @if(index === 0 || message.dayKey !== chat.messages[index - 1].dayKey)
+          @!component('components/day-separator', { label: message.dayLabel })
+        @end
+        @!component('components/message-bubble', { message })
+      @end
+    </div>
+
+    {{-- ===== Zone de saisie ===== --}}
+    <form id="composer" action="{{ route('messages.store', { id: chat.id }) }}" method="POST" data-no-loader class="flex-none border-t border-line bg-surface p-3">
+
+      {{-- Bandeau affiché quand on modifie un message --}}
+      <div id="edit-banner" class="mb-2 hidden items-center justify-between rounded-lg bg-primary-soft px-3 py-1.5 text-sm text-on-primary-soft">
+        <span>Modification du message</span>
+        <button type="button" data-cancel-edit aria-label="Annuler la modification" class="cursor-pointer px-1 font-bold">✕</button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input
+          name="content"
+          type="text"
+          autocomplete="off"
+          maxlength="2000"
+          placeholder="Écrire un message…"
+          class="min-w-0 flex-1 rounded-full border border-line-strong bg-surface px-4 py-2.5 text-fg placeholder:text-fg-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+        >
+        <button type="submit" aria-label="Envoyer" class="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </button>
+      </div>
+    </form>
+  </div>
+@else
+  @include('partials/chat-empty')
+@end
