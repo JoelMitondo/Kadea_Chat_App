@@ -70,6 +70,6 @@ export default class NewAccountController {
     await inscription.delete()
 
     await auth.use('web').login(user)
-    response.redirect().toRoute('dashboard')
+    response.redirect().toRoute('messages')
   }
 }

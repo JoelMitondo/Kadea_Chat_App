@@ -1,0 +1,10 @@
+{{-- Une ligne d'information. Props : label, value. Le slot contient l'icône. --}}
+<div class="flex items-center gap-4 rounded-xl bg-surface-2 p-4">
+  <span class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-surface text-fg-muted">
+    {{{ await $slots.main() }}}
+  </span>
+  <div class="min-w-0">
+    <dt class="text-xs font-medium uppercase tracking-wide text-fg-subtle">{{ $props.get('label') }}</dt>
+    <dd class="truncate font-semibold text-fg">{{ $props.get('value') }}</dd>
+  </div>
+</div>

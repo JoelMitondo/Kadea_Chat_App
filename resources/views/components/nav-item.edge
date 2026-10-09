@@ -1,0 +1,22 @@
+{{--
+  Un bouton de la barre de navigation.
+  Informations reçues : href (adresse), label (texte), active (vrai/faux),
+  delay (délai d'apparition en ms), class (classes en plus, facultatif).
+  Le contenu placé entre @component et @end est l'icône SVG.
+--}}
+<a
+  href="{{ $props.get('href') }}"
+  aria-current="{{ $props.get('active') ? 'page' : 'false' }}"
+  style="animation-delay: {{ $props.get('delay', 0) }}ms"
+  class="kc-apparition flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-fg-muted hover:bg-surface-2 hover:text-fg aria-[current=page]:bg-primary-soft aria-[current=page]:text-on-primary-soft md:h-12 md:flex-none md:flex-row md:gap-0 md:px-0 md:py-0 md:text-sm {{ $props.get('class', '') }}"
+>
+  {{-- L'icône --}}
+  <span class="flex h-6 w-6 items-center justify-center md:h-12 md:w-14 md:flex-none">
+    {{{ await $slots.main() }}}
+  </span>
+
+  {{-- Le nom de la page : sur ordinateur, il n'apparaît que quand la barre est agrandie --}}
+  <span class="md:whitespace-nowrap md:opacity-0 md:transition-opacity md:duration-200 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+    {{ $props.get('label') }}
+  </span>
+</a>

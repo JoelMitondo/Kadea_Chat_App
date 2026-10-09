@@ -15,8 +15,10 @@ export type ScannedRoutes = {
     'forgoPassword.post': { paramsTuple?: []; params?: {} }
     'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'forgot_password.reset': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
-    'dashboard': { paramsTuple?: []; params?: {} }
+    'messages': { paramsTuple?: []; params?: {} }
     'session.destroy': { paramsTuple?: []; params?: {} }
+    'profile': { paramsTuple?: []; params?: {} }
+    'profile.update': { paramsTuple?: []; params?: {} }
   }
   GET: {
     'home': { paramsTuple?: []; params?: {} }
@@ -25,7 +27,8 @@ export type ScannedRoutes = {
     'session.create': { paramsTuple?: []; params?: {} }
     'forgotPassword.get': { paramsTuple?: []; params?: {} }
     'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
-    'dashboard': { paramsTuple?: []; params?: {} }
+    'messages': { paramsTuple?: []; params?: {} }
+    'profile': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
     'home': { paramsTuple?: []; params?: {} }
@@ -34,7 +37,8 @@ export type ScannedRoutes = {
     'session.create': { paramsTuple?: []; params?: {} }
     'forgotPassword.get': { paramsTuple?: []; params?: {} }
     'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
-    'dashboard': { paramsTuple?: []; params?: {} }
+    'messages': { paramsTuple?: []; params?: {} }
+    'profile': { paramsTuple?: []; params?: {} }
   }
   POST: {
     'inscriptions.store': { paramsTuple?: []; params?: {} }
@@ -43,6 +47,7 @@ export type ScannedRoutes = {
     'forgoPassword.post': { paramsTuple?: []; params?: {} }
     'forgot_password.reset': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.destroy': { paramsTuple?: []; params?: {} }
+    'profile.update': { paramsTuple?: []; params?: {} }
   }
 }
 declare module '@adonisjs/core/types/http' {

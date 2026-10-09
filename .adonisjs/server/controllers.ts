@@ -7,5 +7,6 @@ export const controllers = {
   ForgoPasswords: () => import('#controllers/forgo_passwords_controller'),
   Inscriptions: () => import('#controllers/inscriptions_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
+  Profile: () => import('#controllers/profile_controller'),
   Session: () => import('#controllers/session_controller'),
 }

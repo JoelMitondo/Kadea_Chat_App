@@ -151,6 +151,6 @@ export default class ForgoPasswordsController {
     await recuperation.delete()
 
     await auth.use('web').login(user)
-    response.redirect().toRoute('dashboard')
+    response.redirect().toRoute('messages')
   }
 }
