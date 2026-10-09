@@ -1,13 +1,16 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import type User from '#models/user'
+import UserPolicy from '#policies/user_policy'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import { updateProfileValidator } from '#validators/profile'
 
 export default class ProfileController {
-  async show({ auth, view }: HttpContext) {
+  async show({ bouncer, auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
+
+    await bouncer.with(UserPolicy).authorize('show', user)
 
     const privateChats = await this.countConversations(user.id, 'Privee')
     const groups = await this.countConversations(user.id, 'Publique')
@@ -30,18 +33,15 @@ export default class ProfileController {
   }
 
   //modification du profil de user
-  async update({ auth, request, response, session }: HttpContext) {
+  async update({ auth, request, response, session, bouncer }: HttpContext) {
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(updateProfileValidator)
-    const wantsJson = request.accepts(['html', 'json']) === 'json'
 
-    // Même règle que l'inscription : 18 ans minimum
+    await bouncer.with(UserPolicy).authorize('update', user)
+
+    //verification du nouveau age
     if (!this.isAdult(payload.birth_date)) {
       const message = 'Vous devez avoir au moins 18 ans.'
-
-      if (wantsJson) {
-        return response.unprocessableEntity({ errors: [{ field: 'birth_date', message }] })
-      }
       session.flash('error', message)
       return response.redirect().back()
     }
@@ -56,16 +56,11 @@ export default class ProfileController {
     })
     await user.save()
 
-    if (wantsJson) {
-      return response.ok({ message: 'Votre profil a été mis à jour.' })
-    }
     session.flash('success', 'Votre profil a été mis à jour.')
     return response.redirect().toRoute('profile')
   }
 
-  // ---------- Méthodes privées ----------
-
-  /** Nombre de conversations de l'utilisateur pour un type donné (privée ou groupe) */
+  // Nombre de conversations de l'utilisateur pour un type donné (privée ou public)
   private async countConversations(userId: User['id'], typeName: string): Promise<number> {
     const result = await UserConversation.query()
       .where('userId', userId)

@@ -1,5 +1,6 @@
 import { indexEntities } from '@adonisjs/core/generators'
 import { defineConfig } from '@adonisjs/core/app'
+import { indexPolicies } from '@adonisjs/bouncer'
 
 export default defineConfig({
   /*
@@ -27,7 +28,8 @@ export default defineConfig({
     () => import('@adonisjs/core/commands'),
     () => import('@adonisjs/lucid/commands'),
     () => import('@adonisjs/session/commands'),
-    () => import('@adonisjs/mail/commands')
+    () => import('@adonisjs/mail/commands'),
+    () => import('@adonisjs/bouncer/commands')
   ],
 
   /*
@@ -54,7 +56,8 @@ export default defineConfig({
     () => import('@adonisjs/static/static_provider'),
     () => import('@adonisjs/lucid/database_provider'),
     () => import('@adonisjs/auth/auth_provider'),
-    () => import('@adonisjs/mail/mail_provider')
+    () => import('@adonisjs/mail/mail_provider'),
+    () => import('@adonisjs/bouncer/bouncer_provider')
   ],
 
   /*
@@ -134,7 +137,7 @@ export default defineConfig({
   |
   */
   hooks: {
-    init: [indexEntities()],
+    init: [indexEntities(), indexPolicies()],
     buildStarting: [() => import('@adonisjs/vite/build_hook')],
   },
 })

@@ -24,7 +24,7 @@ export default class extends BaseSchema {
         .onDelete('SET NULL')
         .notNullable()
 
-      table.string('title').nullable() // Nullable car les conversations privées (1-to-1) n'ont souvent pas de titre
+      table.string('title').nullable() // Nullable car les conversations privées n'ont pas de titre
 
       table.timestamp('created_at', { useTz: true }).notNullable()
       table.timestamp('updated_at', { useTz: true }).notNullable()

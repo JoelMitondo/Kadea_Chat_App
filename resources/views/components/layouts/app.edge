@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ $props.get('title', 'Kadea Chat') }}</title>
 
-  {{-- Applique le thème (clair ou sombre) avant l'affichage, pour éviter un flash --}}
+  {{-- Application du thème sombre ou clair avant l'affichage, pour éviter un flash --}}
   <script>
     let themeSauvegarde = localStorage.getItem('theme')
     let themeDuSysteme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
