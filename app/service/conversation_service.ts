@@ -4,7 +4,6 @@ import Conversation from '#models/conversation'
 import ConversationType from '#models/conversation_type'
 import RoleConversation from '#models/role_conversation'
 import UserConversation from '#models/user_conversation'
-import { PRIVATE_TYPE } from './chat_service.ts'
 
 /**
  * Renvoie la conversation privée entre deux utilisateurs.
@@ -14,26 +13,37 @@ export async function findOrCreatePrivateConversation(
   currentUser: User,
   otherUser: User
 ): Promise<Conversation> {
-  // 1. Existe-t-il déjà une conversation privée où LES DEUX sont participants ?
+  // 1. Récupérer le type de conversation "Privee" une seule fois
+  const privateType = await ConversationType.firstOrCreate({ type: 'Privee' }, { type: 'Privee' })
+
+  // 2. Chercher s'il existe déjà une conversation privée commune aux deux utilisateurs
   const existingConversation = await Conversation.query()
-    .whereHas('type', (typeQuery) => {
-      typeQuery.where('type', PRIVATE_TYPE)
+    .where('conversationTypeId', privateType.id)
+    .whereHas('participants', (query) => {
+      query.where('userId', currentUser.id)
     })
-    .whereHas('participants', (participantQuery) => {
-      participantQuery.where('userId', currentUser.id)
-    })
-    .whereHas('participants', (participantQuery) => {
-      participantQuery.where('userId', otherUser.id)
+    .whereHas('participants', (query) => {
+      query.where('userId', otherUser.id)
     })
     .first()
 
+  // S'assurer qu'il s'agit bien d'une conversation strictement privée à 2 membres
   if (existingConversation) {
-    return existingConversation
+    const result = await db
+      .from('user_conversations')
+      .where('conversation_id', existingConversation.id)
+      .count('* as total')
+
+    // Utilisation de Number() pour s'assurer qu'on compare bien un nombre
+    const totalParticipants = Number(result[0].total)
+
+    if (totalParticipants === 2) {
+      return existingConversation
+    }
   }
 
-  // 2. Sinon on la crée. Transaction : tout est enregistré ou rien.
-  const privateType = await ConversationType.findByOrFail('type', PRIVATE_TYPE)
-  const memberRole = await RoleConversation.findByOrFail('title', 'membre')
+  // 3. Sinon, on la crée proprement dans une transaction
+  const memberRole = await RoleConversation.firstOrCreate({ title: 'membre' }, { title: 'membre' })
 
   return db.transaction(async (trx) => {
     const conversation = await Conversation.create(

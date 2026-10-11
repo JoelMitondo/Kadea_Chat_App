@@ -19,13 +19,14 @@ export default class ForgoPasswordsController {
     const codeAleatoire = await generateUniqueCode(ForgoPassword)
 
     if (user) {
-      const identite = await ForgoPassword.create({
-        userId: user.id,
-        email: user.email,
-        codeAleatoire: await hash.make(codeAleatoire),
-        expiredAt: DateTime.now().plus({ hours: 1 }),
-      })
-
+      const identite = await ForgoPassword.updateOrCreate(
+        { email: user.email },
+        {
+          userId: user.id,
+          codeAleatoire: await hash.make(codeAleatoire),
+          expiredAt: DateTime.now().plus({ hours: 1 }),
+        }
+      )
       try {
         const baseUrl = `${request.protocol()}://${request.host()}`
 

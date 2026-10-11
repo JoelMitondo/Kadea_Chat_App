@@ -32,7 +32,7 @@ export default class MessagesController {
       .whereNot('userId', user.id)
       .firstOrFail()
 
-    const textType = await MessageType.findByOrFail('type', 'texte')
+    const textType = await MessageType.firstOrCreate({ type: 'texte' }, { type: 'texte' })
 
     // Dernier message existant (avant celui qu'on va créer) : sert à décider du séparateur de date
     const previousMessage = await Message.query()
