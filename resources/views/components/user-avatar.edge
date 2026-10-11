@@ -1,8 +1,9 @@
-{{-- Avatar avec puce "en ligne" clignotante. Props : initials, src, online, size ('sm' ou rien) --}}
+{{-- Avatar. Props : initials, src, online, showOffline, size ('sm' ou rien), tone ('group' pour un groupe) --}}
 @let(sizeClasses = $props.get('size') === 'sm' ? 'h-10 w-10' : 'h-12 w-12')
+@let(toneClasses = $props.get('tone') === 'group' ? 'bg-group-soft text-group' : 'bg-primary-soft text-on-primary-soft')
 
 <span class="relative flex flex-none {{ sizeClasses }}">
-  <span class="flex h-full w-full items-center justify-center rounded-full bg-primary-soft font-semibold text-on-primary-soft">
+  <span class="flex h-full w-full items-center justify-center rounded-full font-semibold {{ toneClasses }}">
     {{ $props.get('initials') }}
   </span>
 

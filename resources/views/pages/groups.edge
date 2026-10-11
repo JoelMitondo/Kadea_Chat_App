@@ -1,0 +1,143 @@
+@layouts.app({ title: 'Groupes · Kadea Chat', active: 'groups' })
+
+  {{-- Jeton de sécurité lu par le JavaScript pour ses requêtes --}}
+  <input type="hidden" id="csrf-token" value="{{ csrfToken }}">
+
+  {{-- Mêmes identifiants que la page Messages : messages.js fonctionne tel quel --}}
+  <div
+    id="messages-page"
+    data-view="{{ chat ? 'chat' : 'list' }}"
+    data-active-id="{{ chat ? chat.id : '' }}"
+    data-list-url="/groups"
+    data-chat-url="/groups"
+    class="group flex h-full min-h-0"
+  >
+
+    {{-- ===== Liste des groupes ===== --}}
+    <section class="flex min-h-0 w-full flex-col border-r border-line bg-surface group-data-[view=chat]:hidden md:w-80 md:flex-none md:group-data-[view=chat]:flex lg:w-96">
+
+      <div class="flex flex-none items-center justify-between px-5 py-4">
+        <h1 class="text-xl font-bold text-fg">Groupes</h1>
+
+        {{-- Icône de création de groupe --}}
+        <button type="button" data-open-group-create title="Créer un groupe" aria-label="Créer un groupe" class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary-hover">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" />
+            <line x1="22" y1="11" x2="16" y2="11" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto">
+
+        {{-- État vide --}}
+        <div id="empty-list" class="{{ groups.length > 0 ? 'hidden' : '' }} px-6 py-12 text-center">
+          <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-group-soft text-group">
+            <svg class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </span>
+          <p class="mt-4 text-fg-muted">Vous ne faites partie d'aucun groupe pour le moment. Créez-en un avec le bouton en haut de la liste.</p>
+        </div>
+
+        <div id="conversations-list">
+          @each(item in groups)
+            <div
+              data-conversation-item
+              data-conversation-id="{{ item.id }}"
+              data-active="{{ chat ? chat.id === item.id : false }}"
+              class="group flex items-center border-l-4 border-transparent hover:bg-surface-2 data-[active=true]:border-primary data-[active=true]:bg-primary-soft"
+            >
+              <a
+                href="/groups/{{ item.id }}"
+                data-conversation-link
+                data-conversation-id="{{ item.id }}"
+                data-no-loader
+                class="flex min-w-0 flex-1 items-center gap-3 px-4 py-3"
+              >
+                @!component('components/user-avatar', { initials: item.initials, tone: 'group' })
+
+                <span class="min-w-0 flex-1">
+                  <span class="flex items-center justify-between gap-2">
+                    <span class="truncate font-semibold text-fg">{{ item.name }}</span>
+                    <span data-time class="flex-none text-xs text-fg-subtle">{{ item.time }}</span>
+                  </span>
+                  <span class="flex items-center justify-between gap-2">
+                    <span data-preview class="truncate text-sm text-fg-muted">{{ item.preview }}</span>
+                    <span data-unread-badge class="{{ item.unreadCount > 0 ? '' : 'hidden' }} flex-none rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-on-accent">{{ item.unreadCount }}</span>
+                  </span>
+                </span>
+              </a>
+            </div>
+          @end
+        </div>
+      </div>
+    </section>
+
+    {{-- ===== Zone de discussion du groupe ===== --}}
+    <section id="chat-pane" class="hidden min-h-0 flex-1 flex-col group-data-[view=chat]:flex md:flex">
+      @include('partials/group-panel')
+    </section>
+  </div>
+
+  {{-- Modèle de l'écran d'accueil, réutilisé par messages.js quand on ferme une discussion --}}
+  <template id="chat-placeholder">
+    @include('partials/group-empty')
+  </template>
+
+  {{-- ===== FENÊTRE : CRÉER UN GROUPE ===== --}}
+  <dialog
+    id="group-create-modal"
+    aria-labelledby="group-create-title"
+    class="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-fg shadow-lg backdrop:bg-black/50"
+  >
+    <form id="group-create-form" data-no-loader class="space-y-5 p-6">
+
+      <div class="flex items-start justify-between gap-4">
+        <h2 id="group-create-title" class="text-xl font-bold text-fg">Créer un groupe</h2>
+        <button type="button" data-modal-close aria-label="Fermer" class="cursor-pointer rounded-md p-1 text-fg-subtle hover:bg-surface-2 hover:text-fg">✕</button>
+      </div>
+
+      <div>
+        <label for="group-name" class="mb-1.5 block text-sm font-medium text-fg">Nom du groupe</label>
+        <input
+          id="group-name"
+          type="text"
+          maxlength="60"
+          autocomplete="off"
+          placeholder="Ex : Promo Kadea 2026"
+          class="w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5 text-fg placeholder:text-fg-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+        >
+      </div>
+
+      <div>
+        <div class="mb-1.5 flex items-center justify-between">
+          <span class="text-sm font-medium text-fg">Membres</span>
+          <span id="group-selected-count" class="text-xs text-fg-subtle">0 sélectionné · minimum 2</span>
+        </div>
+        @!component('components/member-picker', { candidates })
+      </div>
+
+      <p class="text-xs text-fg-subtle">Vous serez l'administrateur de ce groupe.</p>
+
+      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button type="button" data-modal-close class="cursor-pointer rounded-lg border border-line-strong px-4 py-2.5 font-semibold text-fg hover:bg-surface-2">
+          Annuler
+        </button>
+        <button id="group-create-submit" type="submit" disabled class="cursor-pointer rounded-lg bg-primary px-4 py-2.5 font-semibold text-on-primary hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">
+          Créer le groupe
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  {{-- messages.js d'abord : groups.js utilise ses fonctions --}}
+  <script src="/resources/js/message.js"></script>
+  <script src="/resources/js/groupe.js"></script>
+
+@end

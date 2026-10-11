@@ -30,7 +30,7 @@ export default class ProfileController {
         phoneNumber: user.phoneNumber,
         birthDateInput: user.birthDate?.toFormat('yyyy-MM-dd') ?? '',
         birthDateLabel: this.formatDate(user.birthDate),
-        emailCreatedAt: this.formatDate(user.emailVerifiedAt),
+        email: user.email,
         createdAt: this.formatDate(user.createdAt),
       },
       stats: { privateChats, groups, messages },

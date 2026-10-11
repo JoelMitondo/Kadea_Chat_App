@@ -1,0 +1,250 @@
+import type { HttpContext } from '@adonisjs/core/http'
+import User from '#models/user'
+import Message from '#models/message'
+import UserConversation from '#models/user_conversation'
+import { addMembersValidator, createGroupValidator } from '#validators/group'
+import { addMembersToGroup, createGroup } from '../service/group.ts'
+import {
+  ADMIN_ROLE,
+  GROUP_TYPE,
+  buildMessageView,
+  buildPreview,
+  findGroupMembership,
+  formatDate,
+  getInitials,
+  getListTime,
+  getUnreadCounts,
+  markConversationAsRead,
+} from '../service/chat_service.ts'
+
+// Nombre maximum de messages chargés à l'ouverture d'un groupe
+const MESSAGES_LIMIT = 100
+
+export default class GroupsController {
+  /**
+   * Page Groupes, sans groupe ouvert
+   */
+  async index({ auth, view }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const groups = await this.getGroupList(user)
+    const candidates = await this.getCandidates([user.id]) // pour la popup de création
+
+    return view.render('pages/groups', { groups, chat: null, candidates })
+  }
+
+  /**
+   * Ouvre un groupe (même principe que les conversations privées :
+   * panneau seul pour le JavaScript, page complète sinon)
+   */
+  async show({ auth, params, request, view }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const chat = await this.getChat(user, Number(params.id))
+
+    if (request.header('x-requested-with') === 'XMLHttpRequest') {
+      return view.render('partials/group-panel', { chat })
+    }
+
+    const groups = await this.getGroupList(user)
+    const candidates = await this.getCandidates([user.id])
+    return view.render('pages/groups', { groups, chat, candidates })
+  }
+
+  /**
+   * Crée un groupe
+   */
+  async store({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const { name, member_ids: memberIds } = await request.validateUsing(createGroupValidator)
+
+    // Le créateur est déjà dans le groupe (administrateur) : on l'enlève de la liste s'il y figure
+    const otherIds = memberIds.filter((id) => id !== user.id)
+
+    if (otherIds.length < 2) {
+      return response.unprocessableEntity({
+        errors: [{ field: 'member_ids', message: 'Sélectionnez au moins deux autres membres.' }],
+      })
+    }
+
+    // Tous les membres choisis doivent exister
+    const existingUsers = await User.query().whereIn('id', otherIds).select('id')
+    if (existingUsers.length !== otherIds.length) {
+      return response.unprocessableEntity({
+        errors: [{ field: 'member_ids', message: 'Un des membres sélectionnés est introuvable.' }],
+      })
+    }
+
+    const group = await createGroup(user, name, otherIds)
+
+    // Le message s'affichera (toast) sur la page du groupe où le JavaScript redirige
+    session.flash('success', `Le groupe « ${name} » a été créé.`)
+    return response.created({ id: group.id })
+  }
+
+  /**
+   * Ajoute des membres à un groupe (réservé à l'administrateur)
+   */
+  async addMembers({ auth, params, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const conversationId = Number(params.id)
+    const { member_ids: memberIds } = await request.validateUsing(addMembersValidator)
+
+    const membership = await findGroupMembership(user.id, conversationId)
+      .preload('role')
+      .firstOrFail()
+
+    if (membership.role.title !== ADMIN_ROLE) {
+      return response.forbidden({
+        message: "Seul l'administrateur du groupe peut ajouter des membres.",
+      })
+    }
+
+    const existingUsers = await User.query().whereIn('id', memberIds).select('id')
+    if (existingUsers.length !== memberIds.length) {
+      return response.unprocessableEntity({
+        errors: [
+          { field: 'member_ids', message: 'Un des utilisateurs sélectionnés est introuvable.' },
+        ],
+      })
+    }
+
+    const addedCount = await addMembersToGroup(conversationId, memberIds)
+
+    if (addedCount === 0) {
+      return response.unprocessableEntity({
+        errors: [{ field: 'member_ids', message: 'Ces utilisateurs font déjà partie du groupe.' }],
+      })
+    }
+
+    const message =
+      addedCount === 1 ? '1 membre a été ajouté.' : `${addedCount} membres ont été ajoutés.`
+    session.flash('success', message)
+    return response.ok({ message })
+  }
+
+  // ---------- Méthodes privées ----------
+
+  /**
+   * Liste des groupes de l'utilisateur, le plus récent en premier
+   */
+  private async getGroupList(user: User) {
+    const memberships = await UserConversation.query()
+      .where('userId', user.id)
+      .whereHas('conversation', (conversationQuery) => {
+        conversationQuery.whereHas('type', (typeQuery) => {
+          typeQuery.where('type', GROUP_TYPE)
+        })
+      })
+      .preload('conversation')
+      .preload('lastMessage', (messageQuery) => {
+        messageQuery.preload('user') // pour afficher "Jo : le projet est rendu"
+      })
+
+    const unreadCounts = await getUnreadCounts(
+      user.id,
+      memberships.map((membership) => membership.conversationId)
+    )
+
+    const items = memberships.map((membership) => {
+      const lastMessage = membership.lastMessage
+      const name = membership.conversation.title ?? 'Groupe sans nom'
+
+      return {
+        sortTime: (lastMessage?.createdAt ?? membership.conversation.createdAt).toMillis(),
+        view: {
+          id: membership.conversationId,
+          name,
+          initials: getInitials(name),
+          preview: lastMessage ? buildPreview(lastMessage, user.id, true) : 'Aucun message',
+          time: lastMessage ? getListTime(lastMessage.createdAt) : '',
+          unreadCount: unreadCounts.get(membership.conversationId) ?? 0,
+        },
+      }
+    })
+
+    items.sort((a, b) => b.sortTime - a.sortTime)
+    return items.map((item) => item.view)
+  }
+
+  /**
+   * Utilisateurs qu'on peut ajouter (tous, sauf ceux de la liste d'exclusion)
+   */
+  private async getCandidates(excludedIds: User['id'][]) {
+    const users = await User.query().whereNotIn('id', excludedIds).orderBy('fullName', 'asc')
+
+    return users.map((person) => ({
+      id: person.id,
+      fullName: person.fullName,
+      initials: getInitials(person.fullName),
+      avatarUrl: person.avatarUrl,
+      isOnline: person.isOnline,
+    }))
+  }
+
+  /**
+   * Prépare toutes les données d'un groupe ouvert
+   */
+  private async getChat(user: User, conversationId: number) {
+    // Seuls les membres du groupe peuvent l'ouvrir (sinon : erreur 404)
+    const membership = await findGroupMembership(user.id, conversationId)
+      .preload('role')
+      .preload('conversation', (conversationQuery) => {
+        conversationQuery.preload('creator')
+      })
+      .firstOrFail()
+
+    const conversation = membership.conversation
+    const groupName = conversation.title ?? 'Groupe sans nom'
+    const isAdmin = membership.role.title === ADMIN_ROLE
+
+    // Tous les membres, administrateur(s) en premier
+    const memberRows = await UserConversation.query()
+      .where('conversationId', conversationId)
+      .preload('user')
+      .preload('role')
+
+    const members = memberRows
+      .map((row) => ({
+        id: row.user.id,
+        fullName: row.user.fullName,
+        initials: getInitials(row.user.fullName),
+        avatarUrl: row.user.avatarUrl,
+        isOnline: row.user.isOnline,
+        isAdmin: row.role.title === ADMIN_ROLE,
+        isMe: row.userId === user.id,
+      }))
+      .sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin) || a.fullName.localeCompare(b.fullName))
+
+    // Ouvrir le groupe = lire ses messages
+    await markConversationAsRead(user.id, conversationId)
+
+    const messages = (
+      await Message.query()
+        .where('conversationId', conversationId)
+        .preload('user') // pour le nom de l'auteur
+        .preload('statuses', (statusQuery) => {
+          statusQuery.whereNot('userId', user.id) // pour les coches "lu" de MES messages
+        })
+        .orderBy('createdAt', 'desc')
+        .orderBy('id', 'desc')
+        .limit(MESSAGES_LIMIT)
+    ).reverse()
+
+    // Seul l'administrateur peut ajouter des membres : lui seul a besoin de la liste
+    const candidates = isAdmin ? await this.getCandidates(members.map((member) => member.id)) : []
+
+    return {
+      id: conversationId,
+      group: {
+        name: groupName,
+        initials: getInitials(groupName),
+        createdAt: formatDate(conversation.createdAt),
+        creatorName: conversation.creator?.fullName ?? 'Utilisateur supprimé',
+        membersCount: members.length,
+        isAdmin,
+      },
+      members,
+      candidates,
+      messages: messages.map((message) => buildMessageView(message, user.id, true)),
+    }
+  }
+}

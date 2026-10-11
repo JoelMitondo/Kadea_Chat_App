@@ -11,6 +11,7 @@ import {
   getInitials,
   getListTime,
   markConversationAsRead,
+  getUnreadCounts,
 } from '../service/chat_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'une conversation
@@ -82,7 +83,7 @@ export default class ConversationsController {
         })
       })
 
-    const unreadCounts = await this.getUnreadCounts(
+    const unreadCounts = await getUnreadCounts(
       user.id,
       memberships.map((membership) => membership.conversationId)
     )
@@ -124,34 +125,6 @@ export default class ConversationsController {
 
     items.sort((a, b) => b.sortTime - a.sortTime)
     return items.map((item) => item.view)
-  }
-
-  /**
-   * Nombre de messages non lus par conversation (table message_statuses)
-   */
-  private async getUnreadCounts(userId: User['id'], conversationIds: number[]) {
-    const counts = new Map<number, number>()
-
-    if (conversationIds.length === 0) {
-      return counts
-    }
-
-    const rows = await db
-      .from('message_statuses')
-      .join('messages', 'messages.id', 'message_statuses.message_id')
-      .where('message_statuses.user_id', userId)
-      .where('message_statuses.is_read', false)
-      .where('messages.is_deleted', false)
-      .whereIn('messages.conversation_id', conversationIds)
-      .select('messages.conversation_id')
-      .count('* as total')
-      .groupBy('messages.conversation_id')
-
-    for (const row of rows) {
-      counts.set(Number(row.conversation_id), Number(row.total))
-    }
-
-    return counts
   }
 
   /**

@@ -1,11 +1,7 @@
 import { v2 as cloudinary, type UploadApiOptions } from 'cloudinary'
 import logger from '@adonisjs/core/services/logger'
 import env from '#start/env'
-console.log('🔍 Test config Cloudinary:', {
-  cloud: env.get('CLOUDINARY_CLOUD_NAME'),
-  key: env.get('CLOUDINARY_API_KEY'),
-  hasSecret: !!env.get('CLOUDINARY_API_SECRET').release(),
-})
+
 // Connexion à votre compte Cloudinary
 cloudinary.config({
   cloud_name: env.get('CLOUDINARY_CLOUD_NAME'),

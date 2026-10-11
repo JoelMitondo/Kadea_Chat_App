@@ -10,6 +10,7 @@ import { sendMessageValidator, updateMessageValidator } from '#validators/messag
 import {
   buildMessageView,
   buildPreview,
+  findGroupMembership,
   findPrivateMembership,
   getDayKey,
   getListTime,
@@ -17,62 +18,21 @@ import {
 
 export default class MessagesController {
   /**
-   * Envoie un nouveau message
+   * Envoie un message dans une conversation PRIVÉE
    */
-  async store({ auth, params, request, response, view }: HttpContext) {
-    const user = auth.getUserOrFail()
-    const { content } = await request.validateUsing(sendMessageValidator)
-    const conversationId = Number(params.id)
+  async store(ctx: HttpContext) {
+    const user = ctx.auth.getUserOrFail()
+    const membership = await findPrivateMembership(user.id, Number(ctx.params.id)).firstOrFail()
+    return this.sendMessage(ctx, membership)
+  }
 
-    // L'utilisateur doit faire partie de cette conversation privée
-    const membership = await findPrivateMembership(user.id, conversationId).firstOrFail()
-
-    const otherMembership = await UserConversation.query()
-      .where('conversationId', conversationId)
-      .whereNot('userId', user.id)
-      .firstOrFail()
-
-    const textType = await MessageType.firstOrCreate({ type: 'texte' }, { type: 'texte' })
-
-    // Dernier message existant (avant celui qu'on va créer) : sert à décider du séparateur de date
-    const previousMessage = await Message.query()
-      .where('conversationId', conversationId)
-      .orderBy('createdAt', 'desc')
-      .orderBy('id', 'desc')
-      .first()
-
-    // Transaction : soit TOUT est enregistré, soit RIEN
-    const message = await db.transaction(async (trx) => {
-      const newMessage = await Message.create(
-        { userId: user.id, conversationId, messageTypeId: textType.id, content },
-        { client: trx }
-      )
-
-      // Statut "non lu" pour le destinataire (il alimente son compteur de non lus)
-      await MessageStatus.create(
-        { messageId: newMessage.id, userId: otherMembership.userId, isRead: false, status: 'sent' },
-        { client: trx }
-      )
-
-      // Dernier message de la conversation, pour les deux participants
-      await UserConversation.query({ client: trx })
-        .where('conversationId', conversationId)
-        .update({ last_message_id: newMessage.id })
-
-      return newMessage
-    })
-
-    // Faut-il afficher un séparateur de date avant ce message ?
-    let showSeparator = true
-    if (
-      previousMessage &&
-      (!membership.removedAt || previousMessage.createdAt > membership.removedAt)
-    ) {
-      showSeparator = getDayKey(previousMessage.createdAt) !== getDayKey(message.createdAt)
-    }
-
-    const data = await this.buildMessageResponse(message, user.id, view, showSeparator)
-    return response.created(data)
+  /**
+   * Envoie un message dans un GROUPE (tous les membres peuvent écrire)
+   */
+  async storeInGroup(ctx: HttpContext) {
+    const user = ctx.auth.getUserOrFail()
+    const membership = await findGroupMembership(user.id, Number(ctx.params.id)).firstOrFail()
+    return this.sendMessage(ctx, membership)
   }
 
   /**
@@ -93,7 +53,7 @@ export default class MessagesController {
     message.content = content
     await message.save()
 
-    // On recharge le statut de l'interlocuteur pour garder les bonnes coches
+    // On recharge les statuts des autres pour garder les bonnes coches
     await message.load('statuses', (statusQuery) => {
       statusQuery.whereNot('userId', user.id)
     })
@@ -120,6 +80,70 @@ export default class MessagesController {
     return response.ok(data)
   }
 
+  // ---------- Méthodes privées ----------
+
+  /**
+   * Enregistre un nouveau message (conversation privée OU groupe)
+   */
+  private async sendMessage(ctx: HttpContext, membership: UserConversation) {
+    const { auth, request, response, view } = ctx
+    const user = auth.getUserOrFail()
+    const { content } = await request.validateUsing(sendMessageValidator)
+    const conversationId = membership.conversationId
+
+    // Tous les AUTRES participants (1 en privé, plusieurs dans un groupe)
+    const otherMemberships = await UserConversation.query()
+      .where('conversationId', conversationId)
+      .whereNot('userId', user.id)
+
+    const textType = await MessageType.findByOrFail('type', 'texte')
+
+    // Dernier message existant : sert à décider du séparateur de date
+    const previousMessage = await Message.query()
+      .where('conversationId', conversationId)
+      .orderBy('createdAt', 'desc')
+      .orderBy('id', 'desc')
+      .first()
+
+    // Transaction : soit TOUT est enregistré, soit RIEN
+    const message = await db.transaction(async (trx) => {
+      const newMessage = await Message.create(
+        { userId: user.id, conversationId, messageTypeId: textType.id, content },
+        { client: trx }
+      )
+
+      // Un statut "non lu" pour chaque destinataire (il alimente son compteur)
+      await MessageStatus.createMany(
+        otherMemberships.map((other) => ({
+          messageId: newMessage.id,
+          userId: other.userId,
+          isRead: false,
+          status: 'sent',
+        })),
+        { client: trx }
+      )
+
+      // Dernier message de la conversation, pour tous les participants
+      await UserConversation.query({ client: trx })
+        .where('conversationId', conversationId)
+        .update({ last_message_id: newMessage.id })
+
+      return newMessage
+    })
+
+    // Faut-il afficher un séparateur de date avant ce message ?
+    let showSeparator = true
+    if (
+      previousMessage &&
+      (!membership.removedAt || previousMessage.createdAt > membership.removedAt)
+    ) {
+      showSeparator = getDayKey(previousMessage.createdAt) !== getDayKey(message.createdAt)
+    }
+
+    const data = await this.buildMessageResponse(message, user.id, view, showSeparator)
+    return response.created(data)
+  }
+
   /**
    * Réponse JSON commune : la bulle déjà fabriquée en HTML + de quoi mettre la liste à jour
    */
@@ -142,7 +166,7 @@ export default class MessagesController {
 
     return {
       html,
-      isLast: lastMessage?.id === message.id, // si oui, on met à jour l'aperçu dans la liste
+      isLast: lastMessage?.id === message.id,
       preview: buildPreview(message, userId),
       time: getListTime(message.createdAt),
     }

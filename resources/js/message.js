@@ -9,6 +9,9 @@ let liste = document.getElementById('conversations-list')
 let listeVide = document.getElementById('empty-list')
 let modeleAccueil = document.getElementById('chat-placeholder')
 let jeton = document.getElementById('csrf-token').value
+// Adresses utilisées : elles changent selon la page (Messages ou Groupes)
+let adresseListe = page.dataset.listUrl // "/messages" ou "/groups"
+let adresseChat = page.dataset.chatUrl // "/conversations" ou "/groups"
 
 // ===== 1. Petits outils =====
 
@@ -93,7 +96,7 @@ function verifierListeVide() {
 async function ouvrirConversation(id) {
   let reponse
   try {
-    reponse = await fetch('/conversations/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    reponse = await fetch(adresseChat+ '/' + + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
   } catch (erreurReseau) {
     kcNotifier.erreur('Impossible de contacter le serveur. Vérifiez votre connexion.')
     return false
@@ -124,7 +127,7 @@ function fermerChat() {
 // Si une discussion est déjà ouverte, on remplace l'entrée au lieu d'en ajouter une.
 function memoriserDansHistorique(id) {
   let etat = { vue: 'chat', id: id }
-  let adresse = '/conversations/' + id
+  let adresse = adresseChat + '/' + id
 
   if (history.state !== null && history.state.vue === 'chat') {
     history.replaceState(etat, '', adresse)
@@ -137,11 +140,11 @@ function memoriserDansHistorique(id) {
 if (page.dataset.view === 'chat') {
   // Page ouverte directement sur une discussion : on fabrique l'entrée "liste" juste avant
   let idOuvert = page.dataset.activeId
-  history.replaceState({ vue: 'liste' }, '', '/messages')
-  history.pushState({ vue: 'chat', id: idOuvert }, '', '/conversations/' + idOuvert)
+  history.replaceState({ vue: 'liste' }, '', adresseListe)
+  history.pushState({ vue: 'chat', id: idOuvert }, '', adresseChat + '/' + idOuvert)
   defilerEnBas()
 } else {
-  history.replaceState({ vue: 'liste' }, '', '/messages')
+  history.replaceState({ vue: 'liste' }, '', adresseListe)
 }
 
 // Bouton Retour du téléphone ou du navigateur
@@ -254,7 +257,7 @@ async function supprimerConversation(element) {
 
   if (!confirm('Supprimer cette conversation ? Elle disparaîtra de votre liste.')) { return }
 
-  let resultat = await envoyer('/conversations/' + id, 'DELETE')
+  let resultat = await envoyer(adresseChat + '/' + id, 'DELETE')
   if (!resultat.ok) {
     kcNotifier.erreur(lireErreur(resultat.corps))
     return

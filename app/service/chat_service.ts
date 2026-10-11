@@ -9,7 +9,12 @@ export const APP_TIMEZONE = 'Africa/Kinshasa'
 
 // Valeur de la colonne "type" de conversation_types pour les conversations 1-to-1
 export const PRIVATE_TYPE = 'Privee'
+// Valeur de la colonne "type" de conversation_types pour les groupes
+export const GROUP_TYPE = 'Publique'
 
+// Valeurs de la colonne "title" de role_conversations
+export const ADMIN_ROLE = 'admin'
+export const MEMBER_ROLE = 'membre'
 // ---------- Dates ----------
 
 function toLocalDate(date: DateTime): DateTime {
@@ -71,23 +76,39 @@ export function getInitials(fullName: string): string {
 }
 
 // Extrait du dernier message pour la liste
-export function buildPreview(message: Message, currentUserId: User['id']): string {
+// Extrait du dernier message pour la liste.
+// Dans un groupe (showSender = true) : "Jo : le projet est rendu"
+export function buildPreview(
+  message: Message,
+  currentUserId: User['id'],
+  showSender = false
+): string {
   if (message.isDeleted) {
     return 'Message supprimé'
   }
   const text = message.content ?? ''
-  return message.userId === currentUserId ? `Vous : ${text}` : text
+
+  if (message.userId === currentUserId) {
+    return `Vous : ${text}`
+  }
+  if (showSender && message.user) {
+    return `${message.user.fullName} : ${text}`
+  }
+  return text
 }
 
 // Données simples envoyées à la vue pour une bulle de message
-export function buildMessageView(message: Message, currentUserId: User['id']) {
-  // "statuses" contient (si chargé) la ligne de statut de l'interlocuteur
-  const isRead = message.statuses?.some((status) => status.isRead) ?? false
+export function buildMessageView(message: Message, currentUserId: User['id'], showSender = false) {
+  // "statuses" contient (si chargé) les statuts des autres personnes.
+  // Le message est "lu" quand TOUS les autres l'ont lu (une seule personne en conversation privée).
+  const statuses = message.statuses ?? []
+  const isRead = statuses.length > 0 && statuses.every((status) => status.isRead)
+  const isMine = message.userId === currentUserId
 
   return {
     id: message.id,
     content: message.content ?? '',
-    isMine: message.userId === currentUserId,
+    isMine,
     isDeleted: message.isDeleted,
     // Pas de colonne "modifié" : si updated_at est plus tard que created_at, le message a été modifié
     isEdited: message.updatedAt.toMillis() - message.createdAt.toMillis() > 1000,
@@ -95,9 +116,10 @@ export function buildMessageView(message: Message, currentUserId: User['id']) {
     time: formatTime(message.createdAt),
     dayKey: getDayKey(message.createdAt),
     dayLabel: getDayLabel(message.createdAt),
+    // Dans un groupe : nom de l'auteur affiché au-dessus des messages des autres
+    senderName: showSender && !isMine ? (message.user?.fullName ?? null) : null,
   }
 }
-
 // ---------- Base de données ----------
 
 // Cherche la participation de l'utilisateur à UNE conversation privée.
@@ -124,4 +146,43 @@ export async function markConversationAsRead(userId: User['id'], conversationId:
       db.from('messages').select('id').where('conversation_id', conversationId)
     )
     .update({ is_read: true, status: 'read', updated_at: new Date() })
+}
+
+// Même chose que findPrivateMembership, mais pour un GROUPE
+export function findGroupMembership(userId: User['id'], conversationId: number) {
+  return UserConversation.query()
+    .where('userId', userId)
+    .where('conversationId', conversationId)
+    .whereHas('conversation', (conversationQuery) => {
+      conversationQuery.whereHas('type', (typeQuery) => {
+        typeQuery.where('type', GROUP_TYPE)
+      })
+    })
+}
+
+// Nombre de messages non lus par conversation (table message_statuses).
+// (Déplacé ici depuis ConversationsController pour servir aussi aux groupes.)
+export async function getUnreadCounts(userId: User['id'], conversationIds: number[]) {
+  const counts = new Map<number, number>()
+
+  if (conversationIds.length === 0) {
+    return counts
+  }
+
+  const rows = await db
+    .from('message_statuses')
+    .join('messages', 'messages.id', 'message_statuses.message_id')
+    .where('message_statuses.user_id', userId)
+    .where('message_statuses.is_read', false)
+    .where('messages.is_deleted', false)
+    .whereIn('messages.conversation_id', conversationIds)
+    .select('messages.conversation_id')
+    .count('* as total')
+    .groupBy('messages.conversation_id')
+
+  for (const row of rows) {
+    counts.set(Number(row.conversation_id), Number(row.total))
+  }
+
+  return counts
 }

@@ -28,6 +28,9 @@
   @end
 
   <div class="max-w-[80%] rounded-2xl px-3.5 py-2 {{ bubbleClasses }}">
+    @if(message.senderName)
+      <p class="mb-0.5 text-xs font-semibold text-group">{{ message.senderName }}</p>
+    @end
     @if(message.isDeleted)
       <p class="italic opacity-70">Ce message a été supprimé</p>
     @else

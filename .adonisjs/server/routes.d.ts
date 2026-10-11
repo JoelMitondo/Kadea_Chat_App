@@ -26,6 +26,11 @@ export type ScannedRoutes = {
     'messages.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
     'users.chat': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups': { paramsTuple?: []; params?: {} }
+    'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups.store': { paramsTuple?: []; params?: {} }
+    'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
   GET: {
     'home': { paramsTuple?: []; params?: {} }
@@ -38,6 +43,8 @@ export type ScannedRoutes = {
     'messages': { paramsTuple?: []; params?: {} }
     'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
+    'groups': { paramsTuple?: []; params?: {} }
+    'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
   HEAD: {
     'home': { paramsTuple?: []; params?: {} }
@@ -50,6 +57,8 @@ export type ScannedRoutes = {
     'messages': { paramsTuple?: []; params?: {} }
     'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
+    'groups': { paramsTuple?: []; params?: {} }
+    'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
   POST: {
     'inscriptions.store': { paramsTuple?: []; params?: {} }
@@ -61,6 +70,9 @@ export type ScannedRoutes = {
     'profile.update': { paramsTuple?: []; params?: {} }
     'messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users.chat': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups.store': { paramsTuple?: []; params?: {} }
+    'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
   DELETE: {
     'conversations.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
