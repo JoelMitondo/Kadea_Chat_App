@@ -189,7 +189,8 @@ export default class ConversationsController {
       messagesQuery.where('createdAt', '>', membership.removedAt.toJSDate())
     }
 
-    const messages = (await messagesQuery).reverse()
+    const messages = await messagesQuery
+    messages.reverse()
 
     return {
       id: conversationId,

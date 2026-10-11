@@ -33,5 +33,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   MAIL_MAILER: Env.schema.enum(['brevo'] as const),
   MAIL_FROM_NAME: Env.schema.string(),
   MAIL_FROM_ADDRESS: Env.schema.string(),
-  BREVO_API_KEY: Env.schema.string()
+  BREVO_API_KEY: Env.schema.string(),
+
+  // Cloudinary (stockage des images)
+  CLOUDINARY_CLOUD_NAME: Env.schema.string(),
+  CLOUDINARY_API_KEY: Env.schema.string(),
+  CLOUDINARY_API_SECRET: Env.schema.secret(),
 })
