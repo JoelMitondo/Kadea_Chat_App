@@ -10,9 +10,12 @@ export const APP_TIMEZONE = 'Africa/Kinshasa'
 // Valeur de la colonne "type" de conversation_types pour les conversations 1-to-1
 export const PRIVATE_TYPE = 'Privee'
 
+// ---------- Dates ----------
+
 function toLocalDate(date: DateTime): DateTime {
   return date.setZone(APP_TIMEZONE).setLocale('fr')
 }
+
 // Nombre de jours entre la date et aujourd'hui (0 = aujourd'hui, 1 = hier...)
 function getDaysAgo(date: DateTime): number {
   const messageDay = toLocalDate(date).startOf('day')
@@ -51,8 +54,13 @@ export function getListTime(date: DateTime): string {
   return getDaysAgo(date) === 0 ? formatTime(date) : getDayLabel(date)
 }
 
-// ON GERE LES PRESENTATAIONS
-// Pour traiter l'initial du nom d'un utilisateur
+// Date au format 12/10/2026
+export function formatDate(date: DateTime): string {
+  return toLocalDate(date).toFormat('dd/MM/yyyy')
+}
+
+// ---------- Présentation ----------
+
 export function getInitials(fullName: string): string {
   return fullName
     .split(' ')
@@ -69,4 +77,51 @@ export function buildPreview(message: Message, currentUserId: User['id']): strin
   }
   const text = message.content ?? ''
   return message.userId === currentUserId ? `Vous : ${text}` : text
+}
+
+// Données simples envoyées à la vue pour une bulle de message
+export function buildMessageView(message: Message, currentUserId: User['id']) {
+  // "statuses" contient (si chargé) la ligne de statut de l'interlocuteur
+  const isRead = message.statuses?.some((status) => status.isRead) ?? false
+
+  return {
+    id: message.id,
+    content: message.content ?? '',
+    isMine: message.userId === currentUserId,
+    isDeleted: message.isDeleted,
+    // Pas de colonne "modifié" : si updated_at est plus tard que created_at, le message a été modifié
+    isEdited: message.updatedAt.toMillis() - message.createdAt.toMillis() > 1000,
+    isRead,
+    time: formatTime(message.createdAt),
+    dayKey: getDayKey(message.createdAt),
+    dayLabel: getDayLabel(message.createdAt),
+  }
+}
+
+// ---------- Base de données ----------
+
+// Cherche la participation de l'utilisateur à UNE conversation privée.
+// Si l'utilisateur n'en fait pas partie, .firstOrFail() renverra une erreur 404.
+export function findPrivateMembership(userId: User['id'], conversationId: number) {
+  return UserConversation.query()
+    .where('userId', userId)
+    .where('conversationId', conversationId)
+    .whereHas('conversation', (conversationQuery) => {
+      conversationQuery.whereHas('type', (typeQuery) => {
+        typeQuery.where('type', PRIVATE_TYPE)
+      })
+    })
+}
+
+// Passe en "lu" tous les messages non lus de l'utilisateur dans une conversation
+export async function markConversationAsRead(userId: User['id'], conversationId: number) {
+  await db
+    .from('message_statuses')
+    .where('user_id', userId)
+    .where('is_read', false)
+    .whereIn(
+      'message_id',
+      db.from('messages').select('id').where('conversation_id', conversationId)
+    )
+    .update({ is_read: true, status: 'read', updated_at: new Date() })
 }

@@ -7,7 +7,9 @@ export const controllers = {
   Conversations: () => import('#controllers/conversations_controller'),
   ForgoPasswords: () => import('#controllers/forgo_passwords_controller'),
   Inscriptions: () => import('#controllers/inscriptions_controller'),
+  Messages: () => import('#controllers/messages_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
   Profile: () => import('#controllers/profile_controller'),
   Session: () => import('#controllers/session_controller'),
+  Users: () => import('#controllers/users_controller'),
 }

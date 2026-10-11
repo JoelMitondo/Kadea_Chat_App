@@ -38,5 +38,16 @@ router
     router.post('/profile', [controllers.Profile, 'update']).as('profile.update')
 
     router.get('/messages', [controllers.Conversations, 'index']).as('messages')
+    router.get('/conversations/:id', [controllers.Conversations, 'show']).as('conversations.show')
+    router
+      .delete('/conversations/:id', [controllers.Conversations, 'destroy'])
+      .as('conversations.destroy')
+
+    router.post('/conversations/:id/messages', [controllers.Messages, 'store']).as('messages.store')
+    router.put('/messages/:id', [controllers.Messages, 'update']).as('messages.update')
+    router.delete('/messages/:id', [controllers.Messages, 'destroy']).as('messages.destroy')
+
+    router.get('/users', [controllers.Users, 'index']).as('users')
+    router.post('/users/:id/chat', [controllers.Users, 'chat']).as('users.chat')
   })
   .use(middleware.auth())

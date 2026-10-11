@@ -19,6 +19,13 @@ export type ScannedRoutes = {
     'profile': { paramsTuple?: []; params?: {} }
     'profile.update': { paramsTuple?: []; params?: {} }
     'messages': { paramsTuple?: []; params?: {} }
+    'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'conversations.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'messages.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'messages.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'users': { paramsTuple?: []; params?: {} }
+    'users.chat': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
   GET: {
     'home': { paramsTuple?: []; params?: {} }
@@ -29,6 +36,8 @@ export type ScannedRoutes = {
     'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'profile': { paramsTuple?: []; params?: {} }
     'messages': { paramsTuple?: []; params?: {} }
+    'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'users': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
     'home': { paramsTuple?: []; params?: {} }
@@ -39,6 +48,8 @@ export type ScannedRoutes = {
     'forgo_passwords.index_page_new_password': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'profile': { paramsTuple?: []; params?: {} }
     'messages': { paramsTuple?: []; params?: {} }
+    'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'users': { paramsTuple?: []; params?: {} }
   }
   POST: {
     'inscriptions.store': { paramsTuple?: []; params?: {} }
@@ -48,6 +59,15 @@ export type ScannedRoutes = {
     'forgot_password.reset': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.destroy': { paramsTuple?: []; params?: {} }
     'profile.update': { paramsTuple?: []; params?: {} }
+    'messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'users.chat': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+  }
+  DELETE: {
+    'conversations.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'messages.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+  }
+  PUT: {
+    'messages.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
   }
 }
 declare module '@adonisjs/core/types/http' {

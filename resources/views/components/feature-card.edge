@@ -1,0 +1,15 @@
+{{-- Carte de fonctionnalité. Props : title, description, tone (primary | group | accent | success). Le slot contient l'icône. --}}
+@let(tones = {
+  primary: 'bg-primary-soft text-on-primary-soft',
+  group: 'bg-group-soft text-group',
+  accent: 'bg-accent-soft text-on-accent-soft',
+  success: 'bg-success-soft text-success',
+})
+
+<article class="rounded-2xl border border-line bg-canvas p-6">
+  <span class="flex h-11 w-11 items-center justify-center rounded-xl {{ tones[$props.get('tone', 'primary')] }}">
+    {{{ await $slots.main() }}}
+  </span>
+  <h3 class="mt-4 text-lg font-semibold text-fg">{{ $props.get('title') }}</h3>
+  <p class="mt-2 text-sm leading-relaxed text-fg-muted">{{ $props.get('description') }}</p>
+</article>
