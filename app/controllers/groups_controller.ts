@@ -14,8 +14,12 @@ import {
   getInitials,
   getListTime,
   getUnreadCounts,
-  markConversationAsRead,
 } from '../service/chat_service.ts'
+import {
+  notifyConversationAdded,
+  notifyGroupUpdated,
+  markConversationAsReadAndNotify,
+} from '../service/realtime_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'un groupe
 const MESSAGES_LIMIT = 100
@@ -75,6 +79,9 @@ export default class GroupsController {
 
     const group = await createGroup(user, name, otherIds)
 
+    // TEMPS RÉEL : les membres voient le nouveau groupe apparaître dans leur liste
+    await notifyConversationAdded({ conversation: group, userIds: otherIds, lastMessage: null })
+
     // Le message s'affichera (toast) sur la page du groupe où le JavaScript redirige
     session.flash('success', `Le groupe « ${name} » a été créé.`)
     return response.created({ id: group.id })
@@ -90,6 +97,7 @@ export default class GroupsController {
 
     const membership = await findGroupMembership(user.id, conversationId)
       .preload('role')
+      .preload('conversation') // pour le nom du groupe
       .firstOrFail()
 
     if (membership.role.title !== ADMIN_ROLE) {
@@ -107,16 +115,42 @@ export default class GroupsController {
       })
     }
 
-    const addedCount = await addMembersToGroup(conversationId, memberIds)
+    // addMembersToGroup renvoie maintenant la LISTE des identifiants réellement ajoutés
+    const addedIds = await addMembersToGroup(conversationId, memberIds)
 
-    if (addedCount === 0) {
+    if (addedIds.length === 0) {
       return response.unprocessableEntity({
         errors: [{ field: 'member_ids', message: 'Ces utilisateurs font déjà partie du groupe.' }],
       })
     }
 
+    // TEMPS RÉEL 1 : les nouveaux membres voient le groupe apparaître dans leur liste
+    const lastMessage = await Message.query()
+      .where('conversationId', conversationId)
+      .preload('user')
+      .orderBy('createdAt', 'desc')
+      .orderBy('id', 'desc')
+      .first()
+
+    await notifyConversationAdded({
+      conversation: membership.conversation,
+      userIds: addedIds,
+      lastMessage,
+    })
+
+    // TEMPS RÉEL 2 : les membres déjà présents voient le groupe se mettre à jour
+    const allMembers = await UserConversation.query()
+      .where('conversationId', conversationId)
+      .select('user_id')
+    const existingMemberIds = allMembers
+      .map((row) => row.userId)
+      .filter((id) => id !== user.id && !addedIds.includes(id))
+    notifyGroupUpdated(conversationId, existingMemberIds)
+
     const message =
-      addedCount === 1 ? '1 membre a été ajouté.' : `${addedCount} membres ont été ajoutés.`
+      addedIds.length === 1
+        ? '1 membre a été ajouté.'
+        : `${addedIds.length} membres ont été ajoutés.`
     session.flash('success', message)
     return response.ok({ message })
   }
@@ -215,19 +249,18 @@ export default class GroupsController {
       .sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin) || a.fullName.localeCompare(b.fullName))
 
     // Ouvrir le groupe = lire ses messages
-    await markConversationAsRead(user.id, conversationId)
+    await markConversationAsReadAndNotify(user.id, conversationId)
 
-    const messages = (
-      await Message.query()
-        .where('conversationId', conversationId)
-        .preload('user') // pour le nom de l'auteur
-        .preload('statuses', (statusQuery) => {
-          statusQuery.whereNot('userId', user.id) // pour les coches "lu" de MES messages
-        })
-        .orderBy('createdAt', 'desc')
-        .orderBy('id', 'desc')
-        .limit(MESSAGES_LIMIT)
-    ).reverse()
+    const queriedMessages = await Message.query()
+      .where('conversationId', conversationId)
+      .preload('user') // pour le nom de l'auteur
+      .preload('statuses', (statusQuery) => {
+        statusQuery.whereNot('userId', user.id) // pour les coches "lu" de MES messages
+      })
+      .orderBy('createdAt', 'desc')
+      .orderBy('id', 'desc')
+      .limit(MESSAGES_LIMIT)
+    const messages = queriedMessages.reverse()
 
     // Seul l'administrateur peut ajouter des membres : lui seul a besoin de la liste
     const candidates = isAdmin ? await this.getCandidates(members.map((member) => member.id)) : []

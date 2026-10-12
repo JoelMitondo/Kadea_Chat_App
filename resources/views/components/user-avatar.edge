@@ -1,8 +1,18 @@
-{{-- Avatar. Props : initials, src, online, showOffline, size ('sm' ou rien), tone ('group' pour un groupe) --}}
+{{--
+  Avatar. Props : initials, src, online, showOffline, size ('sm' ou rien),
+  tone ('group' pour un groupe), userId (identifiant, pour la mise à jour en direct du statut).
+--}}
 @let(sizeClasses = $props.get('size') === 'sm' ? 'h-10 w-10' : 'h-12 w-12')
 @let(toneClasses = $props.get('tone') === 'group' ? 'bg-group-soft text-group' : 'bg-primary-soft text-on-primary-soft')
+@let(isOnline = Boolean($props.get('online')))
+@let(showOffline = Boolean($props.get('showOffline')))
 
-<span class="relative flex flex-none {{ sizeClasses }}">
+{{-- data-presence-user : realtime.js retrouve cet avatar grâce à l'identifiant et change sa puce en direct --}}
+<span
+  data-presence-user="{{ $props.get('userId', '') }}"
+  data-show-offline="{{ showOffline ? 'true' : 'false' }}"
+  class="relative flex flex-none {{ sizeClasses }}"
+>
   <span class="flex h-full w-full items-center justify-center rounded-full font-semibold {{ toneClasses }}">
     {{ $props.get('initials') }}
   </span>
@@ -11,12 +21,12 @@
     <img src="{{ $props.get('src') }}" alt="" onerror="this.remove()" class="absolute inset-0 h-full w-full rounded-full object-cover">
   @end
 
-  @if($props.get('online'))
-    <span class="absolute bottom-0 right-0 flex h-3 w-3" title="En ligne">
-      <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-online opacity-60"></span>
-      <span class="relative inline-flex h-3 w-3 rounded-full border-2 border-surface bg-online"></span>
-    </span>
-  @elseif($props.get('showOffline'))
-    <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-surface bg-fg-subtle" title="Hors ligne"></span>
-  @end
+  {{-- Puce verte qui clignote : en ligne --}}
+  <span data-presence-online title="En ligne" class="absolute bottom-0 right-0 flex h-3 w-3 {{ isOnline ? '' : 'hidden' }}">
+    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-online opacity-60"></span>
+    <span class="relative inline-flex h-3 w-3 rounded-full border-2 border-surface bg-online"></span>
+  </span>
+
+  {{-- Puce grise : hors ligne (seulement si showOffline) --}}
+  <span data-presence-offline title="Hors ligne" class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-surface bg-fg-subtle {{ (!isOnline && showOffline) ? '' : 'hidden' }}"></span>
 </span>

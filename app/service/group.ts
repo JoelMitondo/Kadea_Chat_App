@@ -50,12 +50,12 @@ export async function createGroup(
 
 /**
  * Ajoute des membres à un groupe. Ceux qui en font déjà partie sont ignorés.
- * Renvoie le nombre de membres réellement ajoutés.
+ * Renvoie la liste des membres réellement ajoutés.
  */
 export async function addMembersToGroup(
   conversationId: number,
   userIds: string[]
-): Promise<number> {
+): Promise<string[]> {
   const existingRows = await UserConversation.query()
     .where('conversationId', conversationId)
     .whereIn('userId', userIds)
@@ -65,7 +65,7 @@ export async function addMembersToGroup(
   const newIds = userIds.filter((userId) => !existingIds.includes(userId))
 
   if (newIds.length === 0) {
-    return 0
+    return []
   }
 
   const memberRole = await RoleConversation.findByOrFail('title', MEMBER_ROLE)
@@ -86,5 +86,5 @@ export async function addMembersToGroup(
     }))
   )
 
-  return newIds.length
+  return newIds
 }

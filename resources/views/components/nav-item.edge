@@ -1,7 +1,7 @@
 {{--
   Un bouton de la barre de navigation.
-  Informations reçues : href (adresse), label (texte), active (vrai/faux),
-  delay (délai d'apparition en ms), class (classes en plus, facultatif).
+  Informations reçues : href, label, active (vrai/faux), delay (ms), class (facultatif),
+  badge (facultatif : 'private' ou 'group' → affiche la pastille de messages non lus).
   Le contenu placé entre @component et @end est l'icône SVG.
 --}}
 <a
@@ -10,9 +10,14 @@
   style="animation-delay: {{ $props.get('delay', 0) }}ms"
   class="kc-apparition flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium text-fg-muted hover:bg-surface-2 hover:text-fg aria-[current=page]:bg-primary-soft aria-[current=page]:text-on-primary-soft md:h-12 md:flex-none md:flex-row md:gap-0 md:px-0 md:py-0 md:text-sm {{ $props.get('class', '') }}"
 >
-  {{-- L'icône --}}
-  <span class="flex h-6 w-6 items-center justify-center md:h-12 md:w-14 md:flex-none">
+  {{-- L'icône (et la pastille, positionnée par rapport à elle) --}}
+  <span class="relative flex h-6 w-6 items-center justify-center md:h-12 md:w-14 md:flex-none">
     {{{ await $slots.main() }}}
+
+    {{-- Pastille de messages non lus : cachée tant qu'il n'y en a pas (realtime.js la met à jour) --}}
+    @if($props.get('badge'))
+      <span data-nav-badge="{{ $props.get('badge') }}" class="absolute -right-2 -top-1.5 hidden min-w-5 rounded-full bg-accent px-1 text-center text-[11px] font-bold leading-5 text-on-accent md:right-2 md:top-1.5">0</span>
+    @end
   </span>
 
   {{-- Le nom de la page : sur ordinateur, il n'apparaît que quand la barre est agrandie --}}

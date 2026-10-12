@@ -30,8 +30,6 @@ export default defineConfig({
     () => import('@adonisjs/session/commands'),
     () => import('@adonisjs/mail/commands'),
     () => import('@adonisjs/bouncer/commands'),
-    // Temps réel : canaux autorisés + suivi des utilisateurs en ligne
-    { file: () => import('#start/transmit'), environment: ['web'] },
   ],
 
   /*
@@ -60,7 +58,8 @@ export default defineConfig({
     () => import('@adonisjs/auth/auth_provider'),
     () => import('@adonisjs/mail/mail_provider'),
     () => import('@adonisjs/bouncer/bouncer_provider'),
-    () => import('@adonisjs/transmit/transmit_provider')
+    () => import('@adonisjs/transmit/transmit_provider'),
+    () => import('@adonisjs/transmit/transmit_provider'),
   ],
 
   /*
@@ -76,6 +75,10 @@ export default defineConfig({
     () => import('#start/kernel'),
     () => import('#start/validator'),
     () => import('#start/view'),
+    {
+      file: () => import('#start/transmit'),
+      environment: ['web'],
+    },
   ],
 
   /*

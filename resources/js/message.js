@@ -111,6 +111,9 @@ async function ouvrirConversation(id) {
   marquerActive(id)
   page.dataset.view = 'chat' // sur téléphone : la liste disparaît
   defilerEnBas()
+
+  // On vient de lire les messages de cette conversation : les pastilles de la navigation changent
+  document.dispatchEvent(new CustomEvent('kc:rafraichir-compteurs'))
   return true
 }
 
@@ -220,6 +223,7 @@ document.addEventListener('submit', async function (evenement) {
     ancienne.outerHTML = resultat.corps.html
     quitterModeEdition()
   } else {
+    retirerMessageVide()
     document.getElementById('messages-list').insertAdjacentHTML('beforeend', resultat.corps.html)
     champ.value = ''
     defilerEnBas()
@@ -322,5 +326,153 @@ document.addEventListener('click', async function (evenement) {
   // Annuler la modification
   if (cible.closest('[data-cancel-edit]') !== null) {
     quitterModeEdition()
+  }
+})
+
+// ===== 8. TEMPS RÉEL =====
+// realtime.js (chargé dans le layout) reçoit les événements du serveur et nous les transmet
+// sous la forme d'un événement du navigateur nommé "kc:evenement".
+// Ici, on met à jour la LISTE et la DISCUSSION de cette page.
+
+function trouverElementListe(idConversation) {
+  return liste.querySelector('[data-conversation-item][data-conversation-id="' + idConversation + '"]')
+}
+
+// Ajoute une ligne (déjà fabriquée par le serveur) en haut de la liste
+function ajouterElementListe(html) {
+  liste.insertAdjacentHTML('afterbegin', html)
+  listeVide.classList.add('hidden')
+}
+
+// Compteur de messages non lus d'une conversation : +1
+function incrementerBadge(idConversation) {
+  let element = trouverElementListe(idConversation)
+  if (element === null) { return }
+
+  let badge = element.querySelector('[data-unread-badge]')
+  let nombre = parseInt(badge.textContent, 10)
+  if (isNaN(nombre)) { nombre = 0 }
+
+  badge.textContent = String(nombre + 1)
+  badge.classList.remove('hidden')
+}
+
+// Retire le texte "Aucun message" quand le premier message arrive
+function retirerMessageVide() {
+  let avis = document.querySelector('[data-empty-notice]')
+  if (avis !== null) { avis.remove() }
+}
+
+// Prévient le serveur que les messages de cette conversation ont été lus
+async function signalerLecture(idConversation) {
+  await envoyer('/conversations/' + idConversation + '/read', 'POST')
+  document.dispatchEvent(new CustomEvent('kc:rafraichir-compteurs'))
+}
+
+// Un nouveau message vient d'être envoyé par quelqu'un d'autre
+function traiterNouveauMessage(donnees) {
+  let idConversation = String(donnees.conversationId)
+  let estOuverte = page.dataset.activeId === idConversation
+
+  // Déjà affiché (par exemple reçu deux fois) : on ne fait rien
+  if (document.querySelector('[data-message-id="' + donnees.messageId + '"]') !== null) { return }
+
+  // 1. La conversation n'est pas encore dans la liste (premier message...) : on l'ajoute
+  if (trouverElementListe(idConversation) === null && donnees.itemHtml) {
+    ajouterElementListe(donnees.itemHtml)
+  }
+
+  // 2. Aperçu et heure mis à jour, la conversation remonte en haut de la liste
+  mettreAJourListe(idConversation, donnees.preview, donnees.time)
+
+  if (estOuverte) {
+    // 3a. On regarde cette conversation : la bulle s'ajoute sous nos yeux
+    retirerMessageVide()
+    document.getElementById('messages-list').insertAdjacentHTML('beforeend', donnees.html)
+    defilerEnBas()
+
+    // Si l'onglet est visible, le message est lu tout de suite (l'expéditeur voit les coches bleues).
+    // Sinon, il sera marqué comme lu au retour sur l'onglet (voir plus bas).
+    if (document.visibilityState === 'visible') {
+      signalerLecture(idConversation)
+    }
+  } else {
+    // 3b. Une autre conversation : son compteur de non lus augmente
+    incrementerBadge(idConversation)
+  }
+}
+
+// Un message a été modifié ou supprimé par son auteur
+function traiterMessageModifie(donnees) {
+  let bulle = document.querySelector('[data-message-id="' + donnees.messageId + '"]')
+  if (bulle !== null) {
+    bulle.outerHTML = donnees.html
+  }
+
+  // C'était le dernier message : l'aperçu de la liste change aussi
+  if (donnees.isLast) {
+    mettreAJourListe(donnees.conversationId, donnees.preview, donnees.time)
+  }
+}
+
+// Quelqu'un a lu nos messages : leurs coches passent en bleu
+function traiterLecture(donnees) {
+  donnees.messageIds.forEach(function (idMessage) {
+    let bulle = document.querySelector('[data-message-id="' + idMessage + '"]')
+    if (bulle === null) { return }
+
+    let cocheEnvoye = bulle.querySelector('[data-tick-sent]')
+    let cocheLu = bulle.querySelector('[data-tick-read]')
+    if (cocheEnvoye !== null) { cocheEnvoye.classList.add('hidden') }
+    if (cocheLu !== null) { cocheLu.classList.remove('hidden') }
+  })
+}
+
+// Un groupe a changé (nouveaux membres) : si on le regarde, on recharge son panneau
+function traiterGroupeModifie(donnees) {
+  if (page.dataset.activeId !== String(donnees.conversationId)) { return }
+
+  // On ne recharge pas si la fenêtre d'infos est ouverte ou si un message est en cours d'écriture
+  let fenetreInfos = document.getElementById('group-info-modal')
+  let champ = document.querySelector('#composer [name="content"]')
+  let fenetreOuverte = fenetreInfos !== null && fenetreInfos.open
+  let messageEnCours = champ !== null && champ.value !== ''
+
+  if (!fenetreOuverte && !messageEnCours) {
+    ouvrirConversation(donnees.conversationId)
+  }
+}
+
+// Point d'entrée : tous les événements du serveur passent par ici
+document.addEventListener('kc:evenement', function (evenement) {
+  let donnees = evenement.detail
+
+  // Cette page ne s'occupe que de son type de conversation (privée ou groupe).
+  // Les événements sans "kind" (comme la lecture ou la présence) passent.
+  if (donnees.kind !== undefined && donnees.kind !== page.dataset.kind) { return }
+
+  if (donnees.type === 'message:new') { traiterNouveauMessage(donnees) }
+  if (donnees.type === 'message:updated') { traiterMessageModifie(donnees) }
+  if (donnees.type === 'messages:read') { traiterLecture(donnees) }
+  if (donnees.type === 'group:updated') { traiterGroupeModifie(donnees) }
+
+  if (donnees.type === 'conversation:added' && trouverElementListe(donnees.conversationId) === null) {
+    ajouterElementListe(donnees.itemHtml)
+  }
+})
+
+// Retour sur l'onglet : les messages reçus pendant son absence sont maintenant lus
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && page.dataset.activeId !== '') {
+    signalerLecture(page.dataset.activeId)
+  }
+})
+
+// Connexion rétablie après une coupure : on a pu rater des messages, on recharge la page
+// (sauf si un message est en cours d'écriture, pour ne pas le perdre)
+document.addEventListener('kc:reconnecte', function () {
+  let champ = document.querySelector('#composer [name="content"]')
+  if (champ === null || champ.value === '') {
+    window.location.reload()
   }
 })

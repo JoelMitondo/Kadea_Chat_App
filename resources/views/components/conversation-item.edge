@@ -1,0 +1,50 @@
+{{--
+  Une ligne de la liste des conversations ou des groupes.
+  Props : item, chatUrl ('/conversations' ou '/groups'), active, isGroup, canDelete
+--}}
+@let(item = $props.get('item'))
+@let(chatUrl = $props.get('chatUrl'))
+
+<div
+  data-conversation-item
+  data-conversation-id="{{ item.id }}"
+  data-active="{{ $props.get('active') ? 'true' : 'false' }}"
+  class="group flex items-center border-l-4 border-transparent hover:bg-surface-2 data-[active=true]:border-primary data-[active=true]:bg-primary-soft"
+>
+  <a
+    href="{{ chatUrl }}/{{ item.id }}"
+    data-conversation-link
+    data-conversation-id="{{ item.id }}"
+    data-no-loader
+    class="flex min-w-0 flex-1 items-center gap-3 px-4 py-3"
+  >
+    @if($props.get('isGroup'))
+      @!component('components/user-avatar', { initials: item.initials, tone: 'group' })
+    @else
+      @!component('components/user-avatar', { initials: item.initials, src: item.avatarUrl, online: item.isOnline, userId: item.userId })
+    @end
+
+    <span class="min-w-0 flex-1">
+      <span class="flex items-center justify-between gap-2">
+        <span class="truncate font-semibold text-fg">{{ item.name }}</span>
+        <span data-time class="flex-none text-xs text-fg-subtle">{{ item.time }}</span>
+      </span>
+      <span class="flex items-center justify-between gap-2">
+        <span data-preview class="truncate text-sm text-fg-muted">{{ item.preview }}</span>
+        <span data-unread-badge class="{{ item.unreadCount > 0 ? '' : 'hidden' }} flex-none rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-on-accent">{{ item.unreadCount }}</span>
+      </span>
+    </span>
+  </a>
+
+  {{-- Supprimer la conversation (conversations privées seulement) --}}
+  @if($props.get('canDelete'))
+    <button type="button" data-delete-conversation title="Supprimer la conversation" aria-label="Supprimer la conversation" class="mr-3 flex-none cursor-pointer rounded-full p-2 text-fg-subtle hover:bg-danger-soft hover:text-danger md:opacity-0 md:group-hover:opacity-100">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      </svg>
+    </button>
+  @end
+</div>

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 /* npx @tailwindcss/cli -i ./resources/css/input.css -o ./resources/css/output.css --watch */
+/* https://i.ibb.co/1YhrGKHz/logo-Kadea.png et grand https://i.ibb.co/zVsVm0NQ/Screenshot-17.png */
 @source "../views/**/*.edge";
 @source "../js/**/*.js";
 

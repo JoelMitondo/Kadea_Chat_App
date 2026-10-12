@@ -12,7 +12,7 @@
         </svg>
       </button>
 
-      @!component('components/user-avatar', { initials: chat.group.initials, tone: 'group', size: 'sm' })
+      @!component('components/user-avatar', { initials: chat.group.initials, tone: 'group', size: 'sm', userId: member.id })
 
       <div class="min-w-0 flex-1">
         <p class="truncate font-semibold text-fg">{{ chat.group.name }}</p>
@@ -32,7 +32,7 @@
     {{-- ===== Messages ===== --}}
     <div id="messages-list" class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-canvas px-3 py-4 sm:px-6">
       @if(chat.messages.length === 0)
-        <p class="py-10 text-center text-sm text-fg-subtle">Aucun message. Lancez la discussion 👋</p>
+        <p data-empty-notice class="py-10 text-center text-sm text-fg-subtle">Aucun message. Lancez la discussion 👋</p>
       @end
 
       @each((message, index) in chat.messages)

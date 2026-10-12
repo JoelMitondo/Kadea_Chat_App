@@ -12,25 +12,23 @@
         </svg>
       </button>
 
-      @!component('components/user-avatar', { initials: chat.other.initials, src: chat.other.avatarUrl, online: chat.other.isOnline, size: 'sm' })
+      @!component('components/user-avatar', { initials: chat.other.initials, src: chat.other.avatarUrl, online: chat.other.isOnline, userId: chat.other.id, size: 'sm' })
 
       <div class="min-w-0">
         <p class="truncate font-semibold text-fg">{{ chat.other.name }}</p>
-        @if(chat.other.isOnline)
-          <p class="flex items-center gap-1.5 text-xs font-medium text-success">
-            <span class="h-2 w-2 animate-pulse rounded-full bg-online"></span>
-            En ligne
-          </p>
-        @else
-          <p class="text-xs text-fg-subtle">Hors ligne</p>
-        @end
+
+        {{-- data-presence-label : realtime.js change ce texte en direct --}}
+        <p data-presence-label="{{ chat.other.id }}" class="flex items-center gap-1.5 text-xs {{ chat.other.isOnline ? 'font-medium text-success' : 'text-fg-subtle' }}">
+          <span data-presence-pulse class="h-2 w-2 animate-pulse rounded-full bg-online {{ chat.other.isOnline ? '' : 'hidden' }}"></span>
+          <span data-presence-text>{{ chat.other.isOnline ? 'En ligne' : 'Hors ligne' }}</span>
+        </p>
       </div>
     </header>
 
     {{-- ===== Messages ===== --}}
     <div id="messages-list" class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-canvas px-3 py-4 sm:px-6">
       @if(chat.messages.length === 0)
-        <p class="py-10 text-center text-sm text-fg-subtle">Aucun message. Dites bonjour 👋</p>
+        <p data-empty-notice class="py-10 text-center text-sm text-fg-subtle">Aucun message. Dites bonjour 👋</p>
       @end
 
       @each((message, index) in chat.messages)

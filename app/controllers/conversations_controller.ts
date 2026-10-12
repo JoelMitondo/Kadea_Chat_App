@@ -113,6 +113,7 @@ export default class ConversationsController {
         sortTime: (lastMessage?.createdAt ?? membership.conversation.createdAt).toMillis(),
         view: {
           id: membership.conversationId,
+          userId: otherUser.id,
           name: otherUser.fullName,
           initials: getInitials(otherUser.fullName),
           avatarUrl: otherUser.avatarUrl,
@@ -145,8 +146,7 @@ export default class ConversationsController {
       throw new Error('Interlocuteur introuvable pour cette conversation.')
     }
 
-    // Ouvrir la conversation = lire les messages reçus
-    await markConversationAsRead(user.id, conversationId)
+    await markConversationAsReadAndNotify(user.id, conversationId)
 
     // On charge les derniers messages (du plus récent au plus ancien), puis on remet dans l'ordre
     const messagesQuery = Message.query()
@@ -169,6 +169,7 @@ export default class ConversationsController {
     return {
       id: conversationId,
       other: {
+        id: otherUser.id,
         name: otherUser.fullName,
         initials: getInitials(otherUser.fullName),
         avatarUrl: otherUser.avatarUrl,

@@ -23,12 +23,12 @@
     @each(person in users)
       <li class="flex items-center gap-3 px-4 py-3 sm:px-5">
 
-        @!component('components/user-avatar', { initials: person.initials, src: person.avatarUrl, online: person.isOnline, showOffline: true })
+        @!component('components/user-avatar', { initials: person.initials, src: person.avatarUrl, online: person.isOnline, showOffline: true, userId: person.id })
 
         <div class="min-w-0 flex-1">
           <p class="truncate font-semibold text-fg">{{ person.fullName }}</p>
-          <p class="text-xs {{ person.isOnline ? 'text-success' : 'text-fg-subtle' }}">
-            {{ person.isOnline ? 'En ligne' : 'Hors ligne' }}
+          <p data-presence-label="{{ person.id }}" class="text-xs {{ person.isOnline ? 'font-medium text-success' : 'text-fg-subtle' }}">
+            <span data-presence-text>{{ person.isOnline ? 'En ligne' : 'Hors ligne' }}</span>
           </p>
         </div>
 
@@ -44,6 +44,7 @@
             data-initials="{{ person.initials }}"
             data-created="{{ person.createdAt }}"
             data-online="{{ person.isOnline }}"
+            data-presence-user="{{ person.id }}"
             title="Voir plus"
             aria-label="Voir plus sur {{ person.fullName }}"
             class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong px-3 py-2 text-sm font-semibold text-fg hover:bg-surface-2"
