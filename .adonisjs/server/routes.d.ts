@@ -31,6 +31,9 @@ export type ScannedRoutes = {
     'groups.store': { paramsTuple?: []; params?: {} }
     'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'event_stream': { paramsTuple?: []; params?: {} }
+    'subscribe': { paramsTuple?: []; params?: {} }
+    'unsubscribe': { paramsTuple?: []; params?: {} }
   }
   GET: {
     'home': { paramsTuple?: []; params?: {} }
@@ -45,6 +48,7 @@ export type ScannedRoutes = {
     'users': { paramsTuple?: []; params?: {} }
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'event_stream': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
     'home': { paramsTuple?: []; params?: {} }
@@ -59,6 +63,7 @@ export type ScannedRoutes = {
     'users': { paramsTuple?: []; params?: {} }
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'event_stream': { paramsTuple?: []; params?: {} }
   }
   POST: {
     'inscriptions.store': { paramsTuple?: []; params?: {} }
@@ -73,6 +78,8 @@ export type ScannedRoutes = {
     'groups.store': { paramsTuple?: []; params?: {} }
     'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'subscribe': { paramsTuple?: []; params?: {} }
+    'unsubscribe': { paramsTuple?: []; params?: {} }
   }
   DELETE: {
     'conversations.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ $props.get('title', 'Kadea Chat') }}</title>
 
+  <meta name="csrf-token" content="{{ csrfToken }}">
   {{-- Application du thème sombre ou clair avant l'affichage, pour éviter un flash --}}
   <script>
     let themeSauvegarde = localStorage.getItem('theme')
@@ -14,10 +15,11 @@
 
   <link rel="stylesheet" href="/resources/css/output.css">
   <link rel="stylesheet" href="/resources/css/animate.css">
-  
+  {{-- charge realtime.js (il passe par Vite) --}}
+  @vite(['resources/js/realtime.js'])
 </head>
 
-<body class="bg-canvas text-fg antialiased">
+<body class="bg-canvas text-fg antialiased" data-user-id="{{ auth.user.id }}">
 
   @!component('components/loader')
   @!component('components/toasts')

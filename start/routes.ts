@@ -1,6 +1,7 @@
 import { middleware } from '#start/kernel'
 import { controllers } from '#generated/controllers'
 import router from '@adonisjs/core/services/router'
+import transmit from '@adonisjs/transmit/services/main'
 
 router.on('/').render('pages/home').as('home')
 
@@ -61,3 +62,11 @@ router
       .as('groups.messages.store')
   })
   .use(middleware.auth())
+
+// Transmit ajoute 3 routes (/__transmit/events, subscribe, unsubscribe).
+// Seules les personnes connectées peuvent ouvrir la connexion et s'abonner à un canal.
+transmit.registerRoutes((route) => {
+  if (route.getPattern() === '__transmit/events' || route.getPattern() === '__transmit/subscribe') {
+    route.middleware(middleware.auth())
+  }
+})

@@ -67,6 +67,7 @@
     "@adonisjs/session": "^8.1.0",
     "@adonisjs/shield": "^9.0.0",
     "@adonisjs/static": "^2.0.1",
+    "@adonisjs/transmit": "^3.0.2",
     "@adonisjs/vite": "^6.0.2",
     "@tailwindcss/cli": "^4.3.3",
     "@vinejs/vine": "^4.4.0",
