@@ -13,6 +13,7 @@ import {
   markConversationAsRead,
   getUnreadCounts,
 } from '../service/chat_service.ts'
+import { markConversationAsReadAndNotify } from './../service/realtime_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'une conversation
 const MESSAGES_LIMIT = 100

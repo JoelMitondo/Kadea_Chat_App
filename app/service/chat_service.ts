@@ -74,7 +74,29 @@ export function getInitials(fullName: string): string {
     .map((word) => word[0].toUpperCase())
     .join('')
 }
+// Ce message est-il le PREMIER que ce participant voit dans la conversation ?
+// (conversation sans message, ou supprimée par lui avant ce message)
+export function isFirstVisibleMessage(
+  previousMessage: Message | null,
+  membership: UserConversation
+): boolean {
+  if (previousMessage === null) {
+    return true
+  }
+  return Boolean(membership.removedAt && previousMessage.createdAt <= membership.removedAt)
+}
 
+// Faut-il afficher un séparateur de date ("Aujourd'hui"...) avant ce message ?
+export function needsDaySeparator(
+  previousMessage: Message | null,
+  message: Message,
+  membership: UserConversation
+): boolean {
+  if (previousMessage === null || isFirstVisibleMessage(previousMessage, membership)) {
+    return true
+  }
+  return getDayKey(previousMessage.createdAt) !== getDayKey(message.createdAt)
+}
 // Extrait du dernier message pour la liste
 // Extrait du dernier message pour la liste.
 // Dans un groupe (showSender = true) : "Jo : le projet est rendu"

@@ -2,19 +2,26 @@ import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import type User from '#models/user'
+import Conversation from '#models/conversation'
 import Message from '#models/message'
 import MessageStatus from '#models/message_status'
 import MessageType from '#models/message_type'
 import UserConversation from '#models/user_conversation'
 import { sendMessageValidator, updateMessageValidator } from '#validators/message'
 import {
+  GROUP_TYPE,
   buildMessageView,
   buildPreview,
   findGroupMembership,
   findPrivateMembership,
-  getDayKey,
   getListTime,
+  needsDaySeparator,
 } from '../service/chat_service.ts'
+import {
+  notifyMessageUpdated,
+  notifyNewMessage,
+  type ConversationKind,
+} from '../service/realtime_service.ts'
 
 export default class MessagesController {
   /**
@@ -23,7 +30,7 @@ export default class MessagesController {
   async store(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
     const membership = await findPrivateMembership(user.id, Number(ctx.params.id)).firstOrFail()
-    return this.sendMessage(ctx, membership)
+    return this.sendMessage(ctx, membership, 'private')
   }
 
   /**
@@ -31,8 +38,10 @@ export default class MessagesController {
    */
   async storeInGroup(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
-    const membership = await findGroupMembership(user.id, Number(ctx.params.id)).firstOrFail()
-    return this.sendMessage(ctx, membership)
+    const membership = await findGroupMembership(user.id, Number(ctx.params.id))
+      .preload('conversation') // pour connaître le nom du groupe
+      .firstOrFail()
+    return this.sendMessage(ctx, membership, 'group')
   }
 
   /**
@@ -59,6 +68,10 @@ export default class MessagesController {
     })
 
     const data = await this.buildMessageResponse(message, user.id, view)
+
+    // TEMPS RÉEL : les autres participants voient la modification tout de suite
+    await this.notifyOthers(message, user, data.isLast)
+
     return response.ok(data)
   }
 
@@ -77,6 +90,10 @@ export default class MessagesController {
     await message.save()
 
     const data = await this.buildMessageResponse(message, user.id, view)
+
+    // TEMPS RÉEL : le message devient "Ce message a été supprimé" chez les autres
+    await this.notifyOthers(message, user, data.isLast)
+
     return response.ok(data)
   }
 
@@ -85,7 +102,11 @@ export default class MessagesController {
   /**
    * Enregistre un nouveau message (conversation privée OU groupe)
    */
-  private async sendMessage(ctx: HttpContext, membership: UserConversation) {
+  private async sendMessage(
+    ctx: HttpContext,
+    membership: UserConversation,
+    kind: ConversationKind
+  ) {
     const { auth, request, response, view } = ctx
     const user = auth.getUserOrFail()
     const { content } = await request.validateUsing(sendMessageValidator)
@@ -131,17 +152,43 @@ export default class MessagesController {
       return newMessage
     })
 
-    // Faut-il afficher un séparateur de date avant ce message ?
-    let showSeparator = true
-    if (
-      previousMessage &&
-      (!membership.removedAt || previousMessage.createdAt > membership.removedAt)
-    ) {
-      showSeparator = getDayKey(previousMessage.createdAt) !== getDayKey(message.createdAt)
-    }
-
+    // Réponse à celui qui vient d'écrire (comme avant)
+    const showSeparator = needsDaySeparator(previousMessage, message, membership)
     const data = await this.buildMessageResponse(message, user.id, view, showSeparator)
+
+    // TEMPS RÉEL : les autres participants reçoivent le message tout de suite.
+    // Le message est déjà enregistré : même si cet envoi échoue, rien n'est perdu.
+    await message.load('user')
+    await notifyNewMessage({
+      message,
+      sender: user,
+      kind,
+      conversationName: kind === 'group' ? (membership.conversation?.title ?? null) : null,
+      previousMessage,
+      recipients: otherMemberships,
+    })
+
     return response.created(data)
+  }
+
+  /**
+   * Prévient les autres participants qu'un message a été modifié ou supprimé
+   */
+  private async notifyOthers(message: Message, sender: User, isLast: boolean) {
+    // Est-ce une conversation privée ou un groupe ?
+    const conversation = await Conversation.query()
+      .where('id', message.conversationId)
+      .preload('type')
+      .firstOrFail()
+    const kind: ConversationKind = conversation.type.type === GROUP_TYPE ? 'group' : 'private'
+
+    const recipients = await UserConversation.query()
+      .where('conversationId', message.conversationId)
+      .whereNot('userId', sender.id)
+
+    await message.load('user') // pour le nom de l'auteur dans un groupe
+
+    await notifyMessageUpdated({ message, kind, isLast, recipients })
   }
 
   /**

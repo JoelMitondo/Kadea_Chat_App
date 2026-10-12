@@ -60,6 +60,9 @@ router
     router
       .post('/groups/:id/messages', [controllers.Messages, 'storeInGroup'])
       .as('groups.messages.store')
+
+    router.get('/unread-counts', [controllers.Realtime, 'unreadCounts']).as('realtime.unread')
+    router.post('/conversations/:id/read', [controllers.Realtime, 'markRead']).as('realtime.read')
   })
   .use(middleware.auth())
 
