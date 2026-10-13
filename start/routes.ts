@@ -63,6 +63,9 @@ router
 
     router.get('/unread-counts', [controllers.Realtime, 'unreadCounts']).as('realtime.unread')
     router.post('/conversations/:id/read', [controllers.Realtime, 'markRead']).as('realtime.read')
+
+    router.get('/stories', [controllers.Stories, 'index']).as('stories')
+    router.post('/stories', [controllers.Stories, 'store']).as('stories.store')
   })
   .use(middleware.auth())
 

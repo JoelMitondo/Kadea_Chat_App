@@ -13,5 +13,6 @@ export const controllers = {
   Profile: () => import('#controllers/profile_controller'),
   Realtime: () => import('#controllers/realtime_controller'),
   Session: () => import('#controllers/session_controller'),
+  Stories: () => import('#controllers/stories_controller'),
   Users: () => import('#controllers/users_controller'),
 }

@@ -33,6 +33,8 @@ export type ScannedRoutes = {
     'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
     'realtime.read': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'stories': { paramsTuple?: []; params?: {} }
+    'stories.store': { paramsTuple?: []; params?: {} }
     'event_stream': { paramsTuple?: []; params?: {} }
     'subscribe': { paramsTuple?: []; params?: {} }
     'unsubscribe': { paramsTuple?: []; params?: {} }
@@ -51,6 +53,7 @@ export type ScannedRoutes = {
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
+    'stories': { paramsTuple?: []; params?: {} }
     'event_stream': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
@@ -67,6 +70,7 @@ export type ScannedRoutes = {
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
+    'stories': { paramsTuple?: []; params?: {} }
     'event_stream': { paramsTuple?: []; params?: {} }
   }
   POST: {
@@ -83,6 +87,7 @@ export type ScannedRoutes = {
     'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.read': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'stories.store': { paramsTuple?: []; params?: {} }
     'subscribe': { paramsTuple?: []; params?: {} }
     'unsubscribe': { paramsTuple?: []; params?: {} }
   }

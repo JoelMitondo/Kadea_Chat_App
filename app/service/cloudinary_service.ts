@@ -105,3 +105,43 @@ function extractPublicId(imageUrl: string): string | null {
 
   return decodeURIComponent(publicId)
 }
+// ---------- Stories ----------
+
+/**
+ * Story : l'image est réduite si elle dépasse 1080 x 1920 (jamais agrandie, jamais déformée).
+ * Cela économise de l'espace de stockage et des données pour ceux qui la regardent.
+ */
+export function uploadStoryImage(filePath: string): Promise<string> {
+  return uploadImage(filePath, 'stories', {
+    transformation: [{ width: 1080, height: 1920, crop: 'limit' }],
+  })
+}
+
+// ---------- Versions d'une même image ----------
+// Dans un lien Cloudinary, ce qui suit "/upload/" décrit une transformation à appliquer.
+// En insérant un texte à cet endroit, Cloudinary fabrique et sert une autre version de la MÊME
+// image, sans qu'on la stocke une deuxième fois. Seul le lien d'origine est enregistré en base.
+const UPLOAD_SEGMENT = '/upload/'
+
+// Aperçu : réduit à 48 pixels de large PUIS très flouté (quelques Ko seulement)
+// Pour le rendre plus ou moins flou, changez le chiffre après "e_blur:" (1 à 2000).
+const BLUR_TRANSFORMATION = 'w_48,c_limit/e_blur:100/q_auto:low,f_auto'
+
+// Version nette : qualité et format choisis automatiquement pour le plus léger possible
+const FULL_TRANSFORMATION = 'q_auto,f_auto'
+
+function withTransformation(imageUrl: string, transformation: string): string {
+  // Ce n'est pas un lien Cloudinary : on le renvoie tel quel
+  if (!imageUrl.includes(UPLOAD_SEGMENT)) {
+    return imageUrl
+  }
+  return imageUrl.replace(UPLOAD_SEGMENT, `${UPLOAD_SEGMENT}${transformation}/`)
+}
+
+export function buildBlurUrl(imageUrl: string): string {
+  return withTransformation(imageUrl, BLUR_TRANSFORMATION)
+}
+
+export function buildFullUrl(imageUrl: string): string {
+  return withTransformation(imageUrl, FULL_TRANSFORMATION)
+}
