@@ -108,6 +108,7 @@ async function ouvrirConversation(id) {
   }
 
   panneau.innerHTML = await reponse.text()
+    fichierJoint = null // un fichier choisi dans l'ancienne conversation est oublié
   marquerActive(id)
   page.dataset.view = 'chat' // sur téléphone : la liste disparaît
   defilerEnBas()
@@ -161,15 +162,90 @@ window.addEventListener('popstate', function (evenement) {
   }
 })
 
+
 // ===== 5. Envoyer ou modifier un message =====
+
+// Fichier (image ou document) choisi avec le trombone, pas encore envoyé
+let fichierJoint = null
+
+const EXTENSIONS_ACCEPTEES = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv']
+const TAILLE_MAX_FICHIER = 10 * 1024 * 1024 // 10 Mo
+
+// Vérifie le fichier choisi (type et taille), puis l'affiche au-dessus du champ de saisie
+function choisirFichier(fichier) {
+  let extension = fichier.name.split('.').pop().toLowerCase()
+
+  if (EXTENSIONS_ACCEPTEES.indexOf(extension) === -1) {
+    kcNotifier.erreur('Type de fichier non accepté. Images : JPG, PNG, GIF, WebP. Documents : PDF, Word, Excel, PowerPoint, TXT, CSV.')
+    retirerFichierJoint()
+    return
+  }
+
+  if (fichier.size > TAILLE_MAX_FICHIER) {
+    kcNotifier.erreur('Le fichier est trop lourd : 10 Mo maximum.')
+    retirerFichierJoint()
+    return
+  }
+
+  fichierJoint = fichier
+  document.getElementById('attachment-name').textContent = fichier.name
+  document.getElementById('attachment-chip').classList.remove('hidden')
+  document.getElementById('attachment-chip').classList.add('flex')
+}
+
+// Annule le fichier choisi
+function retirerFichierJoint() {
+  fichierJoint = null
+
+  let champ = document.getElementById('attachment-input')
+  let bandeau = document.getElementById('attachment-chip')
+
+  if (champ !== null) { champ.value = '' }
+  if (bandeau !== null) {
+    bandeau.classList.add('hidden')
+    bandeau.classList.remove('flex')
+  }
+}
+
+// Envoie un message AVEC un fichier. Un fichier ne peut pas passer en JSON :
+// on utilise un "FormData" (un formulaire construit à la main).
+async function envoyerFichier(adresse, contenu, fichier) {
+  let donnees = new FormData()
+  donnees.append('content', contenu)
+  donnees.append('attachment', fichier)
+
+  try {
+    let reponse = await fetch(adresse, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'X-CSRF-TOKEN': jeton },
+      body: donnees,
+    })
+
+    let corps = {}
+    try {
+      corps = await reponse.json()
+    } catch (erreurLecture) {
+      corps = {}
+    }
+    return { ok: reponse.ok, corps: corps }
+  } catch (erreurReseau) {
+    return { ok: false, corps: { message: 'Impossible de contacter le serveur. Vérifiez votre connexion.' } }
+  }
+}
 
 function entrerModeEdition(idMessage) {
   let bulle = document.querySelector('[data-message-id="' + idMessage + '"]')
   let formulaire = document.getElementById('composer')
   if (bulle === null || formulaire === null) { return }
 
+  // Un message qui n'a pas de texte ne peut pas être modifié
+  let zoneTexte = bulle.querySelector('[data-message-text]')
+  if (zoneTexte === null) { return }
+
+  retirerFichierJoint() // on ne peut pas ajouter un fichier en modifiant un message
+
   let champ = formulaire.querySelector('[name="content"]')
-  champ.value = bulle.querySelector('[data-message-text]').textContent.trim()
+  champ.value = zoneTexte.textContent.trim()
 
   formulaire.dataset.editingId = idMessage
   document.getElementById('edit-banner').classList.remove('hidden')
@@ -186,6 +262,70 @@ function quitterModeEdition() {
   document.getElementById('edit-banner').classList.add('hidden')
   document.getElementById('edit-banner').classList.remove('flex')
 }
+
+// Un fichier est choisi avec le trombone
+document.addEventListener('change', function (evenement) {
+  if (evenement.target.id !== 'attachment-input') { return }
+
+  let fichier = evenement.target.files[0]
+  if (fichier !== undefined) {
+    choisirFichier(fichier)
+  }
+})
+
+// Envoi du formulaire de saisie
+document.addEventListener('submit', async function (evenement) {
+  let formulaire = evenement.target
+  if (formulaire.id !== 'composer') { return }
+
+  evenement.preventDefault()
+
+  let champ = formulaire.querySelector('[name="content"]')
+  let bouton = formulaire.querySelector('[type="submit"]')
+  let contenu = champ.value.trim()
+  let idEdition = formulaire.dataset.editingId
+
+  // Rien à envoyer : en modification il faut du texte ; sinon il faut un texte OU un fichier
+  if (contenu === '' && (idEdition || fichierJoint === null)) { return }
+
+  let idConversation = document.getElementById('chat-panel').dataset.conversationId
+
+  bouton.disabled = true
+
+  let resultat
+  if (idEdition) {
+    resultat = await envoyer('/messages/' + idEdition, 'PUT', { content: contenu })
+  } else if (fichierJoint !== null) {
+    resultat = await envoyerFichier(formulaire.getAttribute('action'), contenu, fichierJoint)
+  } else {
+    resultat = await envoyer(formulaire.getAttribute('action'), 'POST', { content: contenu })
+  }
+
+  bouton.disabled = false
+
+  if (!resultat.ok) {
+    kcNotifier.erreur(lireErreur(resultat.corps))
+    return
+  }
+
+  if (idEdition) {
+    // On remplace l'ancienne bulle par la nouvelle
+    let ancienne = document.querySelector('[data-message-id="' + idEdition + '"]')
+    ancienne.outerHTML = resultat.corps.html
+    quitterModeEdition()
+  } else {
+    retirerMessageVide()
+    document.getElementById('messages-list').insertAdjacentHTML('beforeend', resultat.corps.html)
+    champ.value = ''
+    retirerFichierJoint()
+    defilerEnBas()
+  }
+
+  if (resultat.corps.isLast) {
+    mettreAJourListe(idConversation, resultat.corps.preview, resultat.corps.time)
+  }
+  champ.focus()
+})
 
 document.addEventListener('submit', async function (evenement) {
   let formulaire = evenement.target
@@ -282,6 +422,28 @@ async function supprimerConversation(element) {
   }
 }
 
+// Bloque (bloquer = true) ou débloque (bloquer = false) l'interlocuteur
+async function changerBlocage(idUtilisateur, bloquer) {
+  let question = bloquer
+    ? 'Bloquer cet utilisateur ? Il ne pourra plus vous envoyer de nouveaux messages.'
+    : 'Débloquer cet utilisateur ?'
+
+  if (!confirm(question)) { return }
+
+  let adresse = '/users/' + idUtilisateur + (bloquer ? '/block' : '/unblock')
+  let resultat = await envoyer(adresse, 'POST')
+
+  if (!resultat.ok) {
+    kcNotifier.erreur(lireErreur(resultat.corps))
+    return
+  }
+
+  kcNotifier.succes(resultat.corps.message)
+
+  // On recharge la conversation pour afficher le bandeau et le bon bouton
+  ouvrirConversation(page.dataset.activeId)
+}
+
 // ===== 7. Tous les clics (délégation : fonctionne aussi pour le contenu ajouté après coup) =====
 
 document.addEventListener('click', async function (evenement) {
@@ -322,7 +484,29 @@ document.addEventListener('click', async function (evenement) {
     supprimerMessage(boutonSupprimer.closest('[data-message-id]').dataset.messageId)
     return
   }
+  // Bloquer / débloquer l'interlocuteur
+  let boutonBloquer = cible.closest('[data-block-user]')
+  if (boutonBloquer !== null) {
+    changerBlocage(boutonBloquer.dataset.userId, true)
+    return
+  }
 
+  let boutonDebloquer = cible.closest('[data-unblock-user]')
+  if (boutonDebloquer !== null) {
+    changerBlocage(boutonDebloquer.dataset.userId, false)
+    return
+  }
+    // Trombone : ouvre le choix de fichier
+  if (cible.closest('[data-pick-attachment]') !== null) {
+    document.getElementById('attachment-input').click()
+    return
+  }
+
+  // Croix à côté du nom du fichier : on annule le fichier
+  if (cible.closest('[data-remove-attachment]') !== null) {
+    retirerFichierJoint()
+    return
+  }
   // Annuler la modification
   if (cible.closest('[data-cancel-edit]') !== null) {
     quitterModeEdition()

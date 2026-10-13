@@ -3,6 +3,7 @@ import db from '@adonisjs/lucid/services/db'
 import type Message from '#models/message'
 import type User from '#models/user'
 import UserConversation from '#models/user_conversation'
+import { buildDownloadUrl, buildThumbUrl } from './cloudinary_service.ts'
 
 // Fuseau horaire utilisé pour afficher les heures et calculer "Aujourd'hui" / "Hier"
 export const APP_TIMEZONE = 'Africa/Kinshasa'
@@ -74,6 +75,25 @@ export function getInitials(fullName: string): string {
     .map((word) => word[0].toUpperCase())
     .join('')
 }
+// Taille d'un fichier en texte lisible : "250 Ko", "1.4 Mo"
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} o`
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} Ko`
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
+}
+
+// Texte affiché dans la liste quand un message ne contient qu'un fichier
+function getAttachmentLabel(message: Message): string {
+  const file = message.attachments?.[0]
+  if (!file) {
+    return ''
+  }
+  return file.mimeType.startsWith('image/') ? '📷 Image' : `📎 ${file.fileName}`
+}
 // Ce message est-il le PREMIER que ce participant voit dans la conversation ?
 // (conversation sans message, ou supprimée par lui avant ce message)
 export function isFirstVisibleMessage(
@@ -108,7 +128,7 @@ export function buildPreview(
   if (message.isDeleted) {
     return 'Message supprimé'
   }
-  const text = message.content ?? ''
+  const text = message.content || getAttachmentLabel(message)
 
   if (message.userId === currentUserId) {
     return `Vous : ${text}`
@@ -123,6 +143,7 @@ export function buildPreview(
 export function buildMessageView(message: Message, currentUserId: User['id'], showSender = false) {
   // "statuses" contient (si chargé) les statuts des autres personnes.
   // Le message est "lu" quand TOUS les autres l'ont lu (une seule personne en conversation privée).
+  const file = message.attachments?.[0]
   const statuses = message.statuses ?? []
   const isRead = statuses.length > 0 && statuses.every((status) => status.isRead)
   const isMine = message.userId === currentUserId
@@ -140,6 +161,17 @@ export function buildMessageView(message: Message, currentUserId: User['id'], sh
     dayLabel: getDayLabel(message.createdAt),
     // Dans un groupe : nom de l'auteur affiché au-dessus des messages des autres
     senderName: showSender && !isMine ? (message.user?.fullName ?? null) : null,
+    // Le fichier joint (image ou document), s'il y en a un
+    attachment: file
+      ? {
+          name: file.fileName,
+          size: formatFileSize(file.fileSize),
+          isImage: file.mimeType.startsWith('image/'),
+          url: file.filePath, // le lien d'origine : pour ouvrir l'image ou le document
+          thumbUrl: buildThumbUrl(file.filePath), // miniature légère d'une image
+          downloadUrl: buildDownloadUrl(file.filePath), // lien qui force le téléchargement
+        }
+      : null,
   }
 }
 // ---------- Base de données ----------

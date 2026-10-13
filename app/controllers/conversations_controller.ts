@@ -14,6 +14,7 @@ import {
   getUnreadCounts,
 } from '../service/chat_service.ts'
 import { markConversationAsReadAndNotify } from './../service/realtime_service.ts'
+import { hasBlocked } from '../service/block_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'une conversation
 const MESSAGES_LIMIT = 100
@@ -77,7 +78,9 @@ export default class ConversationsController {
           typeQuery.where('type', 'Privee')
         })
       })
-      .preload('lastMessage')
+      .preload('lastMessage', (messageQuery) => {
+        messageQuery.preload('attachments')
+      })
       .preload('conversation', (conversationQuery) => {
         conversationQuery.preload('users', (usersQuery) => {
           usersQuery.whereNot('users.id', user.id)
@@ -151,6 +154,7 @@ export default class ConversationsController {
     // On charge les derniers messages (du plus récent au plus ancien), puis on remet dans l'ordre
     const messagesQuery = Message.query()
       .where('conversationId', conversationId)
+      .preload('attachments')
       .preload('statuses', (statusQuery) => {
         statusQuery.where('userId', otherUser.id) // pour les coches "lu" de mes messages
       })
@@ -168,6 +172,8 @@ export default class ConversationsController {
 
     return {
       id: conversationId,
+      // Est-ce que j'ai bloqué cet interlocuteur ? (pour le bandeau et le bouton Débloquer)
+      blockedByMe: await hasBlocked(user.id, otherUser.id),
       other: {
         id: otherUser.id,
         name: otherUser.fullName,

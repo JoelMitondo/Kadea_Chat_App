@@ -4,6 +4,7 @@
  */
 
 export const controllers = {
+  Blocks: () => import('#controllers/blocks_controller'),
   Conversations: () => import('#controllers/conversations_controller'),
   ForgoPasswords: () => import('#controllers/forgo_passwords_controller'),
   Groups: () => import('#controllers/groups_controller'),
@@ -12,7 +13,9 @@ export const controllers = {
   NewAccount: () => import('#controllers/new_account_controller'),
   Profile: () => import('#controllers/profile_controller'),
   Realtime: () => import('#controllers/realtime_controller'),
+  Search: () => import('#controllers/search_controller'),
   Session: () => import('#controllers/session_controller'),
+  Settings: () => import('#controllers/settings_controller'),
   Stories: () => import('#controllers/stories_controller'),
   Users: () => import('#controllers/users_controller'),
 }

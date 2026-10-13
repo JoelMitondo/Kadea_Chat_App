@@ -4,10 +4,11 @@ import { DateTime } from 'luxon'
 import type User from '#models/user'
 import Conversation from '#models/conversation'
 import Message from '#models/message'
+import MessageAttachment from '#models/message_attachment'
 import MessageStatus from '#models/message_status'
 import MessageType from '#models/message_type'
 import UserConversation from '#models/user_conversation'
-import { sendMessageValidator, updateMessageValidator } from '#validators/message'
+import { IMAGE_EXTENSIONS, sendMessageValidator, updateMessageValidator } from '#validators/message'
 import {
   GROUP_TYPE,
   buildMessageView,
@@ -17,6 +18,8 @@ import {
   getListTime,
   needsDaySeparator,
 } from '../service/chat_service.ts'
+import { hasBlocked } from '../service/block_service.ts'
+import { deleteFileByUrl, uploadFile, uploadImage } from '../service/cloudinary_service.ts'
 import {
   notifyMessageUpdated,
   notifyNewMessage,
@@ -89,6 +92,12 @@ export default class MessagesController {
     message.merge({ isDeleted: true, deletedAt: DateTime.now() })
     await message.save()
 
+    // Si le message avait un fichier, on le supprime de Cloudinary puis de la base
+    const attachments = await MessageAttachment.query().where('messageId', message.id)
+    for (const file of attachments) {
+      await deleteFileByUrl(file.filePath)
+    }
+    await MessageAttachment.query().where('messageId', message.id).delete()
     const data = await this.buildMessageResponse(message, user.id, view)
 
     // TEMPS RÉEL : le message devient "Ce message a été supprimé" chez les autres
@@ -102,22 +111,67 @@ export default class MessagesController {
   /**
    * Enregistre un nouveau message (conversation privée OU groupe)
    */
+  /**
+   * Enregistre un nouveau message (conversation privée OU groupe), avec ou sans fichier
+   */
   private async sendMessage(
     ctx: HttpContext,
     membership: UserConversation,
     kind: ConversationKind
   ) {
-    const { auth, request, response, view } = ctx
+    const { auth, request, response, view, logger } = ctx
     const user = auth.getUserOrFail()
-    const { content } = await request.validateUsing(sendMessageValidator)
+    const { content, attachment } = await request.validateUsing(sendMessageValidator)
     const conversationId = membership.conversationId
+
+    // ÉTAPE 1 : il faut au moins un texte ou un fichier
+    if (!content && !attachment) {
+      return response.unprocessableEntity({
+        errors: [{ field: 'content', message: 'Écrivez un message ou joignez un fichier.' }],
+      })
+    }
 
     // Tous les AUTRES participants (1 en privé, plusieurs dans un groupe)
     const otherMemberships = await UserConversation.query()
       .where('conversationId', conversationId)
       .whereNot('userId', user.id)
 
-    const textType = await MessageType.findByOrFail('type', 'texte')
+    // ÉTAPE 2 : BLOCAGE (conversations privées) :
+    // si l'autre personne m'a bloqué, je ne peux plus lui écrire
+    if (kind === 'private' && otherMemberships.length > 0) {
+      const isBlocked = await hasBlocked(otherMemberships[0].userId, user.id)
+      if (isBlocked) {
+        return response.forbidden({ message: "Impossible d'envoyer ce message à cet utilisateur." })
+      }
+    }
+
+    // ÉTAPE 3 : s'il y a un fichier, on l'envoie vers Cloudinary
+    let messageTypeName = 'texte'
+    let fileUrl: string | null = null
+    const extension = (attachment?.extname ?? '').toLowerCase()
+
+    if (attachment) {
+      const isImage = IMAGE_EXTENSIONS.includes(extension)
+      messageTypeName = isImage ? 'images' : 'document'
+
+      try {
+        fileUrl = isImage
+          ? await uploadImage(attachment.tmpPath!, 'messages')
+          : await uploadFile(attachment.tmpPath!, 'messages', extension)
+      } catch (error) {
+        logger.error({ err: error }, "Échec de l'envoi du fichier vers Cloudinary")
+        return response.unprocessableEntity({
+          errors: [
+            {
+              field: 'attachment',
+              message: "Impossible d'envoyer le fichier pour le moment. Réessayez dans un instant.",
+            },
+          ],
+        })
+      }
+    }
+
+    const messageType = await MessageType.findByOrFail('type', messageTypeName)
 
     // Dernier message existant : sert à décider du séparateur de date
     const previousMessage = await Message.query()
@@ -126,38 +180,66 @@ export default class MessagesController {
       .orderBy('id', 'desc')
       .first()
 
-    // Transaction : soit TOUT est enregistré, soit RIEN
-    const message = await db.transaction(async (trx) => {
-      const newMessage = await Message.create(
-        { userId: user.id, conversationId, messageTypeId: textType.id, content },
-        { client: trx }
-      )
+    // ÉTAPE 4 : enregistrement en base. Transaction : soit TOUT est enregistré, soit RIEN.
+    let message: Message
+    try {
+      message = await db.transaction(async (trx) => {
+        const newMessage = await Message.create(
+          {
+            userId: user.id,
+            conversationId,
+            messageTypeId: messageType.id,
+            content: content ?? null,
+          },
+          { client: trx }
+        )
 
-      // Un statut "non lu" pour chaque destinataire (il alimente son compteur)
-      await MessageStatus.createMany(
-        otherMemberships.map((other) => ({
-          messageId: newMessage.id,
-          userId: other.userId,
-          isRead: false,
-          status: 'sent',
-        })),
-        { client: trx }
-      )
+        // Le fichier : on enregistre seulement son lien et ses informations
+        if (attachment && fileUrl) {
+          await MessageAttachment.create(
+            {
+              messageId: newMessage.id,
+              fileName: (attachment.clientName ?? 'fichier').slice(0, 200),
+              filePath: fileUrl,
+              mimeType: `${attachment.type ?? 'application'}/${attachment.subtype ?? 'octet-stream'}`,
+              fileSize: attachment.size,
+            },
+            { client: trx }
+          )
+        }
 
-      // Dernier message de la conversation, pour tous les participants
-      await UserConversation.query({ client: trx })
-        .where('conversationId', conversationId)
-        .update({ last_message_id: newMessage.id })
+        // Un statut "non lu" pour chaque destinataire (il alimente son compteur)
+        await MessageStatus.createMany(
+          otherMemberships.map((other) => ({
+            messageId: newMessage.id,
+            userId: other.userId,
+            isRead: false,
+            status: 'sent',
+          })),
+          { client: trx }
+        )
 
-      return newMessage
-    })
+        // Dernier message de la conversation, pour tous les participants
+        await UserConversation.query({ client: trx })
+          .where('conversationId', conversationId)
+          .update({ last_message_id: newMessage.id })
 
-    // Réponse à celui qui vient d'écrire (comme avant)
+        return newMessage
+      })
+    } catch (error) {
+      // La base a refusé : le fichier ne sert à rien, on le supprime de Cloudinary
+      await deleteFileByUrl(fileUrl)
+      throw error
+    }
+
+    // On charge le fichier du message : il est nécessaire pour construire la bulle
+    await message.load('attachments')
+
+    // Réponse à celui qui vient d'écrire
     const showSeparator = needsDaySeparator(previousMessage, message, membership)
     const data = await this.buildMessageResponse(message, user.id, view, showSeparator)
 
-    // TEMPS RÉEL : les autres participants reçoivent le message tout de suite.
-    // Le message est déjà enregistré : même si cet envoi échoue, rien n'est perdu.
+    // TEMPS RÉEL : les autres participants reçoivent le message tout de suite
     await message.load('user')
     await notifyNewMessage({
       message,

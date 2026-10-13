@@ -66,6 +66,16 @@ router
 
     router.get('/stories', [controllers.Stories, 'index']).as('stories')
     router.post('/stories', [controllers.Stories, 'store']).as('stories.store')
+
+    router.get('/settings', [controllers.Settings, 'index']).as('settings')
+    router
+      .post('/settings/password', [controllers.Settings, 'startPasswordChange'])
+      .as('settings.password')
+
+    router.post('/users/:id/block', [controllers.Blocks, 'store']).as('users.block')
+    router.post('/users/:id/unblock', [controllers.Blocks, 'destroy']).as('users.unblock')
+
+    router.get('/search', [controllers.Search, 'index']).as('search')
   })
   .use(middleware.auth())
 

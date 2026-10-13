@@ -171,6 +171,7 @@ export default class GroupsController {
       .preload('conversation')
       .preload('lastMessage', (messageQuery) => {
         messageQuery.preload('user') // pour afficher "Jo : le projet est rendu"
+        messageQuery.preload('attachments') // pour afficher "Image" s'il n'y a que un fichier
       })
 
     const unreadCounts = await getUnreadCounts(
@@ -253,6 +254,7 @@ export default class GroupsController {
 
     const queriedMessages = await Message.query()
       .where('conversationId', conversationId)
+      .preload('attachments')
       .preload('user') // pour le nom de l'auteur
       .preload('statuses', (statusQuery) => {
         statusQuery.whereNot('userId', user.id) // pour les coches "lu" de MES messages

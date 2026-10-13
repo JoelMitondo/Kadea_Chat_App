@@ -23,8 +23,25 @@
           <span data-presence-text>{{ chat.other.isOnline ? 'En ligne' : 'Hors ligne' }}</span>
         </p>
       </div>
+            {{-- Bloquer / débloquer cet utilisateur --}}
+      @if(chat.blockedByMe)
+        <button type="button" data-unblock-user data-user-id="{{ chat.other.id }}" class="flex-none cursor-pointer rounded-lg border border-line-strong px-3 py-1.5 text-sm font-semibold text-fg hover:bg-surface-2">
+          Débloquer
+        </button>
+      @else
+        <button type="button" data-block-user data-user-id="{{ chat.other.id }}" title="Bloquer cet utilisateur" aria-label="Bloquer cet utilisateur" class="flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full text-fg-muted hover:bg-danger-soft hover:text-danger">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+          </svg>
+        </button>
+      @end
     </header>
-
+    @if(chat.blockedByMe)
+      <div class="flex-none bg-warning-soft px-4 py-2 text-center text-sm text-warning">
+        Vous avez bloqué {{ chat.other.name }}. Cette personne ne peut plus vous envoyer de messages.
+      </div>
+    @end
     {{-- ===== Messages ===== --}}
     <div id="messages-list" class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-canvas px-3 py-4 sm:px-6">
       @if(chat.messages.length === 0)
@@ -40,33 +57,9 @@
       @end
     </div>
 
-    {{-- ===== Zone de saisie ===== --}}
-    <form id="composer" action="{{ route('messages.store', { id: chat.id }) }}" method="POST" data-no-loader class="flex-none border-t border-line bg-surface p-3">
-
-      {{-- Bandeau affiché quand on modifie un message --}}
-      <div id="edit-banner" class="mb-2 hidden items-center justify-between rounded-lg bg-primary-soft px-3 py-1.5 text-sm text-on-primary-soft">
-        <span>Modification du message</span>
-        <button type="button" data-cancel-edit aria-label="Annuler la modification" class="cursor-pointer px-1 font-bold">✕</button>
+    {{-- chat-panel.edge (conversation privée) --}}
+    @!component('components/composer', { action: route('messages.store', { id: chat.id }), placeholder: 'Écrire un message…' })
       </div>
-
-      <div class="flex items-center gap-2">
-        <input
-          name="content"
-          type="text"
-          autocomplete="off"
-          maxlength="2000"
-          placeholder="Écrire un message…"
-          class="min-w-0 flex-1 rounded-full border border-line-strong bg-surface px-4 py-2.5 text-fg placeholder:text-fg-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
-        >
-        <button type="submit" aria-label="Envoyer" class="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
-      </div>
-    </form>
-  </div>
-@else
+    @else
   @include('partials/chat-empty')
 @end

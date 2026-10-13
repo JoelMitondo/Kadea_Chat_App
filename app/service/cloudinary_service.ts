@@ -1,6 +1,7 @@
 import { v2 as cloudinary, type UploadApiOptions } from 'cloudinary'
 import logger from '@adonisjs/core/services/logger'
 import env from '#start/env'
+import { randomUUID } from 'node:crypto'
 
 // Connexion à votre compte Cloudinary
 cloudinary.config({
@@ -25,7 +26,8 @@ export async function uploadImage(
   options: UploadApiOptions = {}
 ): Promise<string> {
   const result = await cloudinary.uploader.upload(filePath, {
-    folder: `${ROOT_FOLDER}/${folder}`,
+    // Nom complet choisi par nous, dossier compris : le lien contiendra toujours "kadea-chat/..."
+    public_id: `${ROOT_FOLDER}/${folder}/${randomUUID()}`,
     resource_type: 'image',
     ...options,
   })
@@ -43,67 +45,93 @@ export function uploadAvatar(filePath: string): Promise<string> {
 }
 
 /**
- * Supprime sur Cloudinary l'image correspondant à un lien.
- * - Ne lance JAMAIS d'erreur : un échec de suppression ne doit pas bloquer l'utilisateur
- *   (il est simplement enregistré dans les logs).
+ * Supprime sur Cloudinary le fichier (image OU document) correspondant à un lien.
+ * - Ne lance JAMAIS d'erreur : un échec de suppression ne doit pas bloquer l'utilisateur.
  * - Ne touche pas aux liens qui ne viennent pas de NOTRE Cloudinary.
- * Renvoie true si l'image a bien été supprimée.
+ * Renvoie true si le fichier a bien été supprimé.
  */
-export async function deleteImageByUrl(imageUrl: string | null | undefined): Promise<boolean> {
-  if (!imageUrl) {
+export async function deleteFileByUrl(fileUrl: string | null | undefined): Promise<boolean> {
+  if (!fileUrl) {
     return false
   }
 
-  const publicId = extractPublicId(imageUrl)
-  if (publicId === null) {
+  const target = extractPublicId(fileUrl)
+  if (target === null) {
     return false
   }
 
   try {
-    const result = await cloudinary.uploader.destroy(publicId, {
-      resource_type: 'image',
+    const result = await cloudinary.uploader.destroy(target.publicId, {
+      resource_type: target.resourceType,
       invalidate: true, // vide aussi le cache du CDN
     })
     return result.result === 'ok'
   } catch (error) {
-    logger.error({ err: error, publicId }, "Échec de la suppression d'une image Cloudinary")
+    logger.error(
+      { err: error, publicId: target.publicId },
+      'Échec de la suppression sur Cloudinary'
+    )
     return false
   }
 }
 
+// Ancien nom conservé : le reste de votre code (profil, stories) continue de fonctionner
+export const deleteImageByUrl = deleteFileByUrl
+
 /**
  * Retrouve le "public_id" Cloudinary à partir du lien enregistré.
  *
- * Lien : https://res.cloudinary.com/mon-cloud/image/upload/v1712345678/kadea-chat/avatars/abc123.jpg
- * Public id : kadea-chat/avatars/abc123
+ * Image : https://res.cloudinary.com/mon-cloud/image/upload/v1712345678/kadea-chat/avatars/abc123.jpg
+ *         → public id : kadea-chat/avatars/abc123            (sans l'extension)
+ * Document : https://res.cloudinary.com/mon-cloud/raw/upload/v1712345678/kadea-chat/messages/abc123.pdf
+ *         → public id : kadea-chat/messages/abc123.pdf       (AVEC l'extension)
  */
-function extractPublicId(imageUrl: string): string | null {
+function extractPublicId(
+  fileUrl: string
+): { publicId: string; resourceType: 'image' | 'raw' } | null {
   let url: URL
   try {
-    url = new URL(imageUrl)
+    url = new URL(fileUrl)
   } catch {
     return null // ce n'est pas un lien valide
   }
 
-  // On ne supprime que les images hébergées sur NOTRE compte Cloudinary
-  const cloudName = env.get('CLOUDINARY_CLOUD_NAME')
-  const prefix = `/${cloudName}/image/upload/`
-
-  if (url.hostname !== 'res.cloudinary.com' || !url.pathname.startsWith(prefix)) {
+  if (url.hostname !== 'res.cloudinary.com') {
     return null
   }
 
-  const publicId = url.pathname
-    .slice(prefix.length) // "v1712345678/kadea-chat/avatars/abc123.jpg"
-    .replace(/^v\d+\//, '') // retire la version
-    .replace(/\.[^/.]+$/, '') // retire l'extension
+  // On ne supprime que les fichiers de NOTRE compte Cloudinary
+  const cloudName = env.get('CLOUDINARY_CLOUD_NAME')
+  const imagePrefix = `/${cloudName}/image/upload/`
+  const rawPrefix = `/${cloudName}/raw/upload/`
 
-  // Sécurité : on ne touche qu'aux images de notre application
+  let resourceType: 'image' | 'raw'
+  let prefix: string
+
+  if (url.pathname.startsWith(imagePrefix)) {
+    resourceType = 'image'
+    prefix = imagePrefix
+  } else if (url.pathname.startsWith(rawPrefix)) {
+    resourceType = 'raw'
+    prefix = rawPrefix
+  } else {
+    return null
+  }
+
+  // On retire la version ("v1712345678/")
+  let publicId = url.pathname.slice(prefix.length).replace(/^v\d+\//, '')
+
+  // Pour une image, on retire aussi l'extension (pour un document, elle fait partie du nom)
+  if (resourceType === 'image') {
+    publicId = publicId.replace(/\.[^/.]+$/, '')
+  }
+
+  // Sécurité : on ne touche qu'aux fichiers de notre application
   if (!publicId.startsWith(`${ROOT_FOLDER}/`)) {
     return null
   }
 
-  return decodeURIComponent(publicId)
+  return { publicId: decodeURIComponent(publicId), resourceType }
 }
 // ---------- Stories ----------
 
@@ -144,4 +172,33 @@ export function buildBlurUrl(imageUrl: string): string {
 
 export function buildFullUrl(imageUrl: string): string {
   return withTransformation(imageUrl, FULL_TRANSFORMATION)
+}
+
+// ---------- Fichiers des messages ----------
+
+/**
+ * Envoie un DOCUMENT (pdf, word, excel...) vers Cloudinary.
+ * Un document est envoyé en "raw" et son extension fait partie du nom (.pdf, .docx...).
+ */
+export async function uploadFile(
+  filePath: string,
+  folder: ImageFolder,
+  extension: string
+): Promise<string> {
+  const result = await cloudinary.uploader.upload(filePath, {
+    public_id: `${ROOT_FOLDER}/${folder}/${randomUUID()}.${extension}`,
+    resource_type: 'raw',
+  })
+
+  return result.secure_url
+}
+
+// Miniature d'une image de message : 480 pixels de large au maximum (plus léger à charger)
+export function buildThumbUrl(imageUrl: string): string {
+  return withTransformation(imageUrl, 'w_480,c_limit,q_auto,f_auto')
+}
+
+// Lien qui FORCE le téléchargement du fichier (au lieu de l'ouvrir dans le navigateur)
+export function buildDownloadUrl(fileUrl: string): string {
+  return withTransformation(fileUrl, 'fl_attachment')
 }

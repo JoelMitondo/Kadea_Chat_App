@@ -1,0 +1,54 @@
+{{-- Zone de saisie avec trombone. Props : action (adresse d'envoi), placeholder --}}
+<form
+  id="composer"
+  action="{{ $props.get('action') }}"
+  method="POST"
+  data-no-loader
+  class="flex-none border-t border-line bg-surface p-3"
+>
+
+  {{-- Bandeau affiché quand on modifie un message --}}
+  <div id="edit-banner" class="mb-2 hidden items-center justify-between rounded-lg bg-primary-soft px-3 py-1.5 text-sm text-on-primary-soft">
+    <span>Modification du message</span>
+    <button type="button" data-cancel-edit aria-label="Annuler la modification" class="cursor-pointer px-1 font-bold">✕</button>
+  </div>
+
+  {{-- Fichier choisi, pas encore envoyé --}}
+  <div id="attachment-chip" class="mb-2 hidden items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2 text-sm text-fg">
+    <span id="attachment-name" class="truncate"></span>
+    <button type="button" data-remove-attachment aria-label="Retirer le fichier" class="cursor-pointer px-1 font-bold">✕</button>
+  </div>
+
+  <div class="flex items-center gap-2">
+
+    {{-- Le vrai champ de choix de fichier est caché : le trombone l'ouvre --}}
+    <input
+      id="attachment-input"
+      type="file"
+      accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+      class="hidden"
+    >
+
+    <button type="button" data-pick-attachment title="Joindre une image ou un document" aria-label="Joindre un fichier" class="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full text-fg-muted hover:bg-surface-2 hover:text-fg">
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+      </svg>
+    </button>
+
+    <input
+      name="content"
+      type="text"
+      autocomplete="off"
+      maxlength="2000"
+      placeholder="{{ $props.get('placeholder', 'Écrire un message…') }}"
+      class="min-w-0 flex-1 rounded-full border border-line-strong bg-surface px-4 py-2.5 text-fg placeholder:text-fg-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+    >
+
+    <button type="submit" aria-label="Envoyer" class="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+        <line x1="22" y1="2" x2="11" y2="13" />
+        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+      </svg>
+    </button>
+  </div>
+</form>
