@@ -1,5 +1,4 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import type User from '#models/user'
 import Message from '#models/message'

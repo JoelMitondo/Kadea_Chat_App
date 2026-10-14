@@ -1,6 +1,5 @@
 import type User from '#models/user'
 import { BasePolicy } from '@adonisjs/bouncer'
-import type { AuthorizerResponse } from '@adonisjs/bouncer/types'
 
 export default class UserPolicy extends BasePolicy {
   // pour envoyer les données user a la page profile

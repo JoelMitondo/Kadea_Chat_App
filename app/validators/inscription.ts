@@ -11,11 +11,7 @@ export const inscriptionValidator = vine.create({
   birth_date: vine.date(),
 })
 
-/**
- * Validator to use before validating user credentials
- * during login
- */
 export const loginValidator = vine.create({
   email: email(),
-  password: vine.string(),
+  password: password(),
 })

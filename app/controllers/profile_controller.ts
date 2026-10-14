@@ -11,9 +11,7 @@ const TYPE_PRIVATE = 'Privee'
 const TYPE_GROUP = 'Publique'
 
 export default class ProfileController {
-  /**
-   * Affiche la page profil
-   */
+  // Affichage de la page profil
   async show({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
 
@@ -37,15 +35,13 @@ export default class ProfileController {
     })
   }
 
-  /**
-   * Enregistre les modifications faites dans la modale (y compris la nouvelle photo)
-   */
+  // Enregistre les modifications faites dans la modale (y compris la nouvelle photo)
   async update(ctx: HttpContext) {
     const { auth, request, response, session, logger } = ctx
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(updateProfileValidator)
 
-    // Même règle que l'inscription : 18 ans minimum
+    // 18 ans minimum
     if (!this.isAdult(payload.birth_date)) {
       return this.rejectField(ctx, 'birth_date', 'Vous devez avoir au moins 18 ans.')
     }
@@ -97,9 +93,9 @@ export default class ProfileController {
     return response.redirect().toRoute('profile')
   }
 
-  // ---------- Méthodes privées ----------
+  // Méthodes privées
 
-  /** Renvoie une erreur sur un champ précis (JSON pour le formulaire AJAX, message flash sinon) */
+  // Renvoie une erreur sur un champ précis (JSON pour le formulaire AJAX, message flash sinon)
   private rejectField(ctx: HttpContext, field: string, message: string) {
     if (ctx.request.accepts(['html', 'json']) === 'json') {
       return ctx.response.unprocessableEntity({ errors: [{ field, message }] })
@@ -108,7 +104,7 @@ export default class ProfileController {
     return ctx.response.redirect().back()
   }
 
-  /** Nombre de conversations de l'utilisateur pour un type donné */
+  //Nombre de conversations de l'utilisateur pour un type donné
   private async countConversations(userId: User['id'], typeName: string): Promise<number> {
     const result = await UserConversation.query()
       .where('userId', userId)
@@ -123,7 +119,7 @@ export default class ProfileController {
     return Number(result?.$extras.total ?? 0)
   }
 
-  /** Messages envoyés et reçus : tous les messages des conversations de l'utilisateur */
+  // Messages envoyés et reçus : tous les messages des conversations de l'utilisateur
   private async countMessages(userId: User['id']): Promise<number> {
     const myConversations = UserConversation.query()
       .select('conversation_id')

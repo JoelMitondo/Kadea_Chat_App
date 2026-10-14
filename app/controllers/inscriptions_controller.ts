@@ -17,7 +17,7 @@ export default class InscriptionsController {
     const inscriptionExpire = DateTime.now().plus({ days: 2 })
     const codeAleatoire = await generateUniqueCode(Inscription)
 
-    // 3. Vérification de la majorité
+    // Vérification de la majorité
     if (!this.isMajeur(payload.birth_date)) {
       return response.badRequest({
         error: 'Vous devez avoir au moins 18 ans pour vous inscrire',
@@ -37,7 +37,7 @@ export default class InscriptionsController {
 
       const activationLink = `${baseUrl}/signup/${identite.id}/${codeAleatoire}`
 
-      // Formatage de la date d'expiration si c'est un objet Luxon DateTime ou Date
+      // Formatage de la date d'expiration
       const dateExpirationFormattee =
         typeof inscriptionExpire?.toFormat === 'function'
           ? inscriptionExpire.toFormat('dd/MM/yyyy à HH:mm')

@@ -1,4 +1,4 @@
-// ===== Notifications Kadea Chat =====
+//  Mes Notifications
 
 // ----- Apparence de chaque type de notification -----
 let STYLES = {
@@ -25,7 +25,7 @@ let STYLES = {
   },
 }
 
-// ===== PARTIE 1 : afficher et fermer une notification =====
+//  PARTIE 1 : afficher et fermer une notification 
 
 function fermerNotification(toast) {
   // Si la notification est déjà en train de se fermer, on ne fait rien
@@ -109,7 +109,7 @@ window.kcNotifier = {
   info: function (message) { afficherNotification('info', message) },
 }
 
-// ===== PARTIE 2 : afficher les messages envoyés par le serveur après une redirection =====
+//  PARTIE 2 : afficher les messages envoyés par le serveur après une redirection 
 
 document.addEventListener('DOMContentLoaded', function () {
   let messages = document.querySelectorAll('[data-flash]')
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
   })
 })
 
-// ===== PARTIE 3 : erreurs sous les champs du formulaire =====
+//  PARTIE 3 : erreurs sous les champs du formulaire 
 
 function viderLesErreurs(formulaire) {
   // On supprime les anciens messages d'erreur
@@ -163,7 +163,7 @@ function afficherErreurSurChamp(formulaire, nomDuChamp, message) {
   return true
 }
 
-// ===== PARTIE 4 : envoi des formulaires sans quitter la page =====
+//  PARTIE 4 : envoi des formulaires sans quitter la page 
 
 // Cherche un message lisible dans la réponse du serveur
 function trouverMessage(donnees, messageParDefaut) {

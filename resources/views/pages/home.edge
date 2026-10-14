@@ -1,11 +1,9 @@
-{{-- true si l'utilisateur est connecté --}}
+{{-- vérification si l'utilisateur est connecté --}}
 @let(isLoggedIn = auth.isAuthenticated)
 
 @layouts.landing({ title: 'Kadea Chat · Discutez simplement, en privé ou en groupe', isLoggedIn: isLoggedIn })
 
-  {{-- ==========================================================
-       1. PRÉSENTATION (hero)
-       ========================================================== --}}
+  {{-- hero section --}}
   <section class="relative isolate overflow-hidden">
 
     <div class="mx-auto grid max-w-6xl items-center gap-14 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
@@ -18,7 +16,7 @@
         </span>
 
         <h1 class="mt-5 text-4xl font-bold leading-tight tracking-tight text-fg sm:text-5xl">
-          Discutez <span class="text-brand-gradient">simplement</span>, en privé ou en groupe.
+          Discutez <span class="text-on-primary-soft">simplement</span>, en privé ou en groupe.
         </h1>
 
         <p class="mt-5 max-w-xl text-lg text-fg-muted">
@@ -45,7 +43,7 @@
           @end
         </div>
 
-        {{-- Petits points forts --}}
+        {{-- Nos Petits points forts --}}
         <ul class="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-fg-muted">
           @each(point in ['Accusés de lecture', 'Statut en ligne', 'Historique conservé'])
             <li class="flex items-center gap-2">
@@ -60,11 +58,11 @@
         </ul>
       </div>
 
-      {{-- Aperçu d'une discussion (décoratif) --}}
+      {{-- Aperçu d'une discussion --}}
       <div aria-hidden="true" class="relative mx-auto w-full max-w-md">
         <div class="overflow-hidden rounded-2xl border border-line bg-surface shadow-lg">
 
-          {{-- En-tête de la discussion --}}
+          {{-- En-tête --}}
           <div class="flex items-center gap-3 border-b border-line px-4 py-3">
             <span class="relative flex h-10 w-10 flex-none">
               <span class="flex h-full w-full items-center justify-center rounded-full bg-primary-soft font-semibold text-on-primary-soft">JM</span>
@@ -120,7 +118,7 @@
             </div>
           </div>
 
-          {{-- Zone de saisie factice --}}
+          {{-- Zone de saisie --}}
           <div class="flex items-center gap-2 border-t border-line bg-surface p-3">
             <span class="flex-1 rounded-full border border-line-strong px-4 py-2.5 text-sm text-fg-subtle">Écrire un message…</span>
             <span class="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-on-primary">
@@ -135,9 +133,7 @@
     </div>
   </section>
 
-  {{-- ==========================================================
-       2. FONCTIONNALITÉS
-       ========================================================== --}}
+  {{-- FONCTIONNALITES --}}
   <section id="fonctionnalites" class="scroll-mt-16 border-t border-line bg-surface">
     <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
 
@@ -196,9 +192,7 @@
     </div>
   </section>
 
-  {{-- ==========================================================
-       3. COMMENT ÇA MARCHE
-       ========================================================== --}}
+  {{-- explication sur le fonctionnement de notre App --}}
   <section id="comment-ca-marche" class="scroll-mt-16 border-t border-line">
     <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
 
@@ -227,9 +221,7 @@
     </div>
   </section>
 
-  {{-- ==========================================================
-       4. APPEL À L'ACTION
-       ========================================================== --}}
+  {{-- APPEL À L'ACTION --}}
   <section class="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 lg:pb-24">
     <div class="rounded-3xl bg-primary px-6 py-12 text-center sm:px-12">
       <h2 class="text-3xl font-bold text-on-primary">Prêt à discuter ?</h2>

@@ -1,5 +1,5 @@
 export function validerNomEnTempsReel(selecteurOuElement, selecteurFeedback) {
-    // 1. Récupérer l'élément input via querySelector ou directement
+    // Récupérer l'élément input via querySelector ou directement
     const inputElement = typeof selecteurOuElement === 'string'
         ? document.querySelector(selecteurOuElement)
         : selecteurOuElement;
@@ -9,7 +9,7 @@ export function validerNomEnTempsReel(selecteurOuElement, selecteurFeedback) {
         return () => false;
     }
 
-    // 2. Gérer l'élément de feedback (remarques instantanées)
+    // Gérer l'élément de feedback (remarques instantanées)
     let feedbackElement = selecteurFeedback ? document.querySelector(selecteurFeedback) : null;
     if (!feedbackElement) {
         feedbackElement = document.createElement('div');
@@ -18,11 +18,11 @@ export function validerNomEnTempsReel(selecteurOuElement, selecteurFeedback) {
         inputElement.parentNode.insertBefore(feedbackElement, inputElement.nextSibling);
     }
 
-    // 3. Regex autorisant les lettres (avec accents français), les espaces et les tirets (ex: Jean-Pierre)
-    // Refuse les chiffres et les caractères spéciaux (@, #, $, etc.)
+    // Regex autorisant les lettres (avec accents français), les espaces et les tiret
+    // Refuse les chiffres et les caractères spéciaux
     const regexNom = /^[a-zA-ZÀ-ÿ\s\-]+$/;
 
-    // 4. Écouteur d'événement en temps réel pendant la frappe
+    // Écouteur d'événement en temps réel pendant la frappe
     inputElement.addEventListener('input', (event) => {
         const valeur = event.target.value.trim();
 
@@ -41,7 +41,7 @@ export function validerNomEnTempsReel(selecteurOuElement, selecteurFeedback) {
         }
     });
 
-    // 5. Retourne une fonction de vérification finale qui renvoie la valeur ou false
+    // Retourne une fonction de vérification finale qui renvoie la valeur ou false
     return function() {
         const valeurFinale = inputElement.value.trim();
         if (valeurFinale !== "" && regexNom.test(valeurFinale)) {
@@ -53,7 +53,7 @@ export function validerNomEnTempsReel(selecteurOuElement, selecteurFeedback) {
 
 // fonction pour valider l'email en temps réel avec feedback instantané
 export function validerEmailEnTempsReel(selecteurOuElement, selecteurFeedback) {
-    // 1. Récupérer l'élément input via querySelector ou directement
+    // Récupérer l'élément input via querySelector ou directement
     const inputElement = typeof selecteurOuElement === 'string'
         ? document.querySelector(selecteurOuElement)
         : selecteurOuElement;
@@ -63,7 +63,7 @@ export function validerEmailEnTempsReel(selecteurOuElement, selecteurFeedback) {
         return () => false;
     }
 
-    // 2. Gérer l'élément de feedback (remarques instantanées)
+    // Gérer l'élément de feedback (remarques instantanées)
     let feedbackElement = selecteurFeedback ? document.querySelector(selecteurFeedback) : null;
     if (!feedbackElement) {
         feedbackElement = document.createElement('div');
@@ -72,10 +72,10 @@ export function validerEmailEnTempsReel(selecteurOuElement, selecteurFeedback) {
         inputElement.parentNode.insertBefore(feedbackElement, inputElement.nextSibling);
     }
 
-    // 3. Regex standard pour valider le format d'un email (ex: texte@domaine.extension)
+    // Regex standard pour valider le format d'un email
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    // 4. Écouteur d'événement en temps réel pendant la frappe
+    // Écouteur d'événement en temps réel pendant la frappe
     inputElement.addEventListener('input', (event) => {
         const valeur = event.target.value.trim();
 
@@ -94,7 +94,7 @@ export function validerEmailEnTempsReel(selecteurOuElement, selecteurFeedback) {
         }
     });
 
-    // 5. Retourne une fonction de vérification finale qui renvoie la valeur ou false
+    // Retourne une fonction de vérification finale qui renvoie la valeur ou false
     return function() {
         const valeurFinale = inputElement.value.trim();
         if (valeurFinale !== "" && regexEmail.test(valeurFinale)) {
@@ -106,7 +106,7 @@ export function validerEmailEnTempsReel(selecteurOuElement, selecteurFeedback) {
 
 // fonction pour valider le mot de passe en temps réel avec feedback instantané
 export function validerMotDePasseEnTempsReel(selecteurOuElement, selecteurFeedback) {
-    // 1. Récupérer l'élément input via querySelector ou directement
+    // Récupérer l'élément input via querySelector ou directement
     const inputElement = typeof selecteurOuElement === 'string'
         ? document.querySelector(selecteurOuElement)
         : selecteurOuElement;
@@ -116,7 +116,7 @@ export function validerMotDePasseEnTempsReel(selecteurOuElement, selecteurFeedba
         return () => false;
     }
 
-    // 2. Gérer l'élément de feedback (remarques instantanées)
+    // Gérer l'élément de feedback (remarques instantanées)
     let feedbackElement = selecteurFeedback ? document.querySelector(selecteurFeedback) : null;
     if (!feedbackElement) {
         feedbackElement = document.createElement('div');
@@ -125,7 +125,7 @@ export function validerMotDePasseEnTempsReel(selecteurOuElement, selecteurFeedba
         inputElement.parentNode.insertBefore(feedbackElement, inputElement.nextSibling);
     }
 
-    // 3. Écouteur d'événement en temps réel pendant la frappe
+    // Écouteur d'événement en temps réel pendant la frappe
     inputElement.addEventListener('input', (event) => {
         const valeur = event.target.value;
 
@@ -157,7 +157,7 @@ export function validerMotDePasseEnTempsReel(selecteurOuElement, selecteurFeedba
         }
     });
 
-    // 4. Retourne une fonction de vérification finale qui renvoie la valeur ou false
+    // Retourne une fonction de vérification finale qui renvoie la valeur ou false
     return function() {
         const valeurFinale = inputElement.value;
         const hasLetter = /[a-zA-Z]/.test(valeurFinale);
@@ -174,7 +174,7 @@ export function validerMotDePasseEnTempsReel(selecteurOuElement, selecteurFeedba
 
 // fonction pour valider le numéro de téléphone en temps réel avec feedback instantané
 export function validerTelephoneEnTempsReel(selecteurOuElement, selecteurFeedback) {
-    // 1. Récupérer l'élément input via querySelector ou directement
+    // Récupérer l'élément input via querySelector ou directement
     const inputElement = typeof selecteurOuElement === 'string'
         ? document.querySelector(selecteurOuElement)
         : selecteurOuElement;
@@ -184,7 +184,7 @@ export function validerTelephoneEnTempsReel(selecteurOuElement, selecteurFeedbac
         return () => false;
     }
 
-    // 2. Gérer l'élément de feedback (remarques instantanées)
+    // Gérer l'élément de feedback (remarques instantanées)
     let feedbackElement = selecteurFeedback ? document.querySelector(selecteurFeedback) : null;
     if (!feedbackElement) {
         feedbackElement = document.createElement('div');
@@ -193,12 +193,12 @@ export function validerTelephoneEnTempsReel(selecteurOuElement, selecteurFeedbac
         inputElement.parentNode.insertBefore(feedbackElement, inputElement.nextSibling);
     }
 
-    // 3. Regex pour le format international : 
+    // Regex pour le format international : 
     // Commence obligatoirement par un signe plus (+), suivi de 1 à 3 chiffres pour l'indicatif du pays, 
     // puis de 6 à 12 chiffres pour le numéro national (autorise parfois un espace ou un tiret optionnel).
     const regexTelephone = /^\+\d{1,3}[\s\-]?\d{6,12}$/;
 
-    // 4. Écouteur d'événement en temps réel pendant la frappe
+    // Écouteur d'événement en temps réel pendant la frappe
     inputElement.addEventListener('input', (event) => {
         const valeur = event.target.value.trim();
 
@@ -224,7 +224,7 @@ export function validerTelephoneEnTempsReel(selecteurOuElement, selecteurFeedbac
         }
     });
 
-    // 5. Retourne une fonction de vérification finale qui renvoie la valeur ou false
+    // Retourne une fonction de vérification finale qui renvoie la valeur ou false
     return function() {
         const valeurFinale = inputElement.value.trim();
         if (valeurFinale !== "" && regexTelephone.test(valeurFinale)) {
@@ -236,7 +236,7 @@ export function validerTelephoneEnTempsReel(selecteurOuElement, selecteurFeedbac
 
 // fonction pour valider le message en temps réel avec feedback instantané
 export function validerMessageEnTempsReel(selecteurOuElement, selecteurFeedback) {
-    // 1. Récupérer l'élément input/textarea via querySelector ou directement
+    // Récupérer l'élément input/textarea via querySelector ou directement
     const inputElement = typeof selecteurOuElement === 'string'
         ? document.querySelector(selecteurOuElement)
         : selecteurOuElement;
@@ -246,7 +246,7 @@ export function validerMessageEnTempsReel(selecteurOuElement, selecteurFeedback)
         return () => false;
     }
 
-    // 2. Gérer l'élément de feedback (remarques instantanées)
+    // Gérer l'élément de feedback (remarques instantanées)
     let feedbackElement = selecteurFeedback ? document.querySelector(selecteurFeedback) : null;
     if (!feedbackElement) {
         feedbackElement = document.createElement('div');
@@ -255,11 +255,11 @@ export function validerMessageEnTempsReel(selecteurOuElement, selecteurFeedback)
         inputElement.parentNode.insertBefore(feedbackElement, inputElement.nextSibling);
     }
 
-    // 3. Regex pour détecter les tentatives d'injection de balises HTML ou scripts (XSS)
+    // Regex pour détecter les tentatives d'injection de balises HTML ou scripts (XSS)
     // Elle repère la présence de balises comme <script>, <iframe>, <img onerror=...>, etc.
     const regexXSS = /<\s*([a-zA-Z]+)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>|<[a-zA-Z][^>]*\/>|<[a-zA-Z][^>]*>/;
 
-    // 4. Écouteur d'événement en temps réel pendant la frappe
+    // Écouteur d'événement en temps réel pendant la frappe
     inputElement.addEventListener('input', (event) => {
         const valeur = event.target.value.trim();
 
@@ -285,7 +285,7 @@ export function validerMessageEnTempsReel(selecteurOuElement, selecteurFeedback)
         }
     });
 
-    // 5. Retourne une fonction de vérification finale qui renvoie la valeur ou false
+    // Retourne une fonction de vérification finale qui renvoie la valeur ou false
     return function() {
         const valeurFinale = inputElement.value.trim();
         if (valeurFinale !== "" && valeurFinale.length >= 2 && !regexXSS.test(valeurFinale)) {
@@ -296,7 +296,7 @@ export function validerMessageEnTempsReel(selecteurOuElement, selecteurFeedback)
 }
 
 export function validerCorrespondanceEmailEnTempsReel(selecteurEmailOriginal, selecteurEmailConfirmation, selecteurFeedback) {
-    // 1. Récupérer les deux éléments input du DOM
+    // Récupérer les deux éléments input du DOM
     const inputOriginal = typeof selecteurEmailOriginal === 'string'
         ? document.querySelector(selecteurEmailOriginal)
         : selecteurEmailOriginal;
@@ -310,7 +310,7 @@ export function validerCorrespondanceEmailEnTempsReel(selecteurEmailOriginal, se
         return () => false;
     }
 
-    // 2. Gérer l'élément de feedback (remarques instantanées sous le champ de confirmation)
+    // Gérer l'élément de feedback (remarques instantanées sous le champ de confirmation)
     let feedbackElement = selecteurFeedback ? document.querySelector(selecteurFeedback) : null;
     if (!feedbackElement) {
         feedbackElement = document.createElement('div');
@@ -319,7 +319,7 @@ export function validerCorrespondanceEmailEnTempsReel(selecteurEmailOriginal, se
         inputConfirmation.parentNode.insertBefore(feedbackElement, inputConfirmation.nextSibling);
     }
 
-    // 3. Regex standard pour valider la structure de l'email
+    // Regex standard pour valider la structure de l'email
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Fonction de vérification mutualisée pour le temps réel
@@ -350,7 +350,7 @@ export function validerCorrespondanceEmailEnTempsReel(selecteurEmailOriginal, se
         return true;
     }
 
-    // 4. Écouter les modifications sur les DEUX champs (pour mettre à jour l'affichage si l'utilisateur modifie le premier ou le second)
+    // Écouter les modifications sur les DEUX champs (pour mettre à jour l'affichage si l'utilisateur modifie le premier ou le second)
     inputConfirmation.addEventListener('input', verifier);
     inputOriginal.addEventListener('input', () => {
         if (inputConfirmation.value.trim() !== "") {
@@ -358,7 +358,7 @@ export function validerCorrespondanceEmailEnTempsReel(selecteurEmailOriginal, se
         }
     });
 
-    // 5. Retourne une fonction de vérification finale pour la soumission
+    // Retourne une fonction de vérification finale pour la soumission
     return function() {
         const valConfirmation = inputConfirmation.value.trim();
         const estValide = verifier();
