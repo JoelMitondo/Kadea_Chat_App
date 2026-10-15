@@ -87,9 +87,7 @@
     </form>
   </dialog>
 
-  {{-- ==========================================================
-       VISIONNEUSE : s'ouvre au clic sur une story
-       ========================================================== --}}
+  {{-- VISIONNEUSE : s'ouvre au clic sur une story --}}
   <dialog
     id="story-viewer"
     aria-label="Visionneuse de story"
@@ -117,7 +115,7 @@
       {{-- L'image --}}
       <div class="relative min-h-0 flex-1 overflow-hidden">
 
-        {{-- Fond : l'aperçu flou (déjà téléchargé, quelques Ko) --}}
+        {{-- Fond : l'aperçu flou --}}
         <img id="story-viewer-blur" alt="" class="absolute inset-0 h-full w-full scale-110 object-cover opacity-80">
 
         {{-- Version nette : son téléchargement ne commence qu'à l'ouverture de la visionneuse --}}
