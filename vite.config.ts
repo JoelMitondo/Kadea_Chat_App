@@ -10,15 +10,15 @@ export default defineConfig({
        */
       entryPoints: [
         'resources/css/compiles/app.css',
-        'resources/jscompiles/auth.js',
+        'resources/js/compiles/auth.js',
         'resources/js/realtime.js',
-        'resource/js/compiles/animate.js',
-        'resource/js/groupe.js',
-        'resource/js/message.js',
-        'resource/js/profile.js',
-        'resource/js/settings.js',
-        'resource/js/stories.js',
-        'resource/js/users.js',
+        'resources/js/compiles/animate.js',
+        'resources/js/groupe.js',
+        'resources/js/message.js',
+        'resources/js/profile.js',
+        'resources/js/settings.js',
+        'resources/js/stories.js',
+        'resources/js/users.js',
       ],
 
       /**
