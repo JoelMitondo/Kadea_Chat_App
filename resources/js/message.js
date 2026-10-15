@@ -327,53 +327,6 @@ document.addEventListener('submit', async function (evenement) {
   champ.focus()
 })
 
-document.addEventListener('submit', async function (evenement) {
-  let formulaire = evenement.target
-  if (formulaire.id !== 'composer') { return }
-
-  evenement.preventDefault()
-
-  let champ = formulaire.querySelector('[name="content"]')
-  let bouton = formulaire.querySelector('[type="submit"]')
-  let contenu = champ.value.trim()
-  if (contenu === '') { return }
-
-  let idEdition = formulaire.dataset.editingId
-  let idConversation = document.getElementById('chat-panel').dataset.conversationId
-
-  bouton.disabled = true
-
-  let resultat
-  if (idEdition) {
-    resultat = await envoyer('/messages/' + idEdition, 'PUT', { content: contenu })
-  } else {
-    resultat = await envoyer(formulaire.getAttribute('action'), 'POST', { content: contenu })
-  }
-
-  bouton.disabled = false
-
-  if (!resultat.ok) {
-    kcNotifier.erreur(lireErreur(resultat.corps))
-    return
-  }
-
-  if (idEdition) {
-    // On remplace l'ancienne bulle par la nouvelle
-    let ancienne = document.querySelector('[data-message-id="' + idEdition + '"]')
-    ancienne.outerHTML = resultat.corps.html
-    quitterModeEdition()
-  } else {
-    retirerMessageVide()
-    document.getElementById('messages-list').insertAdjacentHTML('beforeend', resultat.corps.html)
-    champ.value = ''
-    defilerEnBas()
-  }
-
-  if (resultat.corps.isLast) {
-    mettreAJourListe(idConversation, resultat.corps.preview, resultat.corps.time)
-  }
-  champ.focus()
-})
 
 // ===== 6. Supprimer un message / une conversation =====
 
