@@ -9,7 +9,7 @@
   },
 "scripts": {
     "start": "node bin/server.js",
-    "build": "npx @tailwindcss/cli -i ./resources/css/input.css -o ./resources/css/output.css --watch &&  npx esbuild resources/js --bundle --minify --outfile=resources/js/ && node ace build",
+    "build": "node ace build",
     "dev": "node ace serve --hmr",
     "test": "node ace test",
     "lint": "eslint .",
