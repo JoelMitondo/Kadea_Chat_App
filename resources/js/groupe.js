@@ -1,3 +1,4 @@
+import {envoyer} from './message.js'
 // ===== Page Groupes =====
 // Ce fichier s'appuie sur messages.js (chargé avant) : envoyer(), lireErreur()...
 // La liste des groupes, l'ouverture d'un groupe, l'envoi / modification / suppression

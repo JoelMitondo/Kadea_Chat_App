@@ -16,7 +16,7 @@ let adresseChat = page.dataset.chatUrl // "/conversations" ou "/groups"
 // ===== 1. Petits outils =====
 
 // Envoie une requête JSON au serveur et renvoie { ok, corps }
-async function envoyer(adresse, methode, donnees) {
+export async function envoyer(adresse, methode, donnees) {
   let options = {
     method: methode,
     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': jeton },
