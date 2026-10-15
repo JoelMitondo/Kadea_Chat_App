@@ -171,7 +171,10 @@ export default class MessagesController {
       }
     }
 
-    const messageType = await MessageType.findByOrFail('type', messageTypeName)
+    const messageType = await MessageType.firstOrCreate(
+      { type: messageTypeName },
+      { type: messageTypeName }
+    )
 
     // Dernier message existant : sert à décider du séparateur de date
     const previousMessage = await Message.query()

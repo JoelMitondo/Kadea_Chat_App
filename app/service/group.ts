@@ -68,7 +68,10 @@ export async function addMembersToGroup(
     return []
   }
 
-  const memberRole = await RoleConversation.findByOrFail('title', MEMBER_ROLE)
+  const memberRole = await RoleConversation.firstOrCreate(
+    { title: MEMBER_ROLE },
+    { title: MEMBER_ROLE }
+  )
 
   // Les nouveaux membres voient l'historique : leur "dernier message" est celui du groupe
   const lastMessage = await Message.query()

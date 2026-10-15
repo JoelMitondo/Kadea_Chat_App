@@ -5,6 +5,15 @@ import type User from '#models/user'
 import UserConversation from '#models/user_conversation'
 import { buildDownloadUrl, buildThumbUrl } from './cloudinary_service.ts'
 
+const svgAttachment = `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <path d="M0 0h24v24H0z" fill="none" />
+  <path fill="currentColor" d="M14 0a5 5 0 0 1 5 5v12a7 7 0 1 1-14 0V9h2v8a5 5 0 0 0 10 0V5a3 3 0 1 0-6 0v12a1 1 0 1 0 2 0V6h2v11a3 3 0 1 1-6 0V5a5 5 0 0 1 5-5" />
+</svg>`
+
+const svgPhoto = `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+  <path d="M0 0h24v24H0z" fill="none" />
+  <path fill="currentColor" fill-rule="evenodd" d="M7.5 4.586A2 2 0 0 1 8.914 4h6.172a2 2 0 0 1 1.414.586L17.914 6H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1.086zM10 12a2 2 0 1 1 4 0a2 2 0 0 1-4 0m2-4a4 4 0 1 0 0 8a4 4 0 0 0 0-8" clip-rule="evenodd" />
+</svg>`
 // Fuseau horaire utilisé pour afficher les heures et calculer "Aujourd'hui" / "Hier"
 export const APP_TIMEZONE = 'Africa/Kinshasa'
 
@@ -92,7 +101,7 @@ function getAttachmentLabel(message: Message): string {
   if (!file) {
     return ''
   }
-  return file.mimeType.startsWith('image/') ? '📷 Image' : `📎 ${file.fileName}`
+  return file.mimeType.startsWith('image/') ? ' Image ' : `Fichier ${file.fileName}`
 }
 // Ce message est-il le PREMIER que ce participant voit dans la conversation ?
 // (conversation sans message, ou supprimée par lui avant ce message)
