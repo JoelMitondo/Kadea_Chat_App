@@ -32,8 +32,7 @@
     document.documentElement.dataset.theme = themeSauvegarde || themeDuSysteme
   </script>
 
-  <link rel="stylesheet" href="/resources/css/output.css">
-  <link rel="stylesheet" href="/resources/css/animate.css">
+ @vite(['resources/css/compiles/app.css'])
   {{-- charge realtime.js (il passe par Vite) --}}
   @vite(['resources/js/realtime.js'])
 </head>
@@ -217,7 +216,6 @@
     })
   </script>
 
-  <script src="/resources/js/loader.js"></script>
-  <script src="/resources/js/notifications.js"></script>
+@vite(['resources/js/compiles/animate.js'])
 </body>
 </html>

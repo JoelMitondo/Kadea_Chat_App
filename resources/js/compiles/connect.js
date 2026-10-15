@@ -1,0 +1,7 @@
+import '../groupe.js'
+import '../message.js'
+import '../profile.js'
+import '../realtime.js'
+import '../settings.js'
+import '../stories.js'
+import '../users.js'

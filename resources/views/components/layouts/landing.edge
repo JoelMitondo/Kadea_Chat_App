@@ -13,8 +13,7 @@
     document.documentElement.dataset.theme = themeSauvegarde || themeDuSysteme
   </script>
 
-  <link rel="stylesheet" href="/resources/css/output.css">
-  <link rel="stylesheet" href="/resources/css/animate.css">
+  @vite(['resources/css/compiles/app.css'])
 </head>
 
 <body class="flex min-h-screen flex-col bg-canvas text-fg antialiased">
@@ -102,7 +101,6 @@
       localStorage.setItem('theme', nouveauTheme)
     })
   </script>
-  <script src="/resources/js/loader.js"></script>
-  <script src="/resources/js/notifications.js"></script>
+  @vite(['resources/js/compiles/animate.js'])
 </body>
 </html>

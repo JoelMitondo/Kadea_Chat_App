@@ -1,0 +1,1 @@
+import '../auth/register' //resources/js/auth/register.js
