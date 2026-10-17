@@ -42,7 +42,7 @@ export async function envoyer(adresse, methode, donnees) {
 }
 
 // Cherche le message d'erreur dans la réponse du serveur
-function lireErreur(corps) {
+export function lireErreur(corps) {
   if (corps.errors && corps.errors.length > 0 && corps.errors[0].message) {
     return corps.errors[0].message
   }
@@ -96,7 +96,7 @@ function verifierListeVide() {
 async function ouvrirConversation(id) {
   let reponse
   try {
-    reponse = await fetch(adresseChat+ '/' + + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    reponse = await fetch(adresseChat + '/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
   } catch (erreurReseau) {
     kcNotifier.erreur('Impossible de contacter le serveur. Vérifiez votre connexion.')
     return false
