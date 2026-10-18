@@ -298,3 +298,25 @@ export function broadcastNewStory(author: User) {
     logger.error({ err: error }, "Échec de l'annonce d'une nouvelle story")
   }
 }
+
+// ---------- Conversation supprimée ----------
+
+/**
+ * Prévient des personnes qu'une conversation (ou un groupe) vient d'être supprimée :
+ * elle disparaît de leur liste, et on leur explique pourquoi.
+ */
+export function notifyConversationRemoved(options: {
+  userIds: string[]
+  conversationId: number
+  kind: ConversationKind
+  message: string
+}) {
+  for (const userId of options.userIds) {
+    sendToUser(userId, {
+      type: 'conversation:removed',
+      kind: options.kind,
+      conversationId: options.conversationId,
+      message: options.message,
+    })
+  }
+}

@@ -114,7 +114,30 @@ async function ajouterMembres(formulaire) {
   // On recharge la page : la liste des membres est mise à jour et le message de réussite s'affiche
   window.location.reload()
 }
+// ===== Supprimer un groupe (administrateur) =====
 
+async function supprimerGroupe(bouton) {
+  let nom = bouton.dataset.groupName
+
+  let confirme = confirm(
+    'Supprimer définitivement le groupe « ' + nom + ' » ?\n\n' +
+    'Tous ses messages et ses fichiers seront effacés pour tous les membres. Cette action est irréversible.'
+  )
+  if (!confirme) { return }
+
+  bouton.disabled = true
+
+  let resultat = await envoyer('/groups/' + bouton.dataset.groupId, 'DELETE')
+
+  if (!resultat.ok) {
+    kcNotifier.erreur(lireErreur(resultat.corps))
+    bouton.disabled = false
+    return
+  }
+
+  // Le groupe n'existe plus : on retourne à la liste (le message de réussite s'y affichera)
+  window.location.href = '/groups'
+}
 // ===== 4. Événements (délégation : fonctionne aussi pour les panneaux chargés après coup) =====
 
 // Au chargement : le bouton "Créer" est désactivé tant que le formulaire n'est pas valide
@@ -135,7 +158,12 @@ document.addEventListener('click', function (evenement) {
     document.getElementById('group-info-modal').showModal()
     return
   }
-
+  // Bouton "Supprimer le groupe"
+  let boutonSupprimerGroupe = cible.closest('[data-delete-group]')
+  if (boutonSupprimerGroupe !== null) {
+    supprimerGroupe(boutonSupprimerGroupe)
+    return
+  }
   // Boutons "Fermer" / "Annuler" de n'importe quelle fenêtre
   let boutonFermer = cible.closest('[data-modal-close]')
   if (boutonFermer !== null) {

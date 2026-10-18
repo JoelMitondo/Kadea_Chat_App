@@ -579,7 +579,23 @@ function traiterGroupeModifie(donnees) {
     ouvrirConversation(donnees.conversationId)
   }
 }
+// Une conversation (ou un groupe) a été supprimée : elle disparaît de la liste
+function traiterConversationSupprimee(donnees) {
+  let element = trouverElementListe(donnees.conversationId)
+  if (element !== null) {
+    element.remove()
+  }
+  verifierListeVide()
 
+  // Si on était en train de la regarder : on ferme la discussion
+  if (page.dataset.activeId === String(donnees.conversationId)) {
+    if (history.state !== null && history.state.vue === 'chat') {
+      history.back() // l'événement popstate ferme le panneau
+    } else {
+      fermerChat()
+    }
+  }
+}
 // Point d'entrée : tous les événements du serveur passent par ici
 document.addEventListener('kc:evenement', function (evenement) {
   let donnees = evenement.detail
@@ -592,6 +608,7 @@ document.addEventListener('kc:evenement', function (evenement) {
   if (donnees.type === 'message:updated') { traiterMessageModifie(donnees) }
   if (donnees.type === 'messages:read') { traiterLecture(donnees) }
   if (donnees.type === 'group:updated') { traiterGroupeModifie(donnees) }
+  if (donnees.type === 'conversation:removed') { traiterConversationSupprimee(donnees) }
 
   if (donnees.type === 'conversation:added' && trouverElementListe(donnees.conversationId) === null) {
     ajouterElementListe(donnees.itemHtml)

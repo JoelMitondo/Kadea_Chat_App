@@ -4,6 +4,7 @@ import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import { addMembersValidator, createGroupValidator } from '#validators/group'
 import { addMembersToGroup, createGroup } from '../service/group.ts'
+import { deleteConversationAndFiles } from '../service/deletion_service.ts'
 import {
   ADMIN_ROLE,
   GROUP_TYPE,
@@ -19,6 +20,7 @@ import {
   notifyConversationAdded,
   notifyGroupUpdated,
   markConversationAsReadAndNotify,
+  notifyConversationRemoved,
 } from '../service/realtime_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'un groupe
@@ -155,6 +157,42 @@ export default class GroupsController {
     return response.ok({ message })
   }
 
+  /**
+   * Supprime un groupe, pour TOUS ses membres (réservé à l'administrateur)
+   */
+  async destroy({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const conversationId = Number(params.id)
+
+    const membership = await findGroupMembership(user.id, conversationId)
+      .preload('role')
+      .preload('conversation')
+      .firstOrFail()
+
+    // Seul l'administrateur peut supprimer le groupe
+    if (membership.role.title !== ADMIN_ROLE) {
+      return response.forbidden({
+        message: "Seul l'administrateur du groupe peut le supprimer.",
+      })
+    }
+
+    const groupName = membership.conversation.title ?? 'Groupe sans nom'
+
+    // Suppression du groupe, de ses messages et de ses fichiers
+    const memberIds = await deleteConversationAndFiles(conversationId)
+
+    // TEMPS RÉEL : les autres membres voient le groupe disparaître de leur liste
+    notifyConversationRemoved({
+      userIds: memberIds.filter((memberId) => memberId !== user.id),
+      conversationId,
+      kind: 'group',
+      message: `Le groupe « ${groupName} » a été supprimé par son administrateur.`,
+    })
+
+    // Ce message s'affichera sur la page Groupes où le navigateur redirige
+    session.flash('success', `Le groupe « ${groupName} » a été supprimé.`)
+    return response.ok({ message: 'Groupe supprimé.' })
+  }
   // ---------- Méthodes privées ----------
 
   /**

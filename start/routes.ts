@@ -50,6 +50,9 @@ router
 
     router.get('/users', [controllers.Users, 'index']).as('users')
     router.post('/users/:id/chat', [controllers.Users, 'chat']).as('users.chat')
+    router
+      .post('/settings/delete-account', [controllers.Settings, 'deleteAccount'])
+      .as('settings.delete')
 
     router.get('/groups', [controllers.Groups, 'index']).as('groups')
     router.get('/groups/:id', [controllers.Groups, 'show']).as('groups.show')
@@ -57,6 +60,7 @@ router
     router
       .post('/groups/:id/members', [controllers.Groups, 'addMembers'])
       .as('groups.members.store')
+    router.delete('/groups/:id', [controllers.Groups, 'destroy']).as('groups.destroy')
     router
       .post('/groups/:id/messages', [controllers.Messages, 'storeInGroup'])
       .as('groups.messages.store')

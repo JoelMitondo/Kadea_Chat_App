@@ -1,24 +1,38 @@
 // ===== Page Paramètres =====
 
-let fenetreMotDePasse = document.getElementById('password-dialog')
-let boutonOuvrir = document.getElementById('open-password-dialog')
-let boutonsFermer = fenetreMotDePasse.querySelectorAll('[data-modal-close]')
+// Relie un bouton à une fenêtre : le bouton l'ouvre, "Annuler" / "Non" / le fond sombre la ferment
+function brancherFenetre(idBouton, idFenetre) {
+  let bouton = document.getElementById(idBouton)
+  let fenetre = document.getElementById(idFenetre)
 
-// Clic sur "Oui, modifier mon mot de passe" : on ouvre la question sur l'e-mail
-boutonOuvrir.addEventListener('click', function () {
-  fenetreMotDePasse.showModal()
-})
+  if (bouton === null || fenetre === null) { return }
 
-// Clic sur "Non, annuler" : on ferme la fenêtre
-boutonsFermer.forEach(function (bouton) {
   bouton.addEventListener('click', function () {
-    fenetreMotDePasse.close()
+    fenetre.showModal()
   })
-})
 
-// Clic sur le fond sombre (en dehors de la carte) : on ferme aussi
-fenetreMotDePasse.addEventListener('click', function (evenement) {
-  if (evenement.target === fenetreMotDePasse) {
-    fenetreMotDePasse.close()
-  }
-})
+  fenetre.querySelectorAll('[data-modal-close]').forEach(function (boutonFermer) {
+    boutonFermer.addEventListener('click', function () {
+      fenetre.close()
+    })
+  })
+
+  // Clic sur le fond sombre (en dehors de la carte) : on ferme aussi
+  fenetre.addEventListener('click', function (evenement) {
+    if (evenement.target === fenetre) {
+      fenetre.close()
+    }
+  })
+
+  // À la fermeture, on vide ce qui a été saisi (par exemple le mot de passe)
+  fenetre.addEventListener('close', function () {
+    let formulaire = fenetre.querySelector('form')
+    if (formulaire !== null) { formulaire.reset() }
+  })
+}
+
+// Changer de mot de passe : question sur l'accès à l'e-mail
+brancherFenetre('open-password-dialog', 'password-dialog')
+
+// Supprimer mon compte : confirmation avec le mot de passe
+brancherFenetre('open-delete-dialog', 'delete-dialog')

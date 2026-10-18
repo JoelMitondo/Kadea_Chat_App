@@ -1,6 +1,9 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import BlockedUser from '#models/blocked_user'
 import { getInitials } from '../service/chat_service.ts'
+import User from '#models/user'
+import { deleteAccountValidator } from '#validators/account'
+import { deleteUserAccount } from '../service/deletion_service.ts'
 
 export default class SettingsController {
   /**
@@ -39,5 +42,30 @@ export default class SettingsController {
     )
 
     return response.redirect().toRoute('forgotPassword.get')
+  }
+
+  /**
+   * Supprime définitivement le compte de l'utilisateur connecté
+   */
+  async deleteAccount({ auth, request, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const { password } = await request.validateUsing(deleteAccountValidator)
+
+    // ÉTAPE 1 : on vérifie que c'est bien lui, avec son mot de passe
+    try {
+      await User.verifyCredentials(user.email, password)
+    } catch {
+      return response.unprocessableEntity({
+        errors: [{ field: 'password', message: 'Mot de passe incorrect.' }],
+      })
+    }
+
+    // ÉTAPE 2 : suppression du compte et de ses données
+    await deleteUserAccount(user)
+
+    // ÉTAPE 3 : déconnexion (le compte n'existe plus)
+    await auth.use('web').logout()
+
+    return response.ok({ message: 'Votre compte a été supprimé définitivement.' })
   }
 }

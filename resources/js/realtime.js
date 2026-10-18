@@ -108,6 +108,11 @@ function traiterEvenement(donnees) {
       kcNotifier.info(donnees.authorName + ' a ajouté une story.')
     }
   }
+    if (donnees.type === 'conversation:removed') {
+    // Une conversation ou un groupe vient d'être supprimé : on explique pourquoi
+    kcNotifier.info(donnees.message)
+    programmerRafraichissement() // les pastilles de messages non lus changent peut-être
+  }
 }
 
 // La conversation (ou le groupe) est-elle ouverte à l'écran en ce moment ?
