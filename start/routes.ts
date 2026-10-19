@@ -3,6 +3,8 @@ import { controllers } from '#generated/controllers'
 import router from '@adonisjs/core/services/router'
 import transmit from '@adonisjs/transmit/services/main'
 
+//fausse requete pour laisser le serveur evillé :
+router.get('/ping', [controllers.HealthChecks, 'ping'])
 router.on('/').render('pages/home').as('home')
 
 router.post('/register', [controllers.Inscriptions, 'store'])

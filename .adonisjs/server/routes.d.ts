@@ -4,6 +4,7 @@ type ParamValue = string | number | bigint | boolean
 
 export type ScannedRoutes = {
   ALL: {
+    'health_checks.ping': { paramsTuple?: []; params?: {} }
     'home': { paramsTuple?: []; params?: {} }
     'inscriptions.store': { paramsTuple?: []; params?: {} }
     'New_compte.register': { paramsTuple?: []; params?: {} }
@@ -47,6 +48,7 @@ export type ScannedRoutes = {
     'unsubscribe': { paramsTuple?: []; params?: {} }
   }
   GET: {
+    'health_checks.ping': { paramsTuple?: []; params?: {} }
     'home': { paramsTuple?: []; params?: {} }
     'New_compte.register': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
@@ -66,6 +68,7 @@ export type ScannedRoutes = {
     'event_stream': { paramsTuple?: []; params?: {} }
   }
   HEAD: {
+    'health_checks.ping': { paramsTuple?: []; params?: {} }
     'home': { paramsTuple?: []; params?: {} }
     'New_compte.register': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }

@@ -18,4 +18,5 @@ export const controllers = {
   Settings: () => import('#controllers/settings_controller'),
   Stories: () => import('#controllers/stories_controller'),
   Users: () => import('#controllers/users_controller'),
+  HealthChecks: () => import('#controllers/health_checks_controller'),
 }
