@@ -3,7 +3,7 @@ import logger from '@adonisjs/core/services/logger'
 import env from '#start/env'
 import { randomUUID } from 'node:crypto'
 
-// Connexion à votre compte Cloudinary
+// Connexion au compte Cloudinary
 cloudinary.config({
   cloud_name: env.get('CLOUDINARY_CLOUD_NAME'),
   api_key: env.get('CLOUDINARY_API_KEY'),
@@ -17,8 +17,7 @@ const ROOT_FOLDER = 'kadea-chat'
 export type ImageFolder = 'avatars' | 'stories' | 'groups' | 'messages'
 
 /**
- * Envoie une image vers Cloudinary.
- * Renvoie le lien (https) à enregistrer en base de données.
+nous envoiyons l'image à cloudinary et lui nous renvoie l'image a enregistrer sur notre bdd
  */
 export async function uploadImage(
   filePath: string,

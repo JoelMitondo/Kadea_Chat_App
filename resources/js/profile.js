@@ -1,4 +1,4 @@
-// ===== Modale "Modifier le profil" =====
+// Modale "Modifier le profil"
 // L'état (ouverte / fermée) est géré par l'élément <dialog> lui-même : modale.open vaut true ou false.
 
 let modale = document.getElementById('profile-modal')

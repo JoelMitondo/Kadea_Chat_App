@@ -46,7 +46,7 @@ export default class InscriptionsController {
       // Envoyer l'email via Brevo
       await mail.send((message) => {
         message
-          .to(payload.email) // Adresse dynamique depuis payload.email
+          .to(payload.email) // Adresse dynamique de l'utilisateur depuis le payload
           .from('mitondomohindo@gmail.com', 'Kadea Chat')
           .subject('Confirmation de votre adresse email - Kadea Chat').html(`
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">

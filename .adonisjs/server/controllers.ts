@@ -8,6 +8,7 @@ export const controllers = {
   Conversations: () => import('#controllers/conversations_controller'),
   ForgoPasswords: () => import('#controllers/forgo_passwords_controller'),
   Groups: () => import('#controllers/groups_controller'),
+  HealthChecks: () => import('#controllers/health_checks_controller'),
   Inscriptions: () => import('#controllers/inscriptions_controller'),
   Messages: () => import('#controllers/messages_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
@@ -18,5 +19,4 @@ export const controllers = {
   Settings: () => import('#controllers/settings_controller'),
   Stories: () => import('#controllers/stories_controller'),
   Users: () => import('#controllers/users_controller'),
-  HealthChecks: () => import('#controllers/health_checks_controller'),
 }

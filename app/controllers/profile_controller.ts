@@ -26,7 +26,6 @@ export default class ProfileController {
         bio: user.bio,
         avatarUrl: user.avatarUrl,
         phoneNumber: user.phoneNumber,
-        birthDateInput: user.birthDate?.toFormat('yyyy-MM-dd') ?? '',
         birthDateLabel: this.formatDate(user.birthDate),
         email: user.email,
         createdAt: this.formatDate(user.createdAt),
@@ -43,7 +42,7 @@ export default class ProfileController {
 
     // 18 ans minimum
     if (!this.isAdult(payload.birth_date)) {
-      return this.rejectField(ctx, 'birth_date', 'Vous devez avoir au moins 18 ans.')
+      return this.rejectField(ctx, 'Vous devez avoir au moins 18 ans.')
     }
 
     const oldAvatarUrl = user.avatarUrl
@@ -59,7 +58,6 @@ export default class ProfileController {
         logger.error({ err: error }, "Échec de l'envoi de la photo vers Cloudinary")
         return this.rejectField(
           ctx,
-          'avatar',
           "Impossible d'envoyer la photo pour le moment. Réessayez dans un instant."
         )
       }
@@ -85,10 +83,6 @@ export default class ProfileController {
     if (newAvatarUrl) {
       await deleteImageByUrl(oldAvatarUrl)
     }
-
-    if (request.accepts(['html', 'json']) === 'json') {
-      return response.ok({ message: 'Votre profil a été mis à jour.' })
-    }
     session.flash('success', 'Votre profil a été mis à jour.')
     return response.redirect().toRoute('profile')
   }
@@ -96,10 +90,7 @@ export default class ProfileController {
   // Méthodes privées
 
   // Renvoie une erreur sur un champ précis (JSON pour le formulaire AJAX, message flash sinon)
-  private rejectField(ctx: HttpContext, field: string, message: string) {
-    if (ctx.request.accepts(['html', 'json']) === 'json') {
-      return ctx.response.unprocessableEntity({ errors: [{ field, message }] })
-    }
+  private rejectField(ctx: HttpContext, message: string) {
     ctx.session.flash('error', message)
     return ctx.response.redirect().back()
   }
