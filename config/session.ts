@@ -2,10 +2,6 @@ import env from '#start/env'
 import app from '@adonisjs/core/services/app'
 import { defineConfig, stores } from '@adonisjs/session'
 
-/**
- * Session configuration.
- * Defines how user sessions are managed, stored, and secured.
- */
 const sessionConfig = defineConfig({
   /**
    * Enable or disable session management globally.
