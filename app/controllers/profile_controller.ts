@@ -48,7 +48,7 @@ export default class ProfileController {
     const oldAvatarUrl = user.avatarUrl
     let newAvatarUrl: string | null = null
 
-    // ÉTAPE 1 : s'il y a une nouvelle photo, on l'envoie d'abord vers Cloudinary.
+    // S'il y a une nouvelle photo, on l'envoie d'abord vers Cloudinary.
     // Si l'envoi échoue, rien n'a changé : l'ancienne photo est toujours là.
     const avatarTmpPath = payload.avatar?.tmpPath
     if (avatarTmpPath) {
@@ -63,7 +63,7 @@ export default class ProfileController {
       }
     }
 
-    // ÉTAPE 2 : enregistrement en base. On y met le NOUVEAU lien (ou on garde l'ancien).
+    // ENregistrement en base. On y met le NOUVEAU lien (ou on garde l'ancien).
     try {
       user.merge({
         fullName: payload.full_name,
@@ -79,15 +79,13 @@ export default class ProfileController {
       throw error
     }
 
-    // ÉTAPE 3 : tout est enregistré, on peut supprimer l'ANCIENNE photo de Cloudinary
+    // TOUt est enregistré, on peut supprimer l'ANCIENNE photo de Cloudinary
     if (newAvatarUrl) {
       await deleteImageByUrl(oldAvatarUrl)
     }
     session.flash('success', 'Votre profil a été mis à jour.')
     return response.redirect().toRoute('profile')
   }
-
-  // Méthodes privées
 
   // Renvoie une erreur sur un champ précis (JSON pour le formulaire AJAX, message flash sinon)
   private rejectField(ctx: HttpContext, message: string) {

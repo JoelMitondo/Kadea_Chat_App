@@ -19,5 +19,5 @@ export const confirmationCompteValidator = vine.create({
 
 export const loginValidator = vine.create({
   email: email(),
-  password: vine.string(),
+  password: password(),
 })

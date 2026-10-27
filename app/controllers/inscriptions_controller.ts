@@ -78,7 +78,6 @@ export default class InscriptionsController {
         </div>
       `)
       })
-
       // Envoi par le script : on répond en JSON (le message est celui de data-success)
       if (request.accepts(['html', 'json']) === 'json') {
         return response.created({ message: 'Compte créé.' })

@@ -1,10 +1,8 @@
 import { defineConfig } from '@adonisjs/core/bodyparser'
 
-/**
- * Body parser configuration.
- * Defines how request bodies are parsed for different content types
- * including forms, JSON, and file uploads.
- */
+// la lecture des données
+//trimWhitespaces : " jo " devient "jo".
+//convertEmptyStringsToNull : un champ vide "" devient null.
 const bodyParserConfig = defineConfig({
   /**
    * The bodyparser middleware will parse the request body
