@@ -40,7 +40,8 @@ export const validationMessages: Record<string, string> = {
   // ----- Listes -----
   'array': '{{ field }} doit être une liste.',
   'array.minLength': 'Sélectionnez au moins {{ min }} élément(s) pour {{ field }}.',
-  'array.maxLength': 'Vous ne pouvez pas sélectionner plus de {{ max }} élément(s) pour {{ field }}.',
+  'array.maxLength':
+    'Vous ne pouvez pas sélectionner plus de {{ max }} élément(s) pour {{ field }}.',
   'distinct': '{{ field }} contient des doublons.',
   'notEmpty': '{{ field }} ne doit pas être vide.',
 
