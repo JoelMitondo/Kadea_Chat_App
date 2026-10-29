@@ -2,7 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import { searchUsersValidator, chatWithUserValidator } from '#validators/user_list'
 import { findOrCreatePrivateConversation } from '../service/conversation_service.ts'
-import { formatDate, getInitials } from '../service/chat_service.ts'
+import { escapeLike, formatDate, getInitials } from '../service/chat_service.ts'
 
 const USERS_PER_PAGE = 20
 
@@ -21,7 +21,7 @@ export default class UsersController {
     const query = User.query().whereNot('id', currentUser.id).orderBy('fullName', 'asc')
 
     if (search !== '') {
-      query.whereILike('fullName', `%${search}%`)
+      query.whereILike('fullName', `%${escapeLike(search)}%`)
     }
 
     const paginator = await query.paginate(page ?? 1, USERS_PER_PAGE)
