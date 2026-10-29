@@ -7,6 +7,7 @@ export const forgoPassewordValidator = vine.create({
   email: email(),
 })
 
+// confirmed() : le champ "password_confirmation" du formulaire doit être identique
 export const newPassewordValidator = vine.create({
-  password: password(),
+  password: password().confirmed(),
 })

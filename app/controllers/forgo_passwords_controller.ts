@@ -6,6 +6,8 @@ import { generateUniqueCode } from './../service/code_generation.ts'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import mail from '@adonisjs/mail/services/main'
+import logger from '@adonisjs/core/services/logger'
+import { APP_TIMEZONE } from '../service/chat_service.ts'
 
 export default class ForgoPasswordsController {
   async index({ view }: HttpContext) {
@@ -16,9 +18,8 @@ export default class ForgoPasswordsController {
 
     const user = await User.findBy('email', email)
 
-    const codeAleatoire = await generateUniqueCode(ForgoPassword)
-
     if (user) {
+      const codeAleatoire = await generateUniqueCode(ForgoPassword)
       const identite = await ForgoPassword.updateOrCreate(
         { email: user.email },
         {
@@ -34,7 +35,7 @@ export default class ForgoPasswordsController {
 
         const dateExpirationFormattee =
           typeof identite.expiredAt?.toFormat === 'function'
-            ? identite.expiredAt.toFormat('dd/MM/yyyy à HH:mm')
+            ? identite.expiredAt.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
             : identite.expiredAt
 
         // Envoi de l'email via Brevo
@@ -78,69 +79,46 @@ export default class ForgoPasswordsController {
         </div>
       `)
         })
-
-        if (request.accepts(['html', 'json']) === 'json') {
-          return response.ok({ message: 'E-mail de réinitialisation envoyé avec succès.' })
-        }
-
-        session.flash(
-          'success',
-          'Un e-mail de réinitialisation vous a été envoyé. Vérifiez votre boîte de réception.'
-        )
-        return response.redirect().toRoute('home')
       } catch (error) {
-        console.error("Erreur lors de l'envoi de l'e-mail :", error)
-        return response.status(500).json({
-          success: false,
-          message: "Échec de l'envoi de l'e-mail de réinitialisation",
-        })
+        logger.error({ err: error }, "Erreur lors de l'envoi de l'e-mail de réinitialisation")
+        if (request.accepts(['html', 'json']) === 'json') {
+          return response.internalServerError({
+            message: "Échec de l'envoi de l'e-mail de réinitialisation",
+          })
+        }
+        session.flash('error', "Échec de l'envoi de l'e-mail de réinitialisation")
+        return response.redirect().back()
       }
     }
 
-    // Même réponse si le compte existe ou non
-    return response.ok({ message: 'E-mail envoyé si le compte existe.' })
+    // Même réponse si le compte existe ou non : on ne révèle pas quels e-mails sont inscrits
+    const message =
+      'Si cette adresse correspond à un compte, un e-mail de réinitialisation vient de vous être envoyé.'
+    if (request.accepts(['html', 'json']) === 'json') {
+      return response.ok({ message })
+    }
+    session.flash('success', message)
+    return response.redirect().toRoute('home')
   }
 
-  async indexPageNewPassword({ params, response, view }: HttpContext) {
-    const inscription = await ForgoPassword.find(params.id)
+  async indexPageNewPassword({ params, view }: HttpContext) {
+    const recuperation = await this.findValidRequest(params.id, params.code)
 
-    if (!inscription) {
-      return response.badRequest('Lien de récupération invalide ou expiré.')
-    }
-    if (inscription.expiredAt! < DateTime.now()) {
-      await inscription.delete()
-      return response.badRequest('Le lien de récupération a expiré.')
-    }
-    const isValid = await hash.verify(inscription.codeAleatoire, params.code)
-
-    if (!isValid) {
-      return response.notFound('Lien de récupération invalide ou expiré.')
-    }
+    // Lien invalide ou expiré : la page affiche le message "Lien invalide ou expiré"
     return view.render('pages/auth/updatePassword', {
       id: params.id,
       code: params.code,
-      lienValide: true,
+      lienValide: recuperation !== null,
     })
   }
 
   async storeNewPassword({ request, response, auth, params }: HttpContext) {
     const payload = await request.validateUsing(newPassewordValidator)
 
-    const recuperation = await ForgoPassword.find(params.id)
+    const recuperation = await this.findValidRequest(params.id, params.code)
 
     if (!recuperation) {
-      return response.notFound('Lien de récupération invalide ou expiré.')
-    }
-
-    const isValid = await hash.verify(recuperation.codeAleatoire, params.code)
-
-    if (!isValid) {
-      return response.notFound('Lien de récupération invalide ou expiré.')
-    }
-
-    if (recuperation.expiredAt! < DateTime.now()) {
-      await recuperation.delete()
-      return response.badRequest('Le lien de récupération a expiré.')
+      return response.badRequest({ message: 'Lien de récupération invalide ou expiré.' })
     }
 
     //Récupération de l'utilisateur et mise à jour du mot de passe
@@ -152,6 +130,36 @@ export default class ForgoPasswordsController {
     await recuperation.delete()
 
     await auth.use('web').login(user)
-    response.redirect().toRoute('messages')
+
+    // Formulaire envoyé par le script : il redirige lui-même (data-redirect)
+    if (request.accepts(['html', 'json']) === 'json') {
+      return response.ok({ message: 'Votre mot de passe a été modifié.' })
+    }
+    return response.redirect().toRoute('messages')
+  }
+
+  /**
+   * Renvoie la demande de réinitialisation si le lien est valide (bon code, pas expiré), sinon null.
+   * Une demande expirée est supprimée au passage.
+   */
+  private async findValidRequest(id: string, code: string) {
+    // Identifiant non numérique : sans ce contrôle, PostgreSQL renverrait une erreur 500
+    const requestId = Number(id)
+    if (!Number.isInteger(requestId) || requestId <= 0) {
+      return null
+    }
+
+    const recuperation = await ForgoPassword.find(requestId)
+    if (!recuperation) {
+      return null
+    }
+
+    if (recuperation.expiredAt! < DateTime.now()) {
+      await recuperation.delete()
+      return null
+    }
+
+    const isValid = await hash.verify(recuperation.codeAleatoire, code)
+    return isValid ? recuperation : null
   }
 }
