@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { type LucidModel } from '@adonisjs/lucid/types/model'
 
 /**
@@ -18,7 +19,8 @@ export async function generateUniqueCode(
   while (!isUnique) {
     let randomPart = ''
     for (let i = 0; i < length; i++) {
-      const randomIndex = Math.floor(Math.random() * characters.length)
+      // randomInt (module crypto) : tirage imprévisible, contrairement à Math.random()
+      const randomIndex = randomInt(characters.length)
       randomPart += characters[randomIndex]
     }
 
