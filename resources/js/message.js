@@ -103,7 +103,11 @@ async function ouvrirConversation(id) {
   }
 
   if (!reponse.ok) {
-    kcNotifier.erreur("Impossible d'ouvrir cette conversation.")
+    kcNotifier.erreur(messageErreurOuverture(reponse.status))
+    // Session expirée : on renvoie vers la connexion après avoir laissé lire le message
+    if (reponse.status === 401) {
+      setTimeout(function () { window.location.href = '/login' }, 2000)
+    }
     return false
   }
 
@@ -116,6 +120,14 @@ async function ouvrirConversation(id) {
   // On vient de lire les messages de cette conversation : les pastilles de la navigation changent
   document.dispatchEvent(new CustomEvent('kc:rafraichir-compteurs'))
   return true
+}
+
+// Message clair selon la raison pour laquelle la discussion n'a pas pu s'ouvrir
+function messageErreurOuverture(code) {
+  if (code === 401) { return 'Votre session a expiré. Vous allez être redirigé vers la connexion.' }
+  if (code === 404) { return "Cette discussion n'existe plus : elle a peut-être été supprimée." }
+  if (code >= 500) { return 'Le serveur rencontre un problème. Réessayez dans un instant.' }
+  return "Impossible d'ouvrir cette discussion. Veuillez réessayer."
 }
 
 // Revient à l'écran d'accueil (sur téléphone : on réaffiche la liste)
