@@ -1,4 +1,4 @@
-// ===== Page Utilisateurs =====
+// Page Utilisateurs
 
 // Beaucoup de petites requêtes pendant la frappe : pas de chargeur plein écran
 document.body.dataset.loaderFetch = 'off'
@@ -8,7 +8,7 @@ let champ = document.getElementById('users-search')
 let resultats = document.getElementById('users-results')
 let modale = document.getElementById('user-modal')
 
-// ===== 1. Recherche en direct =====
+// Recherche en direct
 
 let minuteur = null
 let numeroRecherche = 0 // sert à ignorer une réponse arrivée en retard
@@ -21,6 +21,7 @@ async function rechercher() {
 
   let reponse
   try {
+    //par x-Requested-With on indique au navigateur qu'il s'agit d'une requete Ajax
     reponse = await fetch('/users?q=' + encodeURIComponent(texte), {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     })
@@ -58,7 +59,7 @@ formulaire.addEventListener('submit', function (evenement) {
   rechercher()
 })
 
-// ===== 2. Popup "Voir plus" =====
+// 2. Popup "Voir plus"
 
 let imageAvatar = document.getElementById('user-modal-avatar')
 

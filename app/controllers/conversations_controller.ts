@@ -66,9 +66,8 @@ export default class ConversationsController {
 
   // ---------- Méthodes privées ----------
 
-  /**
-   * Liste des conversations privées de l'utilisateur, la plus récente en premier
-   */
+  // Liste des conversations privées de l'utilisateur, la plus récente en premier
+
   private async getConversationList(user: User, openConversationId: number | null = null) {
     const memberships = await UserConversation.query()
       .where('userId', user.id)

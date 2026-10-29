@@ -1,4 +1,4 @@
-// ===== Messagerie Kadea Chat =====
+// Messagerie Kadea Chat
 
 // La messagerie fait beaucoup de requêtes : pas de chargeur plein écran pour elles
 document.body.dataset.loaderFetch = 'off'
@@ -13,7 +13,7 @@ let jeton = document.getElementById('csrf-token').value
 let adresseListe = page.dataset.listUrl // "/messages" ou "/groups"
 let adresseChat = page.dataset.chatUrl // "/conversations" ou "/groups"
 
-// ===== 1. Petits outils =====
+// 1. Petits outils
 
 // Envoie une requête JSON au serveur et renvoie { ok, corps }
 export async function envoyer(adresse, methode, donnees) {
@@ -56,7 +56,7 @@ function defilerEnBas() {
   }
 }
 
-// ===== 2. Liste des conversations =====
+// 2. Liste des conversations
 
 // Met en surbrillance la conversation ouverte (id = null : aucune)
 function marquerActive(id) {
@@ -90,7 +90,7 @@ function verifierListeVide() {
   listeVide.classList.toggle('hidden', !aucuneConversation)
 }
 
-// ===== 3. Ouvrir et fermer une discussion =====
+// 3. Ouvrir et fermer une discussion
 
 // Charge le panneau de discussion depuis le serveur. Renvoie true si tout s'est bien passé.
 async function ouvrirConversation(id) {
@@ -125,7 +125,7 @@ function fermerChat() {
   marquerActive(null)
 }
 
-// ===== 4. Historique du navigateur (bouton Retour du téléphone) =====
+// 4. Historique du navigateur (bouton Retour du téléphone)
 
 // Règle : l'historique contient toujours [liste, discussion].
 // Si une discussion est déjà ouverte, on remplace l'entrée au lieu d'en ajouter une.
@@ -163,7 +163,7 @@ window.addEventListener('popstate', function (evenement) {
 })
 
 
-// ===== 5. Envoyer ou modifier un message =====
+// 5. Envoyer ou modifier un message
 
 // Fichier (image ou document) choisi avec le trombone, pas encore envoyé
 let fichierJoint = null
@@ -328,7 +328,7 @@ document.addEventListener('submit', async function (evenement) {
 })
 
 
-// ===== 6. Supprimer un message / une conversation =====
+// 6. Supprimer un message / une conversation
 
 async function supprimerMessage(idMessage) {
   if (!confirm('Supprimer ce message ?')) { return }
@@ -397,7 +397,7 @@ async function changerBlocage(idUtilisateur, bloquer) {
   ouvrirConversation(page.dataset.activeId)
 }
 
-// ===== 7. Tous les clics (délégation : fonctionne aussi pour le contenu ajouté après coup) =====
+// 7. Tous les clics (délégation : fonctionne aussi pour le contenu ajouté après coup)
 
 document.addEventListener('click', async function (evenement) {
   let cible = evenement.target
@@ -466,7 +466,7 @@ document.addEventListener('click', async function (evenement) {
   }
 })
 
-// ===== 8. TEMPS RÉEL =====
+// 8. TEMPS RÉEL
 // realtime.js (chargé dans le layout) reçoit les événements du serveur et nous les transmet
 // sous la forme d'un événement du navigateur nommé "kc:evenement".
 // Ici, on met à jour la LISTE et la DISCUSSION de cette page.

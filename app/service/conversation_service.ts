@@ -5,18 +5,17 @@ import ConversationType from '#models/conversation_type'
 import RoleConversation from '#models/role_conversation'
 import UserConversation from '#models/user_conversation'
 
-/**
- * Renvoie la conversation privée entre deux utilisateurs.
- * Si elle n'existe pas encore, elle est créée (avec les deux participants).
- */
+// Renvoie la conversation privée entre deux utilisateurs.
+// Si elle n'existe pas encore, elle est créée (avec les deux participants).
+
 export async function findOrCreatePrivateConversation(
   currentUser: User,
   otherUser: User
 ): Promise<Conversation> {
-  // 1. Récupérer le type de conversation "Privee" une seule fois
+  // Récupérer le type de conversation "Privee" une seule fois
   const privateType = await ConversationType.firstOrCreate({ type: 'Privee' }, { type: 'Privee' })
 
-  // 2. Chercher s'il existe déjà une conversation privée commune aux deux utilisateurs
+  // Chercher s'il existe déjà une conversation privée commune aux deux utilisateurs
   const existingConversation = await Conversation.query()
     .where('conversationTypeId', privateType.id)
     .whereHas('participants', (query) => {
@@ -42,7 +41,7 @@ export async function findOrCreatePrivateConversation(
     }
   }
 
-  // 3. Sinon, on la crée proprement dans une transaction
+  // Sinon, on la crée proprement dans une transaction
   const memberRole = await RoleConversation.firstOrCreate({ title: 'membre' }, { title: 'membre' })
 
   return db.transaction(async (trx) => {
