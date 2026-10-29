@@ -13,23 +13,31 @@ export default class InscriptionsController {
   async store({ request, response, session }: HttpContext) {
     const payload = await request.validateUsing(inscriptionValidator)
 
+    // Vérification de la majorité (avant tout le reste : inutile de générer un code pour rien)
+    // Format { errors: [{ field, message }] } : le formulaire affiche l'erreur sous le bon champ
+    if (!this.isMajeur(payload.birth_date)) {
+      return response.unprocessableEntity({
+        errors: [
+          { field: 'birth_date', message: 'Vous devez avoir au moins 18 ans pour vous inscrire' },
+        ],
+      })
+    }
+
     const fullName = `${payload.first_name} ${payload.last_name}`
     const inscriptionExpire = DateTime.now().plus({ days: 2 })
     const codeAleatoire = await generateUniqueCode(Inscription)
 
-    // Vérification de la majorité
-    if (!this.isMajeur(payload.birth_date)) {
-      return response.badRequest({
-        error: 'Vous devez avoir au moins 18 ans pour vous inscrire',
-      })
-    }
-    const identite = await Inscription.create({
-      codeAleatoire: await hash.make(codeAleatoire),
-      fullName: fullName,
-      birthDate: payload.birth_date,
-      email: payload.email,
-      expiredAt: inscriptionExpire,
-    })
+    // L'e-mail est unique dans la table inscriptions : si une demande est déjà en attente
+    // pour cette adresse, on la remplace (nouveau lien) au lieu de provoquer une erreur 500.
+    const identite = await Inscription.updateOrCreate(
+      { email: payload.email },
+      {
+        codeAleatoire: await hash.make(codeAleatoire),
+        fullName: fullName,
+        birthDate: payload.birth_date,
+        expiredAt: inscriptionExpire,
+      }
+    )
 
     //on envoie maintenant un email de confirmation de email
     try {
