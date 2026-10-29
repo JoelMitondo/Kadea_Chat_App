@@ -129,6 +129,7 @@ export default class ProfileController {
 
     const result = await Message.query()
       .whereIn('conversation_id', myConversations)
+      .where('is_deleted', false) // un message supprimé n'est plus compté
       .count('* as total')
       .first()
 
