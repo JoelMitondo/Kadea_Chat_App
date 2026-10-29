@@ -5,6 +5,7 @@ import Inscription from '#models/inscription'
 import { DateTime } from 'luxon'
 import { generateUniqueCode } from './../service/code_generation.ts'
 import hash from '@adonisjs/core/services/hash'
+import { APP_TIMEZONE } from '../service/chat_service.ts'
 
 export default class InscriptionsController {
   async show({ view }: HttpContext) {
@@ -48,7 +49,7 @@ export default class InscriptionsController {
       // Formatage de la date d'expiration
       const dateExpirationFormattee =
         typeof inscriptionExpire?.toFormat === 'function'
-          ? inscriptionExpire.toFormat('dd/MM/yyyy à HH:mm')
+          ? inscriptionExpire.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
           : inscriptionExpire
 
       // Envoyer l'email via Brevo
