@@ -12,7 +12,8 @@
 */
 
 import { DateTime } from 'luxon'
-import { VineDate } from '@vinejs/vine'
+import vine, { SimpleMessagesProvider, VineDate } from '@vinejs/vine'
+import { validationFields, validationMessages } from '#validators/messages'
 
 declare module '@vinejs/vine/types' {
   interface VineGlobalTransforms {
@@ -21,3 +22,7 @@ declare module '@vinejs/vine/types' {
 }
 
 VineDate.transform((value) => DateTime.fromJSDate(value))
+
+// Messages d'erreur en français pour TOUS les validateurs (voir app/validators/messages.ts).
+// Sans cela, l'utilisateur voit les messages par défaut en anglais de VineJS.
+vine.messagesProvider = new SimpleMessagesProvider(validationMessages, validationFields)
