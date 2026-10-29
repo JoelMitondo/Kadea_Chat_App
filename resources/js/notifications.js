@@ -261,8 +261,15 @@ document.addEventListener('submit', async function (evenement) {
       kcNotifier.erreur('Votre session a expiré. Rechargez la page, puis réessayez.')
     } else if (reponse.status === 429) {
       kcNotifier.erreur('Trop de tentatives. Patientez un instant, puis réessayez.')
-    } else if (reponse.status === 401 || reponse.status === 403) {
+    } else if (reponse.status === 401) {
+      kcNotifier.erreur(trouverMessage(donnees, 'Votre session a expiré. Veuillez vous reconnecter.'))
+      setTimeout(function () { window.location.href = '/login' }, 2000)
+    } else if (reponse.status === 403) {
       kcNotifier.erreur(trouverMessage(donnees, "Vous n'avez pas l'autorisation d'effectuer cette action."))
+    } else if (reponse.status === 404 || reponse.status === 410) {
+      kcNotifier.erreur(trouverMessage(donnees, "Ce lien n'est plus valide ou l'élément demandé a été supprimé."))
+    } else if (reponse.status === 413) {
+      kcNotifier.erreur(trouverMessage(donnees, 'Le fichier envoyé est trop lourd.'))
     } else if (reponse.status >= 500) {
       kcNotifier.erreur('Une erreur est survenue sur le serveur. Réessayez dans un instant.')
     } else {

@@ -90,7 +90,12 @@ export async function deleteUserAccount(user: User): Promise<void> {
     fileUrls.push(story.imageUrl)
   }
 
-  const adminRole = await RoleConversation.findByOrFail('title', ADMIN_ROLE)
+  // firstOrCreate : si aucun groupe n'a encore été créé, le rôle "admin" n'existe pas en base
+  // (findByOrFail provoquait alors une erreur 404 et le compte ne pouvait pas être supprimé)
+  const adminRole = await RoleConversation.firstOrCreate(
+    { title: ADMIN_ROLE },
+    { title: ADMIN_ROLE }
+  )
 
   // Toutes les conversations (privées et groupes) dont il fait partie
   const memberships = await UserConversation.query()

@@ -27,6 +27,8 @@ export default class ProfileController {
         avatarUrl: user.avatarUrl,
         phoneNumber: user.phoneNumber,
         birthDateLabel: this.formatDate(user.birthDate),
+        // Le champ <input type="date"> n'accepte que le format AAAA-MM-JJ
+        birthDateValue: user.birthDate ? user.birthDate.toISODate() : '',
         email: user.email,
         createdAt: this.formatDate(user.createdAt),
       },
@@ -42,7 +44,7 @@ export default class ProfileController {
 
     // 18 ans minimum
     if (!this.isAdult(payload.birth_date)) {
-      return this.rejectField(ctx, 'Vous devez avoir au moins 18 ans.')
+      return this.rejectField(ctx, 'birth_date', 'Vous devez avoir au moins 18 ans.')
     }
 
     const oldAvatarUrl = user.avatarUrl
@@ -58,6 +60,7 @@ export default class ProfileController {
         logger.error({ err: error }, "Échec de l'envoi de la photo vers Cloudinary")
         return this.rejectField(
           ctx,
+          'avatar',
           "Impossible d'envoyer la photo pour le moment. Réessayez dans un instant."
         )
       }
@@ -83,12 +86,22 @@ export default class ProfileController {
     if (newAvatarUrl) {
       await deleteImageByUrl(oldAvatarUrl)
     }
+    // Formulaire envoyé par le script : il affiche lui-même le message puis recharge la page
+    // (un message flash ici s'afficherait une deuxième fois après le rechargement)
+    if (request.accepts(['html', 'json']) === 'json') {
+      return response.ok({ message: 'Votre profil a été mis à jour.' })
+    }
     session.flash('success', 'Votre profil a été mis à jour.')
     return response.redirect().toRoute('profile')
   }
 
-  // Renvoie une erreur sur un champ précis (JSON pour le formulaire AJAX, message flash sinon)
-  private rejectField(ctx: HttpContext, message: string) {
+  // Renvoie une erreur sur un champ précis (JSON pour le formulaire AJAX, message flash sinon).
+  // Avant, une redirection était renvoyée même au script : il la suivait, recevait un code 200
+  // et affichait "Votre profil a été mis à jour" alors que rien n'avait été enregistré.
+  private rejectField(ctx: HttpContext, field: string, message: string) {
+    if (ctx.request.accepts(['html', 'json']) === 'json') {
+      return ctx.response.unprocessableEntity({ errors: [{ field, message }] })
+    }
     ctx.session.flash('error', message)
     return ctx.response.redirect().back()
   }
@@ -116,6 +129,7 @@ export default class ProfileController {
 
     const result = await Message.query()
       .whereIn('conversation_id', myConversations)
+      .where('is_deleted', false) // un message supprimé n'est plus compté
       .count('* as total')
       .first()
 

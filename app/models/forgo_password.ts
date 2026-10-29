@@ -1,4 +1,3 @@
 import { ForgoPasswordSchema } from '#database/schema'
 
-export default class ForgoPassword extends ForgoPasswordSchema {
-}
+export default class ForgoPassword extends ForgoPasswordSchema {}

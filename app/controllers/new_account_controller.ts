@@ -4,21 +4,20 @@ import { confirmationCompteValidator } from '#validators/user'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
+import { ERROR_PAGES, renderErrorPage } from '../service/error_page.ts'
+
 export default class NewAccountController {
   //function pour envoyer les information d'une invitation lors de l'enregistrement de l'utilisateur
-  async create({ view, params, response }: HttpContext) {
-    const inscription = await Inscription.find(params.id)
+  async create(ctx: HttpContext) {
+    const { view, params } = ctx
+    const result = await this.findInscription(params.id, params.code)
 
-    if (!inscription) {
-      return response.notFound("Lien d'inscription invalide ou expiré.")
+    // Lien invalide ou expiré : page d'erreur du site qui explique quoi faire
+    if (result.error) {
+      return renderErrorPage(ctx, ERROR_PAGES[result.error])
     }
 
-    // On vérifie si le code fourni correspond au hash stocké en BDD
-    const isValid = await hash.verify(inscription.codeAleatoire, params.code)
-
-    if (!isValid) {
-      return response.notFound("Lien d'inscription invalide ou expiré.")
-    }
+    const inscription = result.inscription
     return view.render('pages/auth/signup', {
       code: params.code,
       id: params.id,
@@ -30,24 +29,22 @@ export default class NewAccountController {
     })
   }
 
-  async store({ request, response, auth, params }: HttpContext) {
+  async store(ctx: HttpContext) {
+    const { request, response, auth, params } = ctx
     const payload = await request.validateUsing(confirmationCompteValidator)
 
-    const inscription = await Inscription.find(params.id)
-
-    if (!inscription) {
-      return response.notFound("Lien d'inscription invalide ou expiré.")
+    const result = await this.findInscription(params.id, params.code)
+    if (result.error) {
+      return renderErrorPage(ctx, ERROR_PAGES[result.error])
     }
-    // Vérification de la date d'expiration
-    if (DateTime.now() > inscription.expiredAt!) {
-      // On nettoie la bdd
+    const inscription = result.inscription
+
+    // Un compte a pu être créé avec cet e-mail entre-temps (autre lien d'inscription) :
+    // sans cette vérification, la contrainte d'unicité provoquerait une erreur 500
+    const existingUser = await User.findBy('email', inscription.email)
+    if (existingUser) {
       await inscription.delete()
-      return response.badRequest("Le lien d'inscription a expiré. Veuillez vous réinscrire.")
-    }
-    const isValid = await hash.verify(inscription.codeAleatoire, params.code)
-
-    if (!isValid) {
-      return response.notFound("Lien d'inscription invalide ou expiré.")
+      return renderErrorPage(ctx, ERROR_PAGES.accountAlreadyExists)
     }
 
     const userData = {
@@ -68,7 +65,40 @@ export default class NewAccountController {
     response.redirect().toRoute('messages')
   }
 
-  private formatDate(date: DateTime | null | undefined): string {
-    return date ? date.toFormat('dd/MM/yyyy') : 'Non renseignée'
+  /**
+   * Retrouve la demande d'inscription du lien reçu par e-mail.
+   * Renvoie soit l'inscription, soit le type d'erreur à afficher.
+   */
+  private async findInscription(
+    id: string,
+    code: string
+  ): Promise<
+    | { error: null; inscription: Inscription }
+    | { error: 'signupLinkInvalid' | 'signupLinkExpired'; inscription: null }
+  > {
+    // Identifiant non numérique : sans ce contrôle, PostgreSQL renverrait une erreur 500
+    const inscriptionId = Number(id)
+    if (!Number.isInteger(inscriptionId) || inscriptionId <= 0) {
+      return { error: 'signupLinkInvalid', inscription: null }
+    }
+
+    const inscription = await Inscription.find(inscriptionId)
+    if (!inscription) {
+      return { error: 'signupLinkInvalid', inscription: null }
+    }
+
+    // On vérifie si le code fourni correspond au hash stocké en BDD
+    const isValid = await hash.verify(inscription.codeAleatoire, code)
+    if (!isValid) {
+      return { error: 'signupLinkInvalid', inscription: null }
+    }
+
+    // Lien expiré : on nettoie la bdd
+    if (DateTime.now() > inscription.expiredAt!) {
+      await inscription.delete()
+      return { error: 'signupLinkExpired', inscription: null }
+    }
+
+    return { error: null, inscription }
   }
 }

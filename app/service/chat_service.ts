@@ -75,6 +75,13 @@ export function getInitials(fullName: string): string {
     .map((word) => word[0].toUpperCase())
     .join('')
 }
+
+// Échappe les caractères spéciaux d'une recherche LIKE / ILIKE :
+// sans cela, "%" ou "_" tapés par l'utilisateur serviraient de jokers ("%" trouverait tout)
+export function escapeLike(search: string): string {
+  return search.replace(/[\\%_]/g, (character) => `\\${character}`)
+}
+
 // Taille d'un fichier en texte lisible : "250 Ko", "1.4 Mo"
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) {
