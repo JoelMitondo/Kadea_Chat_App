@@ -13,6 +13,12 @@ export default class NewAccountController {
       return response.notFound("Lien d'inscription invalide ou expiré.")
     }
 
+    // Lien expiré : inutile d'afficher le formulaire, l'envoi serait refusé
+    if (DateTime.now() > inscription.expiredAt!) {
+      await inscription.delete()
+      return response.badRequest("Le lien d'inscription a expiré. Veuillez vous réinscrire.")
+    }
+
     // On vérifie si le code fourni correspond au hash stocké en BDD
     const isValid = await hash.verify(inscription.codeAleatoire, params.code)
 
@@ -50,6 +56,14 @@ export default class NewAccountController {
       return response.notFound("Lien d'inscription invalide ou expiré.")
     }
 
+    // Un compte a pu être créé avec cet e-mail entre-temps (autre lien d'inscription) :
+    // sans cette vérification, la contrainte d'unicité provoquerait une erreur 500
+    const existingUser = await User.findBy('email', inscription.email)
+    if (existingUser) {
+      await inscription.delete()
+      return response.badRequest('Un compte existe déjà avec cette adresse e-mail. Connectez-vous.')
+    }
+
     const userData = {
       fullName: inscription.fullName,
       birthDate: inscription.birthDate,
@@ -66,9 +80,5 @@ export default class NewAccountController {
 
     await auth.use('web').login(user)
     response.redirect().toRoute('messages')
-  }
-
-  private formatDate(date: DateTime | null | undefined): string {
-    return date ? date.toFormat('dd/MM/yyyy') : 'Non renseignée'
   }
 }
