@@ -86,9 +86,7 @@ router
   .use(middleware.auth())
 
 // Transmit ajoute 3 routes (/__transmit/events, subscribe, unsubscribe).
-// Seules les personnes connectées peuvent ouvrir la connexion et s'abonner à un canal.
+// Seules les personnes connectées peuvent ouvrir la connexion, s'abonner et se désabonner.
 transmit.registerRoutes((route) => {
-  if (route.getPattern() === '__transmit/events' || route.getPattern() === '__transmit/subscribe') {
-    route.middleware(middleware.auth())
-  }
+  route.middleware(middleware.auth())
 })
