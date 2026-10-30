@@ -5,7 +5,6 @@ import {
   PRESENCE_CHANNEL,
   broadcastPresence,
   toChannelId,
-  STORIES_CHANNEL,
 } from '../app/service/realtime_service.ts'
 
 // ===== 1. QUI A LE DROIT DE S'ABONNER À QUEL CANAL ? =====
@@ -22,10 +21,7 @@ transmit.authorize(PRESENCE_CHANNEL, (ctx) => {
   return ctx.auth.user !== undefined
 })
 
-// Canal des stories : toute personne connectée peut l'écouter
-transmit.authorize(STORIES_CHANNEL, (ctx) => {
-  return ctx.auth.user !== undefined
-})
+
 // ===== 2. SUIVI DES UTILISATEURS EN LIGNE =====
 // Un utilisateur est "en ligne" tant qu'au moins une de ses pages est ouverte
 // (donc tant qu'il a au moins une connexion Transmit ouverte).

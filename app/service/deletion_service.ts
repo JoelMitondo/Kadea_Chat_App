@@ -5,7 +5,6 @@ import ForgoPassword from '#models/forgo_password'
 import Message from '#models/message'
 import MessageAttachment from '#models/message_attachment'
 import RoleConversation from '#models/role_conversation'
-import Story from '#models/storie'
 import User from '#models/user'
 import UserConversation from '#models/user_conversation'
 import { ADMIN_ROLE, GROUP_TYPE } from './chat_service.ts'
@@ -65,7 +64,7 @@ export async function deleteConversationAndFiles(conversationId: number): Promis
  *     - s'il est le seul membre, le groupe est supprimé ;
  *     - s'il en est l'administrateur, c'est le membre le plus ancien qui devient administrateur ;
  *     - ses messages du groupe sont supprimés.
- * - Sa photo, ses stories et ses fichiers envoyés sont supprimés de Cloudinary.
+ * - Sa photo et ses fichiers envoyés sont supprimés de Cloudinary.
  * - Ses blocages et ses demandes de mot de passe oublié sont supprimés.
  *
  * Toutes les opérations sur la base sont dans UNE transaction : si une seule échoue,
@@ -81,13 +80,9 @@ export async function deleteUserAccount(user: User): Promise<void> {
   const removedPrivateChats: { conversationId: number; otherIds: string[] }[] = []
   const updatedGroups: { conversationId: number; memberIds: string[] }[] = []
 
-  // Sa photo de profil et ses stories
+  // Sa photo de profil
   if (user.avatarUrl) {
     fileUrls.push(user.avatarUrl)
-  }
-  const stories = await Story.query().where('userId', userId).select('image_url')
-  for (const story of stories) {
-    fileUrls.push(story.imageUrl)
   }
 
   // firstOrCreate : si aucun groupe n'a encore été créé, le rôle "admin" n'existe pas en base
@@ -194,7 +189,7 @@ export async function deleteUserAccount(user: User): Promise<void> {
     // Ses demandes de mot de passe oublié
     await ForgoPassword.query({ client: trx }).where('userId', userId).delete()
 
-    // Enfin, le compte lui-même (ses stories partent avec : suppression en cascade)
+    // Enfin, le compte lui-même
     await User.query({ client: trx }).where('id', userId).delete()
   })
 

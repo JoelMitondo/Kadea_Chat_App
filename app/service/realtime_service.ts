@@ -17,8 +17,6 @@ import {
 
 // Canal où l'on annonce qui passe en ligne / hors ligne
 export const PRESENCE_CHANNEL = 'presence'
-// Canal où l'on annonce les nouvelles stories (ouvert à tout utilisateur connecté)
-export const STORIES_CHANNEL = 'stories'
 
 export type ConversationKind = 'private' | 'group'
 
@@ -282,21 +280,6 @@ function renderListItem(item: Record<string, unknown>, isGroup: boolean): Promis
     isGroup,
     canDelete: !isGroup,
   })
-}
-
-// ---------- Stories ----------
-
-// Annonce à tout le monde qu'une nouvelle story est disponible
-export function broadcastNewStory(author: User) {
-  try {
-    transmit.broadcast(STORIES_CHANNEL, {
-      type: 'story:new',
-      userId: author.id,
-      authorName: author.fullName,
-    })
-  } catch (error) {
-    logger.error({ err: error }, "Échec de l'annonce d'une nouvelle story")
-  }
 }
 
 // ---------- Conversation supprimée ----------

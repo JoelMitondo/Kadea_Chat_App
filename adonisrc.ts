@@ -78,8 +78,6 @@ export default defineConfig({
       file: () => import('#start/transmit'),
       environment: ['web'],
     },
-    // Stories : nettoyage automatique des stories expirées
-    { file: () => import('#start/stories'), environment: ['web'] },
   ],
 
   /*
