@@ -2,7 +2,7 @@
 
 # Kadea Chat
 
-**Application web de messagerie : discussions privées, groupes, stories et temps réel.**
+**Application web de messagerie : discussions privées, groupes et temps réel.**
 
 Projet de fin de formation · Kadea Academy
 
@@ -78,7 +78,6 @@ Projet de fin de formation · Kadea Academy
 | **Messages privés** | Envoi, modification, suppression, accusés de lecture, compteur de non-lus, suppression de conversation pour soi |
 | **Groupes** | Création, rôles administrateur / membre, ajout de membres, suppression par l'administrateur |
 | **Temps réel** | Nouveaux messages, lectures, modifications et présence instantanés (SSE) |
-| **Stories** | Images visibles 24 heures, 5 stories actives maximum, purge automatique |
 | **Fichiers joints** | Images et documents jusqu'à 10 Mo, miniatures, ouverture et téléchargement |
 | **Recherche** | Dans tous ses propres messages, avec mot surligné |
 | **Utilisateurs** | Liste paginée, recherche, démarrage d'une discussion |
@@ -305,7 +304,7 @@ Toute nouvelle variable doit aussi être déclarée dans `start/env.ts`, sinon l
 ```
 kadea-chat/
 ├── app/
-│   ├── controllers/        Un contrôleur par domaine (messages, groupes, stories…)
+│   ├── controllers/        Un contrôleur par domaine (messages, groupes…)
 │   ├── middleware/         auth, guest, auth silencieuse, liaisons du conteneur
 │   ├── models/             Modèles Lucid (users, conversations, messages…)
 │   ├── service/            Règles métier (Cloudinary, temps réel, groupes, suppression…)
@@ -326,7 +325,7 @@ kadea-chat/
 │       ├── components/     Composants réutilisables (layouts, bulles, avatars…)
 │       ├── partials/       Fragments renvoyés par le serveur (panneaux de chat)
 │       └── pages/          Pages complètes
-├── start/                  routes, kernel, validator, view, transmit, stories
+├── start/                  routes, kernel, validator, view, transmit
 ├── tests/                  unit/ · functional/ · browser/
 ├── adonisrc.ts             Providers, preloads, suites de tests
 └── vite.config.ts          Points d'entrée JavaScript
@@ -353,7 +352,6 @@ kadea-chat/
 | GET / DELETE | `/groups/:id` | Ouvrir / supprimer | Membre / admin |
 | POST | `/groups/:id/members` | Ajouter des membres | Admin |
 | POST | `/groups/:id/messages` | Écrire dans un groupe | Membre |
-| GET / POST | `/stories` | Voir / publier | Connecté |
 | GET | `/users` | Liste et recherche d'utilisateurs | Connecté |
 | POST | `/users/:id/chat` | Démarrer une discussion | Connecté |
 | POST | `/users/:id/block` · `/unblock` | Bloquer / débloquer | Connecté |
@@ -384,13 +382,11 @@ Le modèle complet (MCD, MLD, MPD) est dans [`docs/modelisation`](docs/modelisat
 | `message_statuses` | Statut d'envoi et de lecture par destinataire |
 | `message_recipients` | Destinataires explicites |
 | `blocked_users` | Qui a bloqué qui |
-| `stories` | Images éphémères avec date d'expiration |
 
 **Choix de conception**
 
 - Un seul modèle pour les conversations privées **et** les groupes.
 - Les rôles sont stockés dans la table de liaison `user_conversations`.
-- Une story est « active » tant que `expires_at > maintenant` : aucun statut n'est stocké.
 - Une migration déjà appliquée n'est jamais modifiée : on en écrit une nouvelle.
 
 ---
@@ -425,7 +421,7 @@ node ace test functional  # tests de routes (base de test)
 
 - Les tests utilisent la base `kadea_chat_test`, **jamais** la base de développement.
 - Chaque test suit le schéma **Préparer → Agir → Vérifier**.
-- Priorités : droits sur les conversations et groupes, règle de blocage, isolation de la recherche, succession d'administrateur à la suppression d'un compte, stories expirées.
+- Priorités : droits sur les conversations et groupes, règle de blocage, isolation de la recherche, succession d'administrateur à la suppression d'un compte.
 
 ---
 
