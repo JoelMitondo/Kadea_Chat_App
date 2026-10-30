@@ -1,3 +1,8 @@
+// SUPPRESSIONS
+// Important : la base de données est nettoyée d'abord, Cloudinary ensuite.
+// Une transaction peut être annulée, pas un fichier effacé : dans l'autre sens, on risquerait
+// de perdre des fichiers encore utilisés si la base refusait la suppression.
+
 import db from '@adonisjs/lucid/services/db'
 import BlockedUser from '#models/blocked_user'
 import Conversation from '#models/conversation'
@@ -5,17 +10,16 @@ import ForgoPassword from '#models/forgo_password'
 import Message from '#models/message'
 import MessageAttachment from '#models/message_attachment'
 import RoleConversation from '#models/role_conversation'
-import Story from '#models/storie'
 import User from '#models/user'
 import UserConversation from '#models/user_conversation'
 import { ADMIN_ROLE, GROUP_TYPE } from './chat_service.ts'
-import { deleteFileByUrl } from './cloudinary_service.ts'
-import { notifyConversationRemoved, notifyGroupUpdated } from './realtime_service.ts'
+import { supprimeFichierParLien } from './cloudinary_service.ts'
+import { previensConversationSupprimee, previensGroupeModifie } from './realtime_service.ts'
 
 // Supprime une liste de fichiers sur Cloudinary (un échec est noté dans les logs, sans rien bloquer)
-async function deleteFiles(fileUrls: string[]) {
+async function supprimeFichiers(fileUrls: string[]) {
   for (const fileUrl of fileUrls) {
-    await deleteFileByUrl(fileUrl)
+    await supprimeFichierParLien(fileUrl)
   }
 }
 
@@ -30,7 +34,7 @@ async function deleteFiles(fileUrls: string[]) {
  * - sur Cloudinary : les fichiers joints à ses messages.
  * Renvoie la liste des identifiants des participants, pour pouvoir les prévenir.
  */
-export async function deleteConversationAndFiles(conversationId: number): Promise<string[]> {
+export async function supprimeConversationEtFichiers(conversationId: number): Promise<string[]> {
   // 1. Les participants (pour les prévenir ensuite)
   const members = await UserConversation.query()
     .where('conversationId', conversationId)
@@ -47,7 +51,7 @@ export async function deleteConversationAndFiles(conversationId: number): Promis
   await Conversation.query().where('id', conversationId).delete()
 
   // 4. Les fichiers sont supprimés de Cloudinary
-  await deleteFiles(fileUrls)
+  await supprimeFichiers(fileUrls)
 
   return memberIds
 }
@@ -65,13 +69,13 @@ export async function deleteConversationAndFiles(conversationId: number): Promis
  *     - s'il est le seul membre, le groupe est supprimé ;
  *     - s'il en est l'administrateur, c'est le membre le plus ancien qui devient administrateur ;
  *     - ses messages du groupe sont supprimés.
- * - Sa photo, ses stories et ses fichiers envoyés sont supprimés de Cloudinary.
+ * - Sa photo et ses fichiers envoyés sont supprimés de Cloudinary.
  * - Ses blocages et ses demandes de mot de passe oublié sont supprimés.
  *
  * Toutes les opérations sur la base sont dans UNE transaction : si une seule échoue,
  * rien n'est supprimé.
  */
-export async function deleteUserAccount(user: User): Promise<void> {
+export async function supprimeCompteUtilisateur(user: User): Promise<void> {
   const userId = user.id
 
   // Les fichiers à supprimer de Cloudinary une fois la base nettoyée
@@ -81,13 +85,9 @@ export async function deleteUserAccount(user: User): Promise<void> {
   const removedPrivateChats: { conversationId: number; otherIds: string[] }[] = []
   const updatedGroups: { conversationId: number; memberIds: string[] }[] = []
 
-  // Sa photo de profil et ses stories
+  // Sa photo de profil
   if (user.avatarUrl) {
     fileUrls.push(user.avatarUrl)
-  }
-  const stories = await Story.query().where('userId', userId).select('image_url')
-  for (const story of stories) {
-    fileUrls.push(story.imageUrl)
   }
 
   // firstOrCreate : si aucun groupe n'a encore été créé, le rôle "admin" n'existe pas en base
@@ -194,16 +194,16 @@ export async function deleteUserAccount(user: User): Promise<void> {
     // Ses demandes de mot de passe oublié
     await ForgoPassword.query({ client: trx }).where('userId', userId).delete()
 
-    // Enfin, le compte lui-même (ses stories partent avec : suppression en cascade)
+    // Enfin, le compte lui-même
     await User.query({ client: trx }).where('id', userId).delete()
   })
 
   // ----- La base est nettoyée : Cloudinary, puis les notifications en temps réel -----
 
-  await deleteFiles(fileUrls)
+  await supprimeFichiers(fileUrls)
 
   for (const chat of removedPrivateChats) {
-    notifyConversationRemoved({
+    previensConversationSupprimee({
       userIds: chat.otherIds,
       conversationId: chat.conversationId,
       kind: 'private',
@@ -212,6 +212,6 @@ export async function deleteUserAccount(user: User): Promise<void> {
   }
 
   for (const group of updatedGroups) {
-    notifyGroupUpdated(group.conversationId, group.memberIds)
+    previensGroupeModifie(group.conversationId, group.memberIds)
   }
 }

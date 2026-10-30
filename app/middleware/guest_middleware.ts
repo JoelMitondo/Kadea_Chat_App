@@ -9,6 +9,7 @@ import type { Authenticators } from '@adonisjs/auth/types'
  * For example, the login page should not be accessible if the user
  * is already logged-in
  */
+// L'inverse d'auth : une personne déjà connectée n'a rien à faire sur /login ou /register.
 export default class GuestMiddleware {
   /**
    * The URL to redirect to when user is logged-in

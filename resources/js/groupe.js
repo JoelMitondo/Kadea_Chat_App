@@ -4,6 +4,7 @@ import { envoyer, lireErreur } from './message.js'
 // La liste des groupes, l'ouverture d'un groupe, l'envoi / modification / suppression
 // de messages et le bouton Retour sont déjà gérés par messages.js.
 
+// Ce fichier s'ajoute à message.js sur la page Groupes : il ne gère que la création, l'ajout de membres et la suppression.
 let formulaireCreation = document.getElementById('group-create-form')
 let modaleCreation = document.getElementById('group-create-modal')
 let champNom = document.getElementById('group-name')

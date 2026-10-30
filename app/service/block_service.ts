@@ -1,7 +1,11 @@
+// BLOCAGE
+// Une ligne dans blocked_users = "blocker_id a bloqué blocked_id".
+// La vérification se fait à l'envoi d'un message, dans messages_controller.ts.
+
 import BlockedUser from '#models/blocked_user'
 
 // "blockerId a-t-il bloqué blockedId ?"
-export async function hasBlocked(blockerId: string, blockedId: string): Promise<boolean> {
+export async function aBloque(blockerId: string, blockedId: string): Promise<boolean> {
   const row = await BlockedUser.query()
     .where('blockerId', blockerId)
     .where('blockedId', blockedId)
@@ -11,11 +15,11 @@ export async function hasBlocked(blockerId: string, blockedId: string): Promise<
 }
 
 // Bloque quelqu'un (s'il est déjà bloqué, rien n'est ajouté une deuxième fois)
-export async function blockUser(blockerId: string, blockedId: string) {
+export async function bloqueUtilisateur(blockerId: string, blockedId: string) {
   await BlockedUser.firstOrCreate({ blockerId, blockedId })
 }
 
 // Débloque quelqu'un
-export async function unblockUser(blockerId: string, blockedId: string) {
+export async function debloqueUtilisateur(blockerId: string, blockedId: string) {
   await BlockedUser.query().where('blockerId', blockerId).where('blockedId', blockedId).delete()
 }

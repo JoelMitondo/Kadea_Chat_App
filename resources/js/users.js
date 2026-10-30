@@ -10,6 +10,9 @@ let modale = document.getElementById('user-modal')
 
 // Recherche en direct
 
+// Technique du "debounce" : à chaque touche, on annule le minuteur et on le relance.
+// La recherche ne part que 300 ms après la dernière touche, au lieu d'une requête par lettre.
+// numeroRecherche sert à ignorer une ancienne réponse qui arriverait après une plus récente.
 let minuteur = null
 let numeroRecherche = 0 // sert à ignorer une réponse arrivée en retard
 

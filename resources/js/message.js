@@ -16,6 +16,8 @@ let adresseChat = page.dataset.chatUrl // "/conversations" ou "/groups"
 // 1. Petits outils
 
 // Envoie une requête JSON au serveur et renvoie { ok, corps }
+// fetch envoie une requête sans recharger la page.
+// X-CSRF-TOKEN : jeton de sécurité exigé par le serveur, qui prouve que la requête vient bien de notre site.
 export async function envoyer(adresse, methode, donnees) {
   let options = {
     method: methode,
@@ -141,6 +143,8 @@ function fermerChat() {
 
 // Règle : l'historique contient toujours [liste, discussion].
 // Si une discussion est déjà ouverte, on remplace l'entrée au lieu d'en ajouter une.
+// La discussion s'ouvre sans changer de page. Sans pushState, le bouton Retour du téléphone
+// quitterait l'application : pushState ajoute une étape à l'historique et change l'adresse affichée.
 function memoriserDansHistorique(id) {
   let etat = { vue: 'chat', id: id }
   let adresse = adresseChat + '/' + id
@@ -221,6 +225,7 @@ function retirerFichierJoint() {
 
 // Envoie un message AVEC un fichier. Un fichier ne peut pas passer en JSON :
 // on utilise un "FormData" (un formulaire construit à la main).
+// Le JSON ne sait transporter que du texte : un fichier doit partir dans un FormData.
 async function envoyerFichier(adresse, contenu, fichier) {
   let donnees = new FormData()
   donnees.append('content', contenu)
@@ -411,6 +416,9 @@ async function changerBlocage(idUtilisateur, bloquer) {
 
 // 7. Tous les clics (délégation : fonctionne aussi pour le contenu ajouté après coup)
 
+// DÉLÉGATION D'ÉVÉNEMENTS : au lieu de poser un écouteur sur chaque bouton, on en pose un seul sur le document.
+// Les bulles ajoutées plus tard (nouveaux messages) n'ont donc besoin de rien de plus.
+// closest('[data-...]') remonte depuis l'élément cliqué pour retrouver le bouton concerné.
 document.addEventListener('click', async function (evenement) {
   let cible = evenement.target
 
@@ -609,6 +617,7 @@ function traiterConversationSupprimee(donnees) {
   }
 }
 // Point d'entrée : tous les événements du serveur passent par ici
+// Reçoit ce que realtime.js a relayé, puis appelle la bonne fonction selon le type d'événement.
 document.addEventListener('kc:evenement', function (evenement) {
   let donnees = evenement.detail
 

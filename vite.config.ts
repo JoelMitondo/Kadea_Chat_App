@@ -17,7 +17,6 @@ export default defineConfig({
         'resources/js/groupe.js',
         'resources/js/profile.js',
         'resources/js/settings.js',
-        'resources/js/stories.js',
         'resources/js/users.js',
       ],
 

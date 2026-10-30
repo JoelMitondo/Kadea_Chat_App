@@ -14,6 +14,9 @@ import BlockedUser from '#models/blocked_user'
  * It extends UserSchema and includes authentication capabilities
  * through the withAuthFinder mixin.
  */
+// withAuthFinder ajoute deux choses au modèle : la méthode verifyCredentials (connexion)
+// et le hachage automatique du mot de passe avant chaque enregistrement.
+// C'est pour cela qu'on écrit user.password = '...' sans jamais appeler hash nous-mêmes.
 export default class User extends compose(UserSchema, withAuthFinder(hash)) {
   /**
    * Get the user's initials from their full name or email.

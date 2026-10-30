@@ -1,15 +1,17 @@
+// Routes appelées par le JavaScript pour le temps réel : compteurs de non-lus et lecture des messages.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import UserConversation from '#models/user_conversation'
 import { GROUP_TYPE } from '../service/chat_service.ts'
-import { markConversationAsReadAndNotify } from '../service/realtime_service.ts'
+import { marqueConversationCommeLueEtPrevient } from '../service/realtime_service.ts'
 
 export default class RealtimeController {
   /**
    * Nombre de messages non lus, pour les pastilles de la barre de navigation
    * Réponse : { private: 3, group: 1 }
    */
-  async unreadCounts({ auth, response }: HttpContext) {
+  async donneCompteursNonLus({ auth, response }: HttpContext) {
     const user = auth.getUserOrFail()
 
     const rows = await db
@@ -40,7 +42,7 @@ export default class RealtimeController {
    * Appelé par le navigateur quand un message arrive dans la conversation que l'utilisateur
    * est en train de regarder : il est lu immédiatement, l'expéditeur voit les coches bleues.
    */
-  async markRead({ auth, params, response }: HttpContext) {
+  async marqueCommeLu({ auth, params, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 
@@ -50,7 +52,7 @@ export default class RealtimeController {
       .where('conversationId', conversationId)
       .firstOrFail()
 
-    await markConversationAsReadAndNotify(user.id, conversationId)
+    await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
     return response.noContent()
   }

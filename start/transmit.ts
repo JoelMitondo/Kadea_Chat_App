@@ -1,11 +1,17 @@
+// TEMPS RÉEL, CÔTÉ SERVEUR
+// Transmit utilise les SSE (Server-Sent Events) : le navigateur ouvre une connexion qui reste ouverte,
+// et le serveur peut y envoyer des messages quand il veut, sans que la page ne demande rien.
+// C'est comme ça qu'un message arrive sans recharger la page.
+// Les données circulent sur des "canaux" : chaque utilisateur a le sien, et un canal "presence" est commun à tous.
+// Ce fichier fait deux choses : il décide QUI peut écouter quel canal, et il suit QUI est en ligne.
+
 import db from '@adonisjs/lucid/services/db'
 import logger from '@adonisjs/core/services/logger'
 import transmit from '@adonisjs/transmit/services/main'
 import {
   PRESENCE_CHANNEL,
-  broadcastPresence,
-  toChannelId,
-  STORIES_CHANNEL,
+  annoncePresence,
+  convertitEnIdentifiantCanal,
 } from '../app/service/realtime_service.ts'
 
 // ===== 1. QUI A LE DROIT DE S'ABONNER À QUEL CANAL ? =====
@@ -14,7 +20,7 @@ import {
 // Canal personnel "users/<id>" : seul son propriétaire peut s'y abonner
 transmit.authorize<{ id: string }>('users/:id', (ctx, { id }) => {
   const currentUser = ctx.auth.user
-  return currentUser !== undefined && toChannelId(currentUser.id) === id
+  return currentUser !== undefined && convertitEnIdentifiantCanal(currentUser.id) === id
 })
 
 // Canal de présence : toute personne connectée peut l'écouter
@@ -22,10 +28,6 @@ transmit.authorize(PRESENCE_CHANNEL, (ctx) => {
   return ctx.auth.user !== undefined
 })
 
-// Canal des stories : toute personne connectée peut l'écouter
-transmit.authorize(STORIES_CHANNEL, (ctx) => {
-  return ctx.auth.user !== undefined
-})
 // ===== 2. SUIVI DES UTILISATEURS EN LIGNE =====
 // Un utilisateur est "en ligne" tant qu'au moins une de ses pages est ouverte
 // (donc tant qu'il a au moins une connexion Transmit ouverte).
@@ -43,16 +45,18 @@ const offlineTimers = new Map<string, NodeJS.Timeout>()
 // On attend donc quelques secondes avant de dire "hors ligne", pour éviter de clignoter.
 const OFFLINE_DELAY_MS = 8000
 
-async function setOnlineStatus(userId: string, isOnline: boolean) {
+async function changeStatutEnLigne(userId: string, isOnline: boolean) {
   try {
     await db.from('users').where('id', userId).update({ is_online: isOnline })
-    broadcastPresence(userId, isOnline) // tout le monde est prévenu
+    annoncePresence(userId, isOnline) // tout le monde est prévenu
   } catch (error) {
     logger.error({ err: error, userId }, 'Échec de la mise à jour du statut en ligne')
   }
 }
 
 // Une connexion s'ouvre (l'utilisateur a ouvert une page de l'application)
+// On compte les connexions, car une même personne peut avoir plusieurs onglets ouverts :
+// elle n'est hors ligne que lorsque son DERNIER onglet est fermé.
 transmit.on('connect', async ({ uid, context }) => {
   const userId = context.auth.user?.id
   if (!userId) {
@@ -73,7 +77,7 @@ transmit.on('connect', async ({ uid, context }) => {
   }
 
   if (!wasOnline) {
-    await setOnlineStatus(userId, true)
+    await changeStatutEnLigne(userId, true)
   }
 })
 
@@ -99,7 +103,7 @@ transmit.on('disconnect', ({ uid }) => {
     userId,
     setTimeout(async () => {
       offlineTimers.delete(userId)
-      await setOnlineStatus(userId, false)
+      await changeStatutEnLigne(userId, false)
     }, OFFLINE_DELAY_MS)
   )
 })

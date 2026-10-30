@@ -1,8 +1,14 @@
+// MOT DE PASSE OUBLIÉ, en 3 étapes :
+//   1. l'utilisateur donne son e-mail : on enregistre un code haché valable 1 heure et on envoie un lien ;
+//   2. il clique sur le lien : on vérifie le code et on affiche le formulaire ;
+//   3. il envoie son nouveau mot de passe : on revérifie le code, on enregistre, puis on supprime la demande
+//      pour que le lien ne serve qu'une seule fois.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import ForgoPassword from '#models/forgo_password'
 import { forgoPassewordValidator, newPassewordValidator } from '#validators/forgo_password'
-import { generateUniqueCode } from './../service/code_generation.ts'
+import { genereCodeUnique } from './../service/code_generation.ts'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import mail from '@adonisjs/mail/services/main'
@@ -10,16 +16,16 @@ import logger from '@adonisjs/core/services/logger'
 import { APP_TIMEZONE } from '../service/chat_service.ts'
 
 export default class ForgoPasswordsController {
-  async index({ view }: HttpContext) {
+  async donnePageMotDePasseOublie({ view }: HttpContext) {
     return view.render('pages/auth/forgoPassword')
   }
-  async storeForgoPassword({ request, response, session }: HttpContext) {
+  async enregistreDemandeReinitialisation({ request, response, session }: HttpContext) {
     const { email } = await request.validateUsing(forgoPassewordValidator)
 
     const user = await User.findBy('email', email)
 
     if (user) {
-      const codeAleatoire = await generateUniqueCode(ForgoPassword)
+      const codeAleatoire = await genereCodeUnique(ForgoPassword)
       const identite = await ForgoPassword.updateOrCreate(
         { email: user.email },
         {
@@ -101,8 +107,8 @@ export default class ForgoPasswordsController {
     return response.redirect().toRoute('home')
   }
 
-  async indexPageNewPassword({ params, view }: HttpContext) {
-    const recuperation = await this.findValidRequest(params.id, params.code)
+  async donnePageNouveauMotDePasse({ params, view }: HttpContext) {
+    const recuperation = await this.chercheDemandeValide(params.id, params.code)
 
     // Lien invalide ou expiré : la page affiche le message "Lien invalide ou expiré"
     return view.render('pages/auth/updatePassword', {
@@ -112,10 +118,10 @@ export default class ForgoPasswordsController {
     })
   }
 
-  async storeNewPassword({ request, response, auth, params }: HttpContext) {
+  async enregistreNouveauMotDePasse({ request, response, auth, params }: HttpContext) {
     const payload = await request.validateUsing(newPassewordValidator)
 
-    const recuperation = await this.findValidRequest(params.id, params.code)
+    const recuperation = await this.chercheDemandeValide(params.id, params.code)
 
     if (!recuperation) {
       return response.badRequest({ message: 'Lien de récupération invalide ou expiré.' })
@@ -142,7 +148,7 @@ export default class ForgoPasswordsController {
    * Renvoie la demande de réinitialisation si le lien est valide (bon code, pas expiré), sinon null.
    * Une demande expirée est supprimée au passage.
    */
-  private async findValidRequest(id: string, code: string) {
+  private async chercheDemandeValide(id: string, code: string) {
     // Identifiant non numérique : sans ce contrôle, PostgreSQL renverrait une erreur 500
     const requestId = Number(id)
     if (!Number.isInteger(requestId) || requestId <= 0) {

@@ -18,6 +18,7 @@ const jetonCsrf = document.querySelector('meta[name="csrf-token"]').content
 
 // ===== 1. Connexion au serveur =====
 
+// Cette ligne ouvre la connexion permanente avec le serveur (voir start/transmit.ts côté serveur).
 const transmit = new Transmit({
   baseUrl: window.location.origin,
 
@@ -66,16 +67,14 @@ async function demarrer() {
   await canalPresence.create()
   canalPresence.onMessage(traiterEvenement)
 
-  // Le canal des stories
-  let canalStories = transmit.subscription('stories')
-  await canalStories.create()
-  canalStories.onMessage(traiterEvenement)
 }
 
 demarrer()
 
 // ===== 3. Réaction aux événements du serveur =====
 
+// Tout ce que le serveur envoie passe par ici. On relaie l'événement à toute la page avec
+// un "CustomEvent" : message.js l'écoute, sans que les deux fichiers aient besoin de se connaître.
 function traiterEvenement(donnees) {
   // Les pages Messages et Groupes (messages.js) écoutent cet événement du navigateur
   document.dispatchEvent(new CustomEvent('kc:evenement', { detail: donnees }))
@@ -100,14 +99,6 @@ function traiterEvenement(donnees) {
     kcNotifier.info('Vous avez été ajouté au groupe « ' + donnees.conversationName + ' ».')
   }
 
-    if (donnees.type === 'story:new') {
-    // Sur la page Stories, stories.js met la liste à jour tout seul.
-    // Ailleurs, on prévient simplement (sauf pour sa propre story).
-    let surPageStories = document.getElementById('stories-page') !== null
-    if (!surPageStories && donnees.userId !== idUtilisateur) {
-      kcNotifier.info(donnees.authorName + ' a ajouté une story.')
-    }
-  }
     if (donnees.type === 'conversation:removed') {
     // Une conversation ou un groupe vient d'être supprimé : on explique pourquoi
     kcNotifier.info(donnees.message)

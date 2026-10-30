@@ -1,15 +1,15 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import BlockedUser from '#models/blocked_user'
-import { getInitials } from '../service/chat_service.ts'
+import { donneInitiales } from '../service/chat_service.ts'
 import User from '#models/user'
 import { deleteAccountValidator } from '#validators/account'
-import { deleteUserAccount } from '../service/deletion_service.ts'
+import { supprimeCompteUtilisateur } from '../service/deletion_service.ts'
 
 export default class SettingsController {
   /**
    * Page Paramètres : mot de passe + liste des utilisateurs bloqués
    */
-  async index({ auth, view }: HttpContext) {
+  async donnePageParametres({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
 
     // Les personnes que j'ai bloquées, avec leurs informations
@@ -21,7 +21,7 @@ export default class SettingsController {
     const blockedUsers = blockedRows.map((row) => ({
       id: row.blocked.id,
       fullName: row.blocked.fullName,
-      initials: getInitials(row.blocked.fullName),
+      initials: donneInitiales(row.blocked.fullName),
       avatarUrl: row.blocked.avatarUrl,
     }))
 
@@ -33,7 +33,7 @@ export default class SettingsController {
    * on le déconnecte et on l'envoie sur la page "Mot de passe oublié",
    * qui fait tout le reste (envoi du lien par e-mail, nouveau mot de passe).
    */
-  async startPasswordChange({ auth, response, session }: HttpContext) {
+  async demarreChangementMotDePasse({ auth, response, session }: HttpContext) {
     await auth.use('web').logout()
 
     session.flash(
@@ -47,7 +47,7 @@ export default class SettingsController {
   /**
    * Supprime définitivement le compte de l'utilisateur connecté
    */
-  async deleteAccount({ auth, request, response }: HttpContext) {
+  async supprimeCompte({ auth, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const { password } = await request.validateUsing(deleteAccountValidator)
 
@@ -61,7 +61,7 @@ export default class SettingsController {
     }
 
     // ÉTAPE 2 : suppression du compte et de ses données
-    await deleteUserAccount(user)
+    await supprimeCompteUtilisateur(user)
 
     // ÉTAPE 3 : déconnexion (le compte n'existe plus)
     await auth.use('web').logout()

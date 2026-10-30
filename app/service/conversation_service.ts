@@ -1,3 +1,8 @@
+// CONVERSATIONS PRIVÉES
+// whereHas('participants', ...) signifie "garde les conversations qui ont un participant qui...".
+// En l'utilisant deux fois, on trouve la conversation où les DEUX personnes sont présentes,
+// ce qui évite de créer un doublon à chaque clic sur "Discuter".
+
 import db from '@adonisjs/lucid/services/db'
 import type User from '#models/user'
 import Conversation from '#models/conversation'
@@ -8,7 +13,7 @@ import UserConversation from '#models/user_conversation'
 // Renvoie la conversation privée entre deux utilisateurs.
 // Si elle n'existe pas encore, elle est créée (avec les deux participants).
 
-export async function findOrCreatePrivateConversation(
+export async function chercheOuCreeConversationPrivee(
   currentUser: User,
   otherUser: User
 ): Promise<Conversation> {
@@ -44,6 +49,9 @@ export async function findOrCreatePrivateConversation(
   // Sinon, on la crée proprement dans une transaction
   const memberRole = await RoleConversation.firstOrCreate({ title: 'membre' }, { title: 'membre' })
 
+  // TRANSACTION : plusieurs écritures traitées comme une seule.
+  // Si l'une échoue, tout est annulé : on n'aura jamais une conversation sans ses participants.
+  // { client: trx } indique que chaque écriture fait partie de cette transaction.
   return db.transaction(async (trx) => {
     const conversation = await Conversation.create(
       { conversationTypeId: privateType.id, createdById: currentUser.id },

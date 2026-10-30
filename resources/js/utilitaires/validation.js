@@ -1,3 +1,6 @@
+// Le modèle de ce fichier : chaque fonction écoute la frappe pour afficher un message,
+// puis renvoie une autre fonction qui donne le résultat final. Cette vérification aide l'utilisateur,
+// mais elle ne protège rien : le serveur revérifie toujours avec les validateurs (app/validators).
 export function validerNomEnTempsReel(selecteurOuElement, selecteurFeedback) {
     // Récupérer l'élément input via querySelector ou directement
     const inputElement = typeof selecteurOuElement === 'string'

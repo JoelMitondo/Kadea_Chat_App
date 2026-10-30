@@ -1,3 +1,11 @@
+// TEMPS RÉEL : ENVOI DES ÉVÉNEMENTS
+// Toutes les notifications instantanées partent d'ici. Le principe est toujours le même :
+//   1. le contrôleur enregistre d'abord en base de données ;
+//   2. il appelle une fonction "previens..." de ce fichier ;
+//   3. l'événement part sur le canal personnel de chaque destinataire ;
+//   4. dans le navigateur, realtime.js le reçoit et message.js met la page à jour.
+// Le HTML est fabriqué ici, côté serveur, pour réutiliser les mêmes vues Edge qu'au chargement de la page.
+
 import edge from 'edge.js'
 import db from '@adonisjs/lucid/services/db'
 import logger from '@adonisjs/core/services/logger'
@@ -7,18 +15,16 @@ import type Message from '#models/message'
 import type User from '#models/user'
 import type UserConversation from '#models/user_conversation'
 import {
-  buildMessageView,
-  buildPreview,
-  getInitials,
-  getListTime,
-  isFirstVisibleMessage,
-  needsDaySeparator,
+  construitVueMessage,
+  construitApercu,
+  donneInitiales,
+  donneHeureDeLaListe,
+  estPremierMessageVisible,
+  besoinSeparateurDeJour,
 } from './chat_service.ts'
 
 // Canal où l'on annonce qui passe en ligne / hors ligne
 export const PRESENCE_CHANNEL = 'presence'
-// Canal où l'on annonce les nouvelles stories (ouvert à tout utilisateur connecté)
-export const STORIES_CHANNEL = 'stories'
 
 export type ConversationKind = 'private' | 'group'
 
@@ -26,21 +32,24 @@ export type ConversationKind = 'private' | 'group'
 
 // Un nom de canal ne peut contenir que des lettres, des chiffres et "/".
 // Nos identifiants sont des uuid avec des tirets : on les retire.
-export function toChannelId(userId: string): string {
+export function convertitEnIdentifiantCanal(userId: string): string {
   return userId.replaceAll('-', '')
 }
 
 // Chaque utilisateur a son canal personnel : seul lui peut s'y abonner (voir start/transmit.ts)
-export function userChannel(userId: string): string {
-  return `users/${toChannelId(userId)}`
+export function donneCanalUtilisateur(userId: string): string {
+  return `users/${convertitEnIdentifiantCanal(userId)}`
 }
 
 // Envoie un événement au navigateur d'UN utilisateur.
 // Un problème de temps réel ne doit JAMAIS faire échouer l'action de l'utilisateur
 // (par exemple l'envoi d'un message) : on note l'erreur dans les logs et on continue.
-function sendToUser(userId: string, event: NonNullable<Parameters<typeof transmit.broadcast>[1]>) {
+function envoieAUtilisateur(
+  userId: string,
+  event: NonNullable<Parameters<typeof transmit.broadcast>[1]>
+) {
   try {
-    transmit.broadcast(userChannel(userId), event)
+    transmit.broadcast(donneCanalUtilisateur(userId), event)
   } catch (error) {
     logger.error({ err: error, userId }, "Échec de l'envoi d'un événement temps réel")
   }
@@ -48,7 +57,7 @@ function sendToUser(userId: string, event: NonNullable<Parameters<typeof transmi
 
 // ---------- Présence (en ligne / hors ligne) ----------
 
-export function broadcastPresence(userId: string, isOnline: boolean) {
+export function annoncePresence(userId: string, isOnline: boolean) {
   try {
     transmit.broadcast(PRESENCE_CHANNEL, { type: 'presence', userId, isOnline })
   } catch (error) {
@@ -63,7 +72,7 @@ export function broadcastPresence(userId: string, isOnline: boolean) {
  * Pour chaque destinataire, on fabrique déjà le HTML de la bulle (côté serveur) :
  * le navigateur n'a plus qu'à l'insérer dans la page.
  */
-export async function notifyNewMessage(options: {
+export async function previensNouveauMessage(options: {
   message: Message // le message tout juste créé, avec son auteur chargé (message.user)
   sender: User
   kind: ConversationKind
@@ -79,22 +88,22 @@ export async function notifyNewMessage(options: {
     try {
       // La bulle, vue par CE destinataire (message reçu, avec le nom de l'auteur dans un groupe)
       const html = await edge.render('partials/message-item', {
-        message: buildMessageView(message, recipient.userId, isGroup),
-        showSeparator: needsDaySeparator(previousMessage, message, recipient),
+        message: construitVueMessage(message, recipient.userId, isGroup),
+        showSeparator: besoinSeparateurDeJour(previousMessage, message, recipient),
       })
 
-      const preview = buildPreview(message, recipient.userId, isGroup)
-      const time = getListTime(message.createdAt)
+      const preview = construitApercu(message, recipient.userId, isGroup)
+      const time = donneHeureDeLaListe(message.createdAt)
 
       // Si c'est le premier message qu'il voit dans cette conversation, elle n'est pas encore
       // dans sa liste : on lui envoie aussi la ligne de liste toute prête.
       let itemHtml: string | null = null
-      if (isFirstVisibleMessage(previousMessage, recipient)) {
+      if (estPremierMessageVisible(previousMessage, recipient)) {
         const item = isGroup
           ? {
               id: message.conversationId,
               name: conversationName ?? 'Groupe sans nom',
-              initials: getInitials(conversationName ?? 'Groupe'),
+              initials: donneInitiales(conversationName ?? 'Groupe'),
               preview,
               time,
               unreadCount: 0,
@@ -103,17 +112,17 @@ export async function notifyNewMessage(options: {
               id: message.conversationId,
               userId: sender.id,
               name: sender.fullName,
-              initials: getInitials(sender.fullName),
+              initials: donneInitiales(sender.fullName),
               avatarUrl: sender.avatarUrl,
               isOnline: sender.isOnline,
               preview,
               time,
               unreadCount: 0,
             }
-        itemHtml = await renderListItem(item, isGroup)
+        itemHtml = await afficheLigneListe(item, isGroup)
       }
 
-      sendToUser(recipient.userId, {
+      envoieAUtilisateur(recipient.userId, {
         type: 'message:new',
         kind,
         conversationId: message.conversationId,
@@ -133,7 +142,7 @@ export async function notifyNewMessage(options: {
 
 // ---------- Message modifié ou supprimé ----------
 
-export async function notifyMessageUpdated(options: {
+export async function previensMessageModifie(options: {
   message: Message // avec son auteur chargé (message.user)
   kind: ConversationKind
   isLast: boolean // est-ce le dernier message de la conversation ? (pour l'aperçu de la liste)
@@ -145,19 +154,19 @@ export async function notifyMessageUpdated(options: {
   for (const recipient of recipients) {
     try {
       const html = await edge.render('partials/message-item', {
-        message: buildMessageView(message, recipient.userId, isGroup),
+        message: construitVueMessage(message, recipient.userId, isGroup),
         showSeparator: false, // on remplace une bulle existante : pas de nouveau séparateur
       })
 
-      sendToUser(recipient.userId, {
+      envoieAUtilisateur(recipient.userId, {
         type: 'message:updated',
         kind,
         conversationId: message.conversationId,
         messageId: message.id,
         html,
         isLast,
-        preview: buildPreview(message, recipient.userId, isGroup),
-        time: getListTime(message.createdAt),
+        preview: construitApercu(message, recipient.userId, isGroup),
+        time: donneHeureDeLaListe(message.createdAt),
       })
     } catch (error) {
       logger.error(
@@ -174,7 +183,7 @@ export async function notifyMessageUpdated(options: {
  * Prévient des personnes qu'elles viennent d'être ajoutées à un groupe (création ou ajout ultérieur) :
  * le groupe apparaît tout de suite dans leur liste.
  */
-export async function notifyConversationAdded(options: {
+export async function previensConversationAjoutee(options: {
   conversation: Conversation
   userIds: string[]
   lastMessage: Message | null // dernier message du groupe, avec son auteur chargé (null si aucun)
@@ -184,19 +193,19 @@ export async function notifyConversationAdded(options: {
 
   for (const userId of userIds) {
     try {
-      const itemHtml = await renderListItem(
+      const itemHtml = await afficheLigneListe(
         {
           id: conversation.id,
           name,
-          initials: getInitials(name),
-          preview: lastMessage ? buildPreview(lastMessage, userId, true) : 'Aucun message',
-          time: lastMessage ? getListTime(lastMessage.createdAt) : '',
+          initials: donneInitiales(name),
+          preview: lastMessage ? construitApercu(lastMessage, userId, true) : 'Aucun message',
+          time: lastMessage ? donneHeureDeLaListe(lastMessage.createdAt) : '',
           unreadCount: 0,
         },
         true
       )
 
-      sendToUser(userId, {
+      envoieAUtilisateur(userId, {
         type: 'conversation:added',
         kind: 'group',
         conversationId: conversation.id,
@@ -210,9 +219,9 @@ export async function notifyConversationAdded(options: {
 }
 
 // Prévient les membres existants que la composition du groupe a changé
-export function notifyGroupUpdated(conversationId: number, userIds: string[]) {
+export function previensGroupeModifie(conversationId: number, userIds: string[]) {
   for (const userId of userIds) {
-    sendToUser(userId, { type: 'group:updated', kind: 'group', conversationId })
+    envoieAUtilisateur(userId, { type: 'group:updated', kind: 'group', conversationId })
   }
 }
 
@@ -222,7 +231,8 @@ export function notifyGroupUpdated(conversationId: number, userIds: string[]) {
  * Marque comme lus les messages d'une conversation pour un utilisateur,
  * puis prévient leurs auteurs pour que leurs coches passent en bleu.
  */
-export async function markConversationAsReadAndNotify(userId: string, conversationId: number) {
+// Cette fonction est appelée quand quelqu'un ouvre une conversation ou y reçoit un message sous ses yeux.
+export async function marqueConversationCommeLueEtPrevient(userId: string, conversationId: number) {
   // 1. Les messages de cette conversation que l'utilisateur n'a pas encore lus
   const unreadRows = await db
     .from('message_statuses')
@@ -249,6 +259,8 @@ export async function markConversationAsReadAndNotify(userId: string, conversati
 
   // 3. Parmi eux, lesquels sont maintenant lus par TOUS leurs destinataires ?
   // (dans un groupe, la coche devient bleue seulement quand tout le monde a lu)
+  // whereNotExists = "garde les messages pour lesquels il N'EXISTE PAS de statut non lu".
+  // Autrement dit : tous les destinataires les ont lus.
   const fullyReadMessages = await db
     .from('messages')
     .whereIn('id', messageIds)
@@ -268,14 +280,14 @@ export async function markConversationAsReadAndNotify(userId: string, conversati
   }
 
   for (const [authorId, ids] of idsByAuthor) {
-    sendToUser(authorId, { type: 'messages:read', conversationId, messageIds: ids })
+    envoieAUtilisateur(authorId, { type: 'messages:read', conversationId, messageIds: ids })
   }
 }
 
 // ---------- Outil ----------
 
 // Fabrique le HTML d'une ligne de la liste des conversations / groupes
-function renderListItem(item: Record<string, unknown>, isGroup: boolean): Promise<string> {
+function afficheLigneListe(item: Record<string, unknown>, isGroup: boolean): Promise<string> {
   return edge.render('partials/list-item', {
     item,
     chatUrl: isGroup ? '/groups' : '/conversations',
@@ -284,35 +296,20 @@ function renderListItem(item: Record<string, unknown>, isGroup: boolean): Promis
   })
 }
 
-// ---------- Stories ----------
-
-// Annonce à tout le monde qu'une nouvelle story est disponible
-export function broadcastNewStory(author: User) {
-  try {
-    transmit.broadcast(STORIES_CHANNEL, {
-      type: 'story:new',
-      userId: author.id,
-      authorName: author.fullName,
-    })
-  } catch (error) {
-    logger.error({ err: error }, "Échec de l'annonce d'une nouvelle story")
-  }
-}
-
 // ---------- Conversation supprimée ----------
 
 /**
  * Prévient des personnes qu'une conversation (ou un groupe) vient d'être supprimée :
  * elle disparaît de leur liste, et on leur explique pourquoi.
  */
-export function notifyConversationRemoved(options: {
+export function previensConversationSupprimee(options: {
   userIds: string[]
   conversationId: number
   kind: ConversationKind
   message: string
 }) {
   for (const userId of options.userIds) {
-    sendToUser(userId, {
+    envoieAUtilisateur(userId, {
       type: 'conversation:removed',
       kind: options.kind,
       conversationId: options.conversationId,

@@ -11,15 +11,17 @@ export default class SessionController {
   /**
    * Display the login page
    */
-  async create({ view }: HttpContext) {
+  async donnePageConnexion({ view }: HttpContext) {
     return view.render('pages/auth/login')
   }
 
   /**
    * Authenticate user credentials and create a new session
    */
-  async store({ request, auth, response }: HttpContext) {
+  async connecte({ request, auth, response }: HttpContext) {
     const { email, password } = await request.validateUsing(loginValidator)
+    // verifyCredentials cherche l'e-mail et compare le mot de passe à son hash.
+    // En cas d'échec, il déclenche E_INVALID_CREDENTIALS, traduit dans app/exceptions/handler.ts.
     const user = await User.verifyCredentials(email, password)
 
     await auth.use('web').login(user)
@@ -29,7 +31,7 @@ export default class SessionController {
   /**
    * Log out the current user and destroy their session
    */
-  async destroy({ auth, response }: HttpContext) {
+  async deconnecte({ auth, response }: HttpContext) {
     await auth.use('web').logout()
     response.redirect().toRoute('session.create')
   }

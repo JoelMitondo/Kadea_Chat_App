@@ -89,8 +89,6 @@ export const validationFields: Record<string, string> = {
   bio: 'La bio',
   content: 'Le message',
   attachment: 'Le fichier joint',
-  image: "L'image",
-  caption: 'La légende',
   name: 'Le nom du groupe',
   member_ids: 'Les membres',
   q: 'La recherche',

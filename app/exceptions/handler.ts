@@ -1,7 +1,7 @@
 import app from '@adonisjs/core/services/app'
 import { type HttpContext, ExceptionHandler } from '@adonisjs/core/http'
 import type { StatusPageRange, StatusPageRenderer } from '@adonisjs/core/types/http'
-import { ERROR_PAGES, renderErrorPage } from '../service/error_page.ts'
+import { ERROR_PAGES, affichePageErreur } from '../service/error_page.ts'
 
 // Messages en français qui remplacent les messages par défaut (en anglais) d'AdonisJS
 const FRENCH_MESSAGES: Record<string, string> = {
@@ -42,17 +42,18 @@ export default class HttpExceptionHandler extends ExceptionHandler {
   protected renderStatusPages = true
 
   protected statusPages: Record<StatusPageRange, StatusPageRenderer> = {
-    '404': (_, ctx) => renderErrorPage(ctx, ERROR_PAGES.notFound),
-    '403': (_, ctx) => renderErrorPage(ctx, ERROR_PAGES.forbidden),
-    '413': (_, ctx) => renderErrorPage(ctx, ERROR_PAGES.tooLarge),
+    '404': (_, ctx) => affichePageErreur(ctx, ERROR_PAGES.notFound),
+    '403': (_, ctx) => affichePageErreur(ctx, ERROR_PAGES.forbidden),
+    '413': (_, ctx) => affichePageErreur(ctx, ERROR_PAGES.tooLarge),
     ...(app.inProduction
       ? {
           '500..599': (_: unknown, ctx: HttpContext) =>
-            renderErrorPage(ctx, ERROR_PAGES.serverError),
+            affichePageErreur(ctx, ERROR_PAGES.serverError),
         }
       : {}),
   }
 
+  // Toute erreur non gérée dans l'application arrive ici. Le nom "handle" est imposé par AdonisJS.
   async handle(error: unknown, ctx: HttpContext) {
     const httpError = error as HttpError
 

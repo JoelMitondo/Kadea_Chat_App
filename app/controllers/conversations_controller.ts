@@ -1,19 +1,21 @@
+// CONVERSATIONS PRIVÉES : liste, ouverture, suppression.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import type User from '#models/user'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import {
-  buildMessageView,
-  buildPreview,
-  findPrivateMembership,
-  getInitials,
-  getListTime,
-  markConversationAsRead,
-  getUnreadCounts,
+  construitVueMessage,
+  construitApercu,
+  chercheParticipationPrivee,
+  donneInitiales,
+  donneHeureDeLaListe,
+  marqueConversationCommeLue,
+  donneNombreMessagesNonLus,
 } from '../service/chat_service.ts'
-import { markConversationAsReadAndNotify } from './../service/realtime_service.ts'
-import { hasBlocked } from '../service/block_service.ts'
+import { marqueConversationCommeLueEtPrevient } from './../service/realtime_service.ts'
+import { aBloque } from '../service/block_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'une conversation
 const MESSAGES_LIMIT = 100
@@ -22,9 +24,9 @@ export default class ConversationsController {
   /**
    * Page de messagerie, sans conversation ouverte
    */
-  async index({ auth, view }: HttpContext) {
+  async donnePageMessages({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
-    const conversations = await this.getConversationList(user)
+    const conversations = await this.donneListeConversations(user)
 
     return view.render('pages/message', { conversations, chat: null })
   }
@@ -34,16 +36,16 @@ export default class ConversationsController {
    * - Appel depuis le JavaScript de la page : on renvoie seulement le panneau de discussion.
    * - Ouverture directe de l'adresse (rechargement, lien) : on renvoie la page complète.
    */
-  async show({ auth, params, request, view }: HttpContext) {
+  async donneConversation({ auth, params, request, view }: HttpContext) {
     const user = auth.getUserOrFail()
-    const chat = await this.getChat(user, Number(params.id))
+    const chat = await this.donneDiscussion(user, Number(params.id))
 
     if (request.header('x-requested-with') === 'XMLHttpRequest') {
       return view.render('partials/chat-panel', { chat })
     }
 
-    // La liste est chargée APRÈS getChat() : les messages sont déjà passés en "lu"
-    const conversations = await this.getConversationList(user, chat.id)
+    // La liste est chargée APRÈS donneDiscussion() : les messages sont déjà passés en "lu"
+    const conversations = await this.donneListeConversations(user, chat.id)
     return view.render('pages/message', { conversations, chat })
   }
 
@@ -51,15 +53,17 @@ export default class ConversationsController {
    * Supprime la conversation DE LA LISTE de l'utilisateur (l'autre personne la garde).
    * On renseigne removed_at : les anciens messages ne sont plus affichés.
    */
-  async destroy({ auth, params, response }: HttpContext) {
+  async supprimeConversation({ auth, params, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 
-    const membership = await findPrivateMembership(user.id, conversationId).firstOrFail()
+    const membership = await chercheParticipationPrivee(user.id, conversationId).firstOrFail()
+    // Suppression "pour moi" : on ne supprime aucun message, car l'autre personne doit les garder.
+    // On note seulement la date : je ne verrai plus que les messages arrivés après.
     membership.removedAt = DateTime.now()
     await membership.save()
 
-    await markConversationAsRead(user.id, conversationId)
+    await marqueConversationCommeLue(user.id, conversationId)
 
     return response.ok({ message: 'La conversation a été supprimée.' })
   }
@@ -68,7 +72,7 @@ export default class ConversationsController {
 
   // Liste des conversations privées de l'utilisateur, la plus récente en premier
 
-  private async getConversationList(user: User, openConversationId: number | null = null) {
+  private async donneListeConversations(user: User, openConversationId: number | null = null) {
     const memberships = await UserConversation.query()
       .where('userId', user.id)
       .whereHas('conversation', (conversationQuery) => {
@@ -85,7 +89,7 @@ export default class ConversationsController {
         })
       })
 
-    const unreadCounts = await getUnreadCounts(
+    const unreadCounts = await donneNombreMessagesNonLus(
       user.id,
       memberships.map((membership) => membership.conversationId)
     )
@@ -116,11 +120,11 @@ export default class ConversationsController {
           id: membership.conversationId,
           userId: otherUser.id,
           name: otherUser.fullName,
-          initials: getInitials(otherUser.fullName),
+          initials: donneInitiales(otherUser.fullName),
           avatarUrl: otherUser.avatarUrl,
           isOnline: otherUser.isOnline,
-          preview: lastMessage ? buildPreview(lastMessage, user.id) : 'Aucun message',
-          time: lastMessage ? getListTime(lastMessage.createdAt) : '',
+          preview: lastMessage ? construitApercu(lastMessage, user.id) : 'Aucun message',
+          time: lastMessage ? donneHeureDeLaListe(lastMessage.createdAt) : '',
           unreadCount: unreadCounts.get(membership.conversationId) ?? 0,
         },
       })
@@ -133,8 +137,8 @@ export default class ConversationsController {
   /**
    * Prépare toutes les données d'une conversation ouverte
    */
-  private async getChat(user: User, conversationId: number) {
-    const membership = await findPrivateMembership(user.id, conversationId)
+  private async donneDiscussion(user: User, conversationId: number) {
+    const membership = await chercheParticipationPrivee(user.id, conversationId)
       .preload('conversation', (conversationQuery) => {
         conversationQuery.preload('users', (usersQuery) => {
           usersQuery.whereNot('users.id', user.id)
@@ -147,7 +151,7 @@ export default class ConversationsController {
       throw new Error('Interlocuteur introuvable pour cette conversation.')
     }
 
-    await markConversationAsReadAndNotify(user.id, conversationId)
+    await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
     // On charge les derniers messages (du plus récent au plus ancien), puis on remet dans l'ordre
     const messagesQuery = Message.query()
@@ -171,15 +175,15 @@ export default class ConversationsController {
     return {
       id: conversationId,
       // Est-ce que j'ai bloqué cet interlocuteur ? (pour le bandeau et le bouton Débloquer)
-      blockedByMe: await hasBlocked(user.id, otherUser.id),
+      blockedByMe: await aBloque(user.id, otherUser.id),
       other: {
         id: otherUser.id,
         name: otherUser.fullName,
-        initials: getInitials(otherUser.fullName),
+        initials: donneInitiales(otherUser.fullName),
         avatarUrl: otherUser.avatarUrl,
         isOnline: otherUser.isOnline,
       },
-      messages: messages.map((message) => buildMessageView(message, user.id)),
+      messages: messages.map((message) => construitVueMessage(message, user.id)),
     }
   }
 }

@@ -1,3 +1,7 @@
+// MESSAGES : envoi, modification, suppression.
+// Parcours d'un message : formulaire -> route -> ce contrôleur (validation, droits, base de données)
+// -> réponse à l'expéditeur + événement temps réel vers les autres participants.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
@@ -11,18 +15,22 @@ import UserConversation from '#models/user_conversation'
 import { IMAGE_EXTENSIONS, sendMessageValidator, updateMessageValidator } from '#validators/message'
 import {
   GROUP_TYPE,
-  buildMessageView,
-  buildPreview,
-  findGroupMembership,
-  findPrivateMembership,
-  getListTime,
-  needsDaySeparator,
+  construitVueMessage,
+  construitApercu,
+  chercheParticipationGroupe,
+  chercheParticipationPrivee,
+  donneHeureDeLaListe,
+  besoinSeparateurDeJour,
 } from '../service/chat_service.ts'
-import { hasBlocked } from '../service/block_service.ts'
-import { deleteFileByUrl, uploadFile, uploadImage } from '../service/cloudinary_service.ts'
+import { aBloque } from '../service/block_service.ts'
 import {
-  notifyMessageUpdated,
-  notifyNewMessage,
+  supprimeFichierParLien,
+  envoieDocument,
+  envoieImage,
+} from '../service/cloudinary_service.ts'
+import {
+  previensMessageModifie,
+  previensNouveauMessage,
   type ConversationKind,
 } from '../service/realtime_service.ts'
 
@@ -30,27 +38,30 @@ export default class MessagesController {
   /**
    * Envoie un message dans une conversation PRIVÉE
    */
-  async store(ctx: HttpContext) {
+  async enregistreMessagePrive(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
-    const membership = await findPrivateMembership(user.id, Number(ctx.params.id)).firstOrFail()
-    return this.sendMessage(ctx, membership, 'private')
+    const membership = await chercheParticipationPrivee(
+      user.id,
+      Number(ctx.params.id)
+    ).firstOrFail()
+    return this.envoieMessage(ctx, membership, 'private')
   }
 
   /**
    * Envoie un message dans un GROUPE (tous les membres peuvent écrire)
    */
-  async storeInGroup(ctx: HttpContext) {
+  async enregistreMessageGroupe(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
-    const membership = await findGroupMembership(user.id, Number(ctx.params.id))
+    const membership = await chercheParticipationGroupe(user.id, Number(ctx.params.id))
       .preload('conversation') // pour connaître le nom du groupe
       .firstOrFail()
-    return this.sendMessage(ctx, membership, 'group')
+    return this.envoieMessage(ctx, membership, 'group')
   }
 
   /**
    * Modifie un message (uniquement par son auteur)
    */
-  async update({ auth, params, request, response, view }: HttpContext) {
+  async modifieMessage({ auth, params, request, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const { content } = await request.validateUsing(updateMessageValidator)
     const message = await Message.findOrFail(params.id)
@@ -70,10 +81,10 @@ export default class MessagesController {
       statusQuery.whereNot('userId', user.id)
     })
 
-    const data = await this.buildMessageResponse(message, user.id, view)
+    const data = await this.construitReponseMessage(message, user.id, view)
 
     // TEMPS RÉEL : les autres participants voient la modification tout de suite
-    await this.notifyOthers(message, user, data.isLast)
+    await this.previensAutresParticipants(message, user, data.isLast)
 
     return response.ok(data)
   }
@@ -81,7 +92,7 @@ export default class MessagesController {
   /**
    * Supprime un message (uniquement par son auteur) : suppression "douce"
    */
-  async destroy({ auth, params, response, view }: HttpContext) {
+  async supprimeMessage({ auth, params, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const message = await Message.findOrFail(params.id)
 
@@ -95,13 +106,13 @@ export default class MessagesController {
     // Si le message avait un fichier, on le supprime de Cloudinary puis de la base
     const attachments = await MessageAttachment.query().where('messageId', message.id)
     for (const file of attachments) {
-      await deleteFileByUrl(file.filePath)
+      await supprimeFichierParLien(file.filePath)
     }
     await MessageAttachment.query().where('messageId', message.id).delete()
-    const data = await this.buildMessageResponse(message, user.id, view)
+    const data = await this.construitReponseMessage(message, user.id, view)
 
     // TEMPS RÉEL : le message devient "Ce message a été supprimé" chez les autres
-    await this.notifyOthers(message, user, data.isLast)
+    await this.previensAutresParticipants(message, user, data.isLast)
 
     return response.ok(data)
   }
@@ -114,7 +125,7 @@ export default class MessagesController {
   /**
    * Enregistre un nouveau message (conversation privée OU groupe), avec ou sans fichier
    */
-  private async sendMessage(
+  private async envoieMessage(
     ctx: HttpContext,
     membership: UserConversation,
     kind: ConversationKind
@@ -139,7 +150,7 @@ export default class MessagesController {
     // ÉTAPE 2 : BLOCAGE (conversations privées) :
     // si l'autre personne m'a bloqué, je ne peux plus lui écrire
     if (kind === 'private' && otherMemberships.length > 0) {
-      const isBlocked = await hasBlocked(otherMemberships[0].userId, user.id)
+      const isBlocked = await aBloque(otherMemberships[0].userId, user.id)
       if (isBlocked) {
         return response.forbidden({ message: "Impossible d'envoyer ce message à cet utilisateur." })
       }
@@ -156,8 +167,8 @@ export default class MessagesController {
 
       try {
         fileUrl = isImage
-          ? await uploadImage(attachment.tmpPath!, 'messages')
-          : await uploadFile(attachment.tmpPath!, 'messages', extension)
+          ? await envoieImage(attachment.tmpPath!, 'messages')
+          : await envoieDocument(attachment.tmpPath!, 'messages', extension)
       } catch (error) {
         logger.error({ err: error }, "Échec de l'envoi du fichier vers Cloudinary")
         return response.unprocessableEntity({
@@ -184,6 +195,7 @@ export default class MessagesController {
       .first()
 
     // ÉTAPE 4 : enregistrement en base. Transaction : soit TOUT est enregistré, soit RIEN.
+    // Transaction : le message, son fichier, ses statuts et le "dernier message" sont enregistrés ensemble.
     let message: Message
     try {
       message = await db.transaction(async (trx) => {
@@ -231,7 +243,7 @@ export default class MessagesController {
       })
     } catch (error) {
       // La base a refusé : le fichier ne sert à rien, on le supprime de Cloudinary
-      await deleteFileByUrl(fileUrl)
+      await supprimeFichierParLien(fileUrl)
       throw error
     }
 
@@ -239,12 +251,12 @@ export default class MessagesController {
     await message.load('attachments')
 
     // Réponse à celui qui vient d'écrire
-    const showSeparator = needsDaySeparator(previousMessage, message, membership)
-    const data = await this.buildMessageResponse(message, user.id, view, showSeparator)
+    const showSeparator = besoinSeparateurDeJour(previousMessage, message, membership)
+    const data = await this.construitReponseMessage(message, user.id, view, showSeparator)
 
     // TEMPS RÉEL : les autres participants reçoivent le message tout de suite
     await message.load('user')
-    await notifyNewMessage({
+    await previensNouveauMessage({
       message,
       sender: user,
       kind,
@@ -259,7 +271,7 @@ export default class MessagesController {
   /**
    * Prévient les autres participants qu'un message a été modifié ou supprimé
    */
-  private async notifyOthers(message: Message, sender: User, isLast: boolean) {
+  private async previensAutresParticipants(message: Message, sender: User, isLast: boolean) {
     // Est-ce une conversation privée ou un groupe ?
     const conversation = await Conversation.query()
       .where('id', message.conversationId)
@@ -273,13 +285,13 @@ export default class MessagesController {
 
     await message.load('user') // pour le nom de l'auteur dans un groupe
 
-    await notifyMessageUpdated({ message, kind, isLast, recipients })
+    await previensMessageModifie({ message, kind, isLast, recipients })
   }
 
   /**
    * Réponse JSON commune : la bulle déjà fabriquée en HTML + de quoi mettre la liste à jour
    */
-  private async buildMessageResponse(
+  private async construitReponseMessage(
     message: Message,
     userId: User['id'],
     view: HttpContext['view'],
@@ -292,15 +304,15 @@ export default class MessagesController {
       .first()
 
     const html = await view.render('partials/message-item', {
-      message: buildMessageView(message, userId),
+      message: construitVueMessage(message, userId),
       showSeparator,
     })
 
     return {
       html,
       isLast: lastMessage?.id === message.id,
-      preview: buildPreview(message, userId),
-      time: getListTime(message.createdAt),
+      preview: construitApercu(message, userId),
+      time: donneHeureDeLaListe(message.createdAt),
     }
   }
 }

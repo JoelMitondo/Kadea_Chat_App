@@ -7,7 +7,7 @@ export default class HealthChecksController {
   /**
    * Health check endpoint pour maintenir le serveur éveillé
    */
-  public async ping({ response }: HttpContext) {
+  public async verifieServeur({ response }: HttpContext) {
     return response.ok({
       status: 'healthy',
       timestamp: new Date().toISOString(),

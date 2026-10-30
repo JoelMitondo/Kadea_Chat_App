@@ -1,8 +1,8 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import { searchUsersValidator, chatWithUserValidator } from '#validators/user_list'
-import { findOrCreatePrivateConversation } from '../service/conversation_service.ts'
-import { escapeLike, formatDate, getInitials } from '../service/chat_service.ts'
+import { chercheOuCreeConversationPrivee } from '../service/conversation_service.ts'
+import { protegeCaracteresRecherche, formateDate, donneInitiales } from '../service/chat_service.ts'
 
 const USERS_PER_PAGE = 20
 
@@ -12,7 +12,7 @@ export default class UsersController {
    * - Appel du JavaScript (recherche en direct) : on renvoie seulement la liste.
    * - Ouverture normale de la page : on renvoie la page complète.
    */
-  async index({ auth, request, view }: HttpContext) {
+  async donnePageUtilisateurs({ auth, request, view }: HttpContext) {
     const currentUser = auth.getUserOrFail()
     const { q, page } = await request.validateUsing(searchUsersValidator)
     const search = q ?? ''
@@ -21,19 +21,20 @@ export default class UsersController {
     const query = User.query().whereNot('id', currentUser.id).orderBy('fullName', 'asc')
 
     if (search !== '') {
-      query.whereILike('fullName', `%${escapeLike(search)}%`)
+      query.whereILike('fullName', `%${protegeCaracteresRecherche(search)}%`)
     }
 
+    // paginate découpe les résultats en pages : on ne charge que 20 utilisateurs à la fois.
     const paginator = await query.paginate(page ?? 1, USERS_PER_PAGE)
 
     const users = paginator.all().map((person) => ({
       id: person.id,
       fullName: person.fullName,
-      initials: getInitials(person.fullName),
+      initials: donneInitiales(person.fullName),
       avatarUrl: person.avatarUrl,
       email: person.email,
       isOnline: person.isOnline,
-      createdAt: formatDate(person.createdAt),
+      createdAt: formateDate(person.createdAt),
     }))
 
     // Adresse d'une page, en gardant la recherche en cours
@@ -61,7 +62,7 @@ export default class UsersController {
   /**
    * Bouton "Discuter" : ouvre la conversation privée existante, ou la crée, puis redirige
    */
-  async chat({ auth, params, response, session }: HttpContext) {
+  async ouvreDiscussion({ auth, params, response, session }: HttpContext) {
     const currentUser = auth.getUserOrFail()
     const { id } = await chatWithUserValidator.validate({ id: params.id })
 
@@ -71,7 +72,7 @@ export default class UsersController {
     }
 
     const otherUser = await User.findOrFail(id)
-    const conversation = await findOrCreatePrivateConversation(currentUser, otherUser)
+    const conversation = await chercheOuCreeConversationPrivee(currentUser, otherUser)
 
     // La page Messages s'ouvre directement sur cette conversation, avec ses messages
     return response.redirect().toRoute('conversations.show', { id: conversation.id })

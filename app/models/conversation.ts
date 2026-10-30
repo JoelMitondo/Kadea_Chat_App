@@ -6,6 +6,8 @@ import UserConversation from '#models/user_conversation'
 import { belongsTo, hasMany, manyToMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 
+// Un modèle représente une table. Les "relations" ci-dessous décrivent les liens avec les autres tables
+// et permettent d'écrire .preload('users') pour charger les données liées en une fois.
 export default class Conversation extends ConversationSchema {
   @belongsTo(() => ConversationType)
   declare type: BelongsTo<typeof ConversationType>

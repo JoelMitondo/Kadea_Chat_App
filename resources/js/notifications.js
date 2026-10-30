@@ -178,6 +178,8 @@ function trouverMessage(donnees, messageParDefaut) {
 
 // Le "true" à la fin = la capture : notre code passe AVANT celui du chargeur,
 // ce qui évite d'afficher le chargeur plein écran si on gère déjà l'envoi.
+// Ce code gère tous les formulaires qui portent l'attribut data-ajax :
+// ils s'envoient sans changer de page, et la réponse du serveur devient une notification.
 document.addEventListener('submit', async function (evenement) {
   let formulaire = evenement.target
 

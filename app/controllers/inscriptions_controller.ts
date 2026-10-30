@@ -1,22 +1,25 @@
+// INSCRIPTION, première étape : on garde les informations dans la table inscriptions (temporaire)
+// et on envoie le lien de confirmation. La suite est dans new_account_controller.ts.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import mail from '@adonisjs/mail/services/main'
 import { inscriptionValidator } from '#validators/inscription'
 import Inscription from '#models/inscription'
 import { DateTime } from 'luxon'
-import { generateUniqueCode } from './../service/code_generation.ts'
+import { genereCodeUnique } from './../service/code_generation.ts'
 import hash from '@adonisjs/core/services/hash'
 import { APP_TIMEZONE } from '../service/chat_service.ts'
 
 export default class InscriptionsController {
-  async show({ view }: HttpContext) {
+  async donnePageInscription({ view }: HttpContext) {
     return view.render('pages/auth/register')
   }
-  async store({ request, response, session }: HttpContext) {
+  async enregistreInscription({ request, response, session }: HttpContext) {
     const payload = await request.validateUsing(inscriptionValidator)
 
     // Vérification de la majorité (avant tout le reste : inutile de générer un code pour rien)
     // Format { errors: [{ field, message }] } : le formulaire affiche l'erreur sous le bon champ
-    if (!this.isMajeur(payload.birth_date)) {
+    if (!this.estMajeur(payload.birth_date)) {
       return response.unprocessableEntity({
         errors: [
           { field: 'birth_date', message: 'Vous devez avoir au moins 18 ans pour vous inscrire' },
@@ -26,7 +29,7 @@ export default class InscriptionsController {
 
     const fullName = `${payload.first_name} ${payload.last_name}`
     const inscriptionExpire = DateTime.now().plus({ days: 2 })
-    const codeAleatoire = await generateUniqueCode(Inscription)
+    const codeAleatoire = await genereCodeUnique(Inscription)
 
     // L'e-mail est unique dans la table inscriptions : si une demande est déjà en attente
     // pour cette adresse, on la remplace (nouveau lien) au lieu de provoquer une erreur 500.
@@ -103,7 +106,7 @@ export default class InscriptionsController {
     }
   }
 
-  private isMajeur(dateNaissance: DateTime): boolean {
+  private estMajeur(dateNaissance: DateTime): boolean {
     // Récupère la date et l'heure actuelles du serveur backend
     const now = DateTime.now()
 
