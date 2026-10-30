@@ -262,33 +262,6 @@ export class RoleConversationSchema extends BaseModel {
   declare updatedAt: DateTime | null
 }
 
-export class StorySchema extends BaseModel {
-  static $columns = [
-    'caption',
-    'createdAt',
-    'expiresAt',
-    'id',
-    'imageUrl',
-    'updatedAt',
-    'userId',
-  ] as const
-  $columns = StorySchema.$columns
-  @column()
-  declare caption: string | null
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
-  @column.dateTime()
-  declare expiresAt: DateTime
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare imageUrl: string
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime
-  @column()
-  declare userId: string
-}
-
 export class UserConversationSchema extends BaseModel {
   static $columns = [
     'conversationId',
