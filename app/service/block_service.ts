@@ -1,3 +1,7 @@
+// BLOCAGE
+// Une ligne dans blocked_users = "blocker_id a bloqué blocked_id".
+// La vérification se fait à l'envoi d'un message, dans messages_controller.ts.
+
 import BlockedUser from '#models/blocked_user'
 
 // "blockerId a-t-il bloqué blockedId ?"

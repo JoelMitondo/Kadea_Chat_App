@@ -1,3 +1,7 @@
+// MESSAGES : envoi, modification, suppression.
+// Parcours d'un message : formulaire -> route -> ce contrôleur (validation, droits, base de données)
+// -> réponse à l'expéditeur + événement temps réel vers les autres participants.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
@@ -184,6 +188,7 @@ export default class MessagesController {
       .first()
 
     // ÉTAPE 4 : enregistrement en base. Transaction : soit TOUT est enregistré, soit RIEN.
+    // Transaction : le message, son fichier, ses statuts et le "dernier message" sont enregistrés ensemble.
     let message: Message
     try {
       message = await db.transaction(async (trx) => {

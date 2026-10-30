@@ -1,3 +1,8 @@
+// SUPPRESSIONS
+// Important : la base de données est nettoyée d'abord, Cloudinary ensuite.
+// Une transaction peut être annulée, pas un fichier effacé : dans l'autre sens, on risquerait
+// de perdre des fichiers encore utilisés si la base refusait la suppression.
+
 import db from '@adonisjs/lucid/services/db'
 import BlockedUser from '#models/blocked_user'
 import Conversation from '#models/conversation'

@@ -1,3 +1,11 @@
+// TEMPS RÉEL : ENVOI DES ÉVÉNEMENTS
+// Toutes les notifications instantanées partent d'ici. Le principe est toujours le même :
+//   1. le contrôleur enregistre d'abord en base de données ;
+//   2. il appelle une fonction "previens..." de ce fichier ;
+//   3. l'événement part sur le canal personnel de chaque destinataire ;
+//   4. dans le navigateur, realtime.js le reçoit et message.js met la page à jour.
+// Le HTML est fabriqué ici, côté serveur, pour réutiliser les mêmes vues Edge qu'au chargement de la page.
+
 import edge from 'edge.js'
 import db from '@adonisjs/lucid/services/db'
 import logger from '@adonisjs/core/services/logger'
@@ -220,6 +228,7 @@ export function previensGroupeModifie(conversationId: number, userIds: string[])
  * Marque comme lus les messages d'une conversation pour un utilisateur,
  * puis prévient leurs auteurs pour que leurs coches passent en bleu.
  */
+// Cette fonction est appelée quand quelqu'un ouvre une conversation ou y reçoit un message sous ses yeux.
 export async function marqueConversationCommeLueEtPrevient(userId: string, conversationId: number) {
   // 1. Les messages de cette conversation que l'utilisateur n'a pas encore lus
   const unreadRows = await db
@@ -247,6 +256,8 @@ export async function marqueConversationCommeLueEtPrevient(userId: string, conve
 
   // 3. Parmi eux, lesquels sont maintenant lus par TOUS leurs destinataires ?
   // (dans un groupe, la coche devient bleue seulement quand tout le monde a lu)
+  // whereNotExists = "garde les messages pour lesquels il N'EXISTE PAS de statut non lu".
+  // Autrement dit : tous les destinataires les ont lus.
   const fullyReadMessages = await db
     .from('messages')
     .whereIn('id', messageIds)

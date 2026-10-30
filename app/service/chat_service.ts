@@ -1,3 +1,7 @@
+// BOÎTE À OUTILS DE LA MESSAGERIE
+// Fonctions partagées par les conversations privées et les groupes : dates, aperçus, droits d'accès,
+// compteurs de non-lus. Les regrouper ici évite d'écrire deux fois le même code dans les contrôleurs.
+
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 import type Message from '#models/message'
@@ -18,6 +22,8 @@ export const ADMIN_ROLE = 'admin'
 export const MEMBER_ROLE = 'membre'
 // ---------- Dates ----------
 
+// Le serveur et la base travaillent en UTC. Pour l'affichage, on convertit à l'heure de Kinshasa,
+// sinon "Aujourd'hui" et "Hier" seraient faux autour de minuit.
 function convertitEnDateLocale(date: DateTime): DateTime {
   return date.setZone(APP_TIMEZONE).setLocale('fr')
 }
@@ -185,6 +191,9 @@ export function construitVueMessage(message: Message, currentUserId: User['id'],
 
 // Cherche la participation de l'utilisateur à UNE conversation privée.
 // Si l'utilisateur n'en fait pas partie, .firstOrFail() renverra une erreur 404.
+// SÉCURITÉ : c'est ici que se vérifie "je ne peux pas accéder à une conversation dont je ne fais pas partie".
+// On cherche une ligne dans user_conversations pour CET utilisateur et CETTE conversation.
+// Pas de ligne = pas membre : firstOrFail() déclenche une erreur 404, et rien n'est affiché.
 export function chercheParticipationPrivee(userId: User['id'], conversationId: number) {
   return UserConversation.query()
     .where('userId', userId)
@@ -223,6 +232,8 @@ export function chercheParticipationGroupe(userId: User['id'], conversationId: n
 
 // Nombre de messages non lus par conversation (table message_statuses).
 // (Déplacé ici depuis ConversationsController pour servir aussi aux groupes.)
+// groupBy regroupe les lignes par conversation et count les compte :
+// on obtient une seule requête pour toutes les conversations, au lieu d'une requête par conversation.
 export async function donneNombreMessagesNonLus(userId: User['id'], conversationIds: number[]) {
   const counts = new Map<number, number>()
 

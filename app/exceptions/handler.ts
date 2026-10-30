@@ -53,6 +53,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       : {}),
   }
 
+  // Toute erreur non gérée dans l'application arrive ici. Le nom "handle" est imposé par AdonisJS.
   async handle(error: unknown, ctx: HttpContext) {
     const httpError = error as HttpError
 

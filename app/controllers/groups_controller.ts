@@ -1,3 +1,6 @@
+// GROUPES : liste, ouverture, création, ajout de membres, suppression.
+// Les actions sensibles vérifient d'abord le rôle : seul l'administrateur peut ajouter ou supprimer.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import Message from '#models/message'

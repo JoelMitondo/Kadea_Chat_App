@@ -20,6 +20,8 @@ export default class SessionController {
    */
   async connecte({ request, auth, response }: HttpContext) {
     const { email, password } = await request.validateUsing(loginValidator)
+    // verifyCredentials cherche l'e-mail et compare le mot de passe à son hash.
+    // En cas d'échec, il déclenche E_INVALID_CREDENTIALS, traduit dans app/exceptions/handler.ts.
     const user = await User.verifyCredentials(email, password)
 
     await auth.use('web').login(user)

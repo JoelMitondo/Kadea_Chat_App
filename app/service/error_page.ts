@@ -1,3 +1,6 @@
+// PAGES D'ERREUR
+// Regroupe les textes de toutes les pages d'erreur du site : pour changer un message, c'est ici.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import { APP_TIMEZONE } from './chat_service.ts'

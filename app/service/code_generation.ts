@@ -1,3 +1,8 @@
+// CODES DES LIENS ENVOYÉS PAR E-MAIL
+// Le code est envoyé en clair dans l'e-mail, mais la base n'en garde qu'une version hachée (hash.make) :
+// même si quelqu'un lisait la base, il ne pourrait pas fabriquer un lien valide.
+// Pour vérifier un lien, on compare le code reçu au hash avec hash.verify.
+
 import { randomInt } from 'node:crypto'
 import { type LucidModel } from '@adonisjs/lucid/types/model'
 

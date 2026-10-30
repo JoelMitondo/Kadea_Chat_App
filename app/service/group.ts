@@ -1,3 +1,7 @@
+// GROUPES
+// Un groupe est une conversation de type "Publique". Les membres et leur rôle (admin ou membre)
+// sont enregistrés dans la table user_conversations.
+
 import db from '@adonisjs/lucid/services/db'
 import type User from '#models/user'
 import Conversation from '#models/conversation'

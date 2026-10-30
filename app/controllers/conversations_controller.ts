@@ -1,3 +1,5 @@
+// CONVERSATIONS PRIVÉES : liste, ouverture, suppression.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import type User from '#models/user'
@@ -56,6 +58,8 @@ export default class ConversationsController {
     const conversationId = Number(params.id)
 
     const membership = await chercheParticipationPrivee(user.id, conversationId).firstOrFail()
+    // Suppression "pour moi" : on ne supprime aucun message, car l'autre personne doit les garder.
+    // On note seulement la date : je ne verrai plus que les messages arrivés après.
     membership.removedAt = DateTime.now()
     await membership.save()
 

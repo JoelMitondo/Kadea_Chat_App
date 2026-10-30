@@ -1,3 +1,7 @@
+// STOCKAGE DES FICHIERS
+// Les images et documents ne sont pas gardés sur notre serveur : on les envoie à Cloudinary,
+// qui nous renvoie un lien. La base de données n'enregistre que ce lien.
+
 import { v2 as cloudinary, type UploadApiOptions } from 'cloudinary'
 import logger from '@adonisjs/core/services/logger'
 import env from '#start/env'

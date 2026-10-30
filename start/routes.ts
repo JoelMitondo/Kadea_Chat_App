@@ -1,3 +1,12 @@
+// LES ROUTES : le "plan" du site.
+// Chaque ligne relie une adresse (ex. GET /messages) à une méthode d'un contrôleur.
+// Exemple : [controllers.Groups, 'donneGroupe'] = "appelle la méthode donneGroupe de groups_controller.ts".
+// - GET sert à afficher, POST à enregistrer, PUT à modifier, DELETE à supprimer.
+// - :id dans une adresse est une valeur variable, lue ensuite avec params.id.
+// - .as('nom') donne un nom à la route : les vues et les redirections utilisent ce nom plutôt que l'adresse.
+// - middleware.guest() : réservé aux visiteurs NON connectés (connexion, inscription...).
+// - middleware.auth() : réservé aux personnes connectées, sinon redirection vers /login.
+
 import { middleware } from '#start/kernel'
 import { controllers } from '#generated/controllers'
 import router from '@adonisjs/core/services/router'

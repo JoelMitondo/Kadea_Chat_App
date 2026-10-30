@@ -32,6 +32,9 @@ server.use([
  * The router middleware stack runs middleware on all the HTTP
  * requests with a registered route.
  */
+// Ces middlewares s'exécutent dans l'ordre, à chaque requête, AVANT le contrôleur :
+// lecture des données envoyées -> session -> sécurité (CSRF) -> reconnaissance de l'utilisateur.
+// L'ordre compte : l'authentification a besoin que la session soit déjà chargée.
 router.use([
   () => import('@adonisjs/core/bodyparser_middleware'),
   () => import('@adonisjs/session/session_middleware'),

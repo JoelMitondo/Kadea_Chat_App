@@ -1,3 +1,9 @@
+// MOT DE PASSE OUBLIÉ, en 3 étapes :
+//   1. l'utilisateur donne son e-mail : on enregistre un code haché valable 1 heure et on envoie un lien ;
+//   2. il clique sur le lien : on vérifie le code et on affiche le formulaire ;
+//   3. il envoie son nouveau mot de passe : on revérifie le code, on enregistre, puis on supprime la demande
+//      pour que le lien ne serve qu'une seule fois.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import ForgoPassword from '#models/forgo_password'

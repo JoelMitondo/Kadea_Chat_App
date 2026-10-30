@@ -1,3 +1,10 @@
+// TEMPS RÉEL, CÔTÉ SERVEUR
+// Transmit utilise les SSE (Server-Sent Events) : le navigateur ouvre une connexion qui reste ouverte,
+// et le serveur peut y envoyer des messages quand il veut, sans que la page ne demande rien.
+// C'est comme ça qu'un message arrive sans recharger la page.
+// Les données circulent sur des "canaux" : chaque utilisateur a le sien, et un canal "presence" est commun à tous.
+// Ce fichier fait deux choses : il décide QUI peut écouter quel canal, et il suit QUI est en ligne.
+
 import db from '@adonisjs/lucid/services/db'
 import logger from '@adonisjs/core/services/logger'
 import transmit from '@adonisjs/transmit/services/main'
@@ -48,6 +55,8 @@ async function changeStatutEnLigne(userId: string, isOnline: boolean) {
 }
 
 // Une connexion s'ouvre (l'utilisateur a ouvert une page de l'application)
+// On compte les connexions, car une même personne peut avoir plusieurs onglets ouverts :
+// elle n'est hors ligne que lorsque son DERNIER onglet est fermé.
 transmit.on('connect', async ({ uid, context }) => {
   const userId = context.auth.user?.id
   if (!userId) {

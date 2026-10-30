@@ -1,3 +1,5 @@
+// Routes appelées par le JavaScript pour le temps réel : compteurs de non-lus et lecture des messages.
+
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import UserConversation from '#models/user_conversation'

@@ -24,6 +24,7 @@ export default class UsersController {
       query.whereILike('fullName', `%${protegeCaracteresRecherche(search)}%`)
     }
 
+    // paginate découpe les résultats en pages : on ne charge que 20 utilisateurs à la fois.
     const paginator = await query.paginate(page ?? 1, USERS_PER_PAGE)
 
     const users = paginator.all().map((person) => ({
