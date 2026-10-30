@@ -73,6 +73,8 @@ document.addEventListener('click', function (evenement) {
 // qui affiche le chargeur pendant que la requête est en cours.
 var fetchOriginal = window.fetch
 
+// On remplace la fonction fetch du navigateur par la nôtre : toutes les requêtes passent ici,
+// sans avoir à modifier chaque fichier. La vraie fonction reste appelée à la fin (fetchOriginal).
 window.fetch = function (adresse, options) {
   // Pour une requête précise sans chargeur : fetch(url, { noLoader: true })
   if (options && options.noLoader === true) {
