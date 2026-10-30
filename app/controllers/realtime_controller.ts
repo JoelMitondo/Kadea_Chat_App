@@ -2,7 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import UserConversation from '#models/user_conversation'
 import { GROUP_TYPE } from '../service/chat_service.ts'
-import { markConversationAsReadAndNotify } from '../service/realtime_service.ts'
+import { marqueConversationCommeLueEtPrevient } from '../service/realtime_service.ts'
 
 export default class RealtimeController {
   /**
@@ -50,7 +50,7 @@ export default class RealtimeController {
       .where('conversationId', conversationId)
       .firstOrFail()
 
-    await markConversationAsReadAndNotify(user.id, conversationId)
+    await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
     return response.noContent()
   }

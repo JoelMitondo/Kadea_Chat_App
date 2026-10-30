@@ -7,7 +7,7 @@ import { type LucidModel } from '@adonisjs/lucid/types/model'
  * @param columnName Le nom de la colonne servant de filtre (par défaut: 'codeAleatoire')
  * @param length La longueur du code généré (par défaut: 25)
  */
-export async function generateUniqueCode(
+export async function genereCodeUnique(
   model: LucidModel, // où verifie si le code existe déjà
   columnName: string = 'codeAleatoire',
   length: number = 25

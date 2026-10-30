@@ -3,7 +3,7 @@ import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import UserConversation from '#models/user_conversation'
 import { searchMessagesValidator } from '#validators/search'
-import { GROUP_TYPE, escapeLike, formatTime, getDayLabel } from '../service/chat_service.ts'
+import { GROUP_TYPE, protegeCaracteresRecherche, formateHeure, donneLibelleDuJour } from '../service/chat_service.ts'
 
 // Nombre maximum de résultats affichés
 const RESULTS_LIMIT = 50
@@ -29,7 +29,7 @@ export default class SearchController {
       .join('users as sender', 'sender.id', 'messages.user_id')
       .where('me.user_id', user.id)
       .where('messages.is_deleted', false)
-      .whereILike('messages.content', `%${escapeLike(search)}%`)
+      .whereILike('messages.content', `%${protegeCaracteresRecherche(search)}%`)
       .where((query) => {
         // Si j'ai supprimé la conversation, je ne cherche que dans les messages arrivés après
         query.whereNull('me.removed_at').orWhereRaw('messages.created_at > me.removed_at')
@@ -76,7 +76,7 @@ export default class SearchController {
           ? (row.title ?? 'Groupe sans nom')
           : (otherNames.get(row.conversation_id) ?? 'Conversation'),
         senderName: row.sender_name as string,
-        when: `${getDayLabel(date)} · ${formatTime(date)}`,
+        when: `${donneLibelleDuJour(date)} · ${formateHeure(date)}`,
         // Un clic ouvre la conversation (ou le groupe) qui contient le message
         url: isGroup ? `/groups/${row.conversation_id}` : `/conversations/${row.conversation_id}`,
         before: parts.before,

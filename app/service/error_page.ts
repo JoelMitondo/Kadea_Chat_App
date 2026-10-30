@@ -107,7 +107,7 @@ export const ERROR_PAGES = {
  * Affiche la page d'erreur du site avec le bon code HTTP.
  * Les boutons par défaut dépendent de la connexion : "Mes messages" ou "Accueil".
  */
-export async function renderErrorPage(
+export async function affichePageErreur(
   ctx: HttpContext,
   page: ErrorPage,
   overrides: Partial<ErrorPage> = {}

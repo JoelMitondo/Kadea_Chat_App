@@ -3,8 +3,8 @@ import logger from '@adonisjs/core/services/logger'
 import transmit from '@adonisjs/transmit/services/main'
 import {
   PRESENCE_CHANNEL,
-  broadcastPresence,
-  toChannelId,
+  annoncePresence,
+  convertitEnIdentifiantCanal,
 } from '../app/service/realtime_service.ts'
 
 // ===== 1. QUI A LE DROIT DE S'ABONNER À QUEL CANAL ? =====
@@ -13,7 +13,7 @@ import {
 // Canal personnel "users/<id>" : seul son propriétaire peut s'y abonner
 transmit.authorize<{ id: string }>('users/:id', (ctx, { id }) => {
   const currentUser = ctx.auth.user
-  return currentUser !== undefined && toChannelId(currentUser.id) === id
+  return currentUser !== undefined && convertitEnIdentifiantCanal(currentUser.id) === id
 })
 
 // Canal de présence : toute personne connectée peut l'écouter
@@ -38,10 +38,10 @@ const offlineTimers = new Map<string, NodeJS.Timeout>()
 // On attend donc quelques secondes avant de dire "hors ligne", pour éviter de clignoter.
 const OFFLINE_DELAY_MS = 8000
 
-async function setOnlineStatus(userId: string, isOnline: boolean) {
+async function changeStatutEnLigne(userId: string, isOnline: boolean) {
   try {
     await db.from('users').where('id', userId).update({ is_online: isOnline })
-    broadcastPresence(userId, isOnline) // tout le monde est prévenu
+    annoncePresence(userId, isOnline) // tout le monde est prévenu
   } catch (error) {
     logger.error({ err: error, userId }, 'Échec de la mise à jour du statut en ligne')
   }
@@ -68,7 +68,7 @@ transmit.on('connect', async ({ uid, context }) => {
   }
 
   if (!wasOnline) {
-    await setOnlineStatus(userId, true)
+    await changeStatutEnLigne(userId, true)
   }
 })
 
@@ -94,7 +94,7 @@ transmit.on('disconnect', ({ uid }) => {
     userId,
     setTimeout(async () => {
       offlineTimers.delete(userId)
-      await setOnlineStatus(userId, false)
+      await changeStatutEnLigne(userId, false)
     }, OFFLINE_DELAY_MS)
   )
 })

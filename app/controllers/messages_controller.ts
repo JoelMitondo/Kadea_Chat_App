@@ -11,18 +11,18 @@ import UserConversation from '#models/user_conversation'
 import { IMAGE_EXTENSIONS, sendMessageValidator, updateMessageValidator } from '#validators/message'
 import {
   GROUP_TYPE,
-  buildMessageView,
-  buildPreview,
-  findGroupMembership,
-  findPrivateMembership,
-  getListTime,
-  needsDaySeparator,
+  construitVueMessage,
+  construitApercu,
+  chercheParticipationGroupe,
+  chercheParticipationPrivee,
+  donneHeureDeLaListe,
+  besoinSeparateurDeJour,
 } from '../service/chat_service.ts'
-import { hasBlocked } from '../service/block_service.ts'
-import { deleteFileByUrl, uploadFile, uploadImage } from '../service/cloudinary_service.ts'
+import { aBloque } from '../service/block_service.ts'
+import { supprimeFichierParLien, envoieDocument, envoieImage } from '../service/cloudinary_service.ts'
 import {
-  notifyMessageUpdated,
-  notifyNewMessage,
+  previensMessageModifie,
+  previensNouveauMessage,
   type ConversationKind,
 } from '../service/realtime_service.ts'
 
@@ -32,7 +32,7 @@ export default class MessagesController {
    */
   async store(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
-    const membership = await findPrivateMembership(user.id, Number(ctx.params.id)).firstOrFail()
+    const membership = await chercheParticipationPrivee(user.id, Number(ctx.params.id)).firstOrFail()
     return this.sendMessage(ctx, membership, 'private')
   }
 
@@ -41,7 +41,7 @@ export default class MessagesController {
    */
   async storeInGroup(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
-    const membership = await findGroupMembership(user.id, Number(ctx.params.id))
+    const membership = await chercheParticipationGroupe(user.id, Number(ctx.params.id))
       .preload('conversation') // pour connaître le nom du groupe
       .firstOrFail()
     return this.sendMessage(ctx, membership, 'group')
@@ -95,7 +95,7 @@ export default class MessagesController {
     // Si le message avait un fichier, on le supprime de Cloudinary puis de la base
     const attachments = await MessageAttachment.query().where('messageId', message.id)
     for (const file of attachments) {
-      await deleteFileByUrl(file.filePath)
+      await supprimeFichierParLien(file.filePath)
     }
     await MessageAttachment.query().where('messageId', message.id).delete()
     const data = await this.buildMessageResponse(message, user.id, view)
@@ -139,7 +139,7 @@ export default class MessagesController {
     // ÉTAPE 2 : BLOCAGE (conversations privées) :
     // si l'autre personne m'a bloqué, je ne peux plus lui écrire
     if (kind === 'private' && otherMemberships.length > 0) {
-      const isBlocked = await hasBlocked(otherMemberships[0].userId, user.id)
+      const isBlocked = await aBloque(otherMemberships[0].userId, user.id)
       if (isBlocked) {
         return response.forbidden({ message: "Impossible d'envoyer ce message à cet utilisateur." })
       }
@@ -156,8 +156,8 @@ export default class MessagesController {
 
       try {
         fileUrl = isImage
-          ? await uploadImage(attachment.tmpPath!, 'messages')
-          : await uploadFile(attachment.tmpPath!, 'messages', extension)
+          ? await envoieImage(attachment.tmpPath!, 'messages')
+          : await envoieDocument(attachment.tmpPath!, 'messages', extension)
       } catch (error) {
         logger.error({ err: error }, "Échec de l'envoi du fichier vers Cloudinary")
         return response.unprocessableEntity({
@@ -231,7 +231,7 @@ export default class MessagesController {
       })
     } catch (error) {
       // La base a refusé : le fichier ne sert à rien, on le supprime de Cloudinary
-      await deleteFileByUrl(fileUrl)
+      await supprimeFichierParLien(fileUrl)
       throw error
     }
 
@@ -239,12 +239,12 @@ export default class MessagesController {
     await message.load('attachments')
 
     // Réponse à celui qui vient d'écrire
-    const showSeparator = needsDaySeparator(previousMessage, message, membership)
+    const showSeparator = besoinSeparateurDeJour(previousMessage, message, membership)
     const data = await this.buildMessageResponse(message, user.id, view, showSeparator)
 
     // TEMPS RÉEL : les autres participants reçoivent le message tout de suite
     await message.load('user')
-    await notifyNewMessage({
+    await previensNouveauMessage({
       message,
       sender: user,
       kind,
@@ -273,7 +273,7 @@ export default class MessagesController {
 
     await message.load('user') // pour le nom de l'auteur dans un groupe
 
-    await notifyMessageUpdated({ message, kind, isLast, recipients })
+    await previensMessageModifie({ message, kind, isLast, recipients })
   }
 
   /**
@@ -292,15 +292,15 @@ export default class MessagesController {
       .first()
 
     const html = await view.render('partials/message-item', {
-      message: buildMessageView(message, userId),
+      message: construitVueMessage(message, userId),
       showSeparator,
     })
 
     return {
       html,
       isLast: lastMessage?.id === message.id,
-      preview: buildPreview(message, userId),
-      time: getListTime(message.createdAt),
+      preview: construitApercu(message, userId),
+      time: donneHeureDeLaListe(message.createdAt),
     }
   }
 }

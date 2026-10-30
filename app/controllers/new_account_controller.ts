@@ -4,7 +4,7 @@ import { confirmationCompteValidator } from '#validators/user'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
-import { ERROR_PAGES, renderErrorPage } from '../service/error_page.ts'
+import { ERROR_PAGES, affichePageErreur } from '../service/error_page.ts'
 
 export default class NewAccountController {
   //function pour envoyer les information d'une invitation lors de l'enregistrement de l'utilisateur
@@ -14,7 +14,7 @@ export default class NewAccountController {
 
     // Lien invalide ou expiré : page d'erreur du site qui explique quoi faire
     if (result.error) {
-      return renderErrorPage(ctx, ERROR_PAGES[result.error])
+      return affichePageErreur(ctx, ERROR_PAGES[result.error])
     }
 
     const inscription = result.inscription
@@ -35,7 +35,7 @@ export default class NewAccountController {
 
     const result = await this.findInscription(params.id, params.code)
     if (result.error) {
-      return renderErrorPage(ctx, ERROR_PAGES[result.error])
+      return affichePageErreur(ctx, ERROR_PAGES[result.error])
     }
     const inscription = result.inscription
 
@@ -44,7 +44,7 @@ export default class NewAccountController {
     const existingUser = await User.findBy('email', inscription.email)
     if (existingUser) {
       await inscription.delete()
-      return renderErrorPage(ctx, ERROR_PAGES.accountAlreadyExists)
+      return affichePageErreur(ctx, ERROR_PAGES.accountAlreadyExists)
     }
 
     const userData = {

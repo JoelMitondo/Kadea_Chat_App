@@ -8,7 +8,7 @@ import UserConversation from '#models/user_conversation'
 // Renvoie la conversation privée entre deux utilisateurs.
 // Si elle n'existe pas encore, elle est créée (avec les deux participants).
 
-export async function findOrCreatePrivateConversation(
+export async function chercheOuCreeConversationPrivee(
   currentUser: User,
   otherUser: User
 ): Promise<Conversation> {

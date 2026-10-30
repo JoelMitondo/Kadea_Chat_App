@@ -3,7 +3,7 @@ import db from '@adonisjs/lucid/services/db'
 import type Message from '#models/message'
 import type User from '#models/user'
 import UserConversation from '#models/user_conversation'
-import { buildDownloadUrl, buildThumbUrl } from './cloudinary_service.ts'
+import { construitLienTelechargement, construitLienMiniature } from './cloudinary_service.ts'
 
 // Fuseau horaire utilisé pour afficher les heures et calculer "Aujourd'hui" / "Hier"
 export const APP_TIMEZONE = 'Africa/Kinshasa'
@@ -18,29 +18,29 @@ export const ADMIN_ROLE = 'admin'
 export const MEMBER_ROLE = 'membre'
 // ---------- Dates ----------
 
-function toLocalDate(date: DateTime): DateTime {
+function convertitEnDateLocale(date: DateTime): DateTime {
   return date.setZone(APP_TIMEZONE).setLocale('fr')
 }
 
 // Nombre de jours entre la date et aujourd'hui (0 = aujourd'hui, 1 = hier...)
-function getDaysAgo(date: DateTime): number {
-  const messageDay = toLocalDate(date).startOf('day')
+function donneNombreJoursEcoules(date: DateTime): number {
+  const messageDay = convertitEnDateLocale(date).startOf('day')
   const today = DateTime.now().setZone(APP_TIMEZONE).startOf('day')
   return Math.round(today.diff(messageDay, 'days').days)
 }
 
 // Clé du jour (ex: "2026-10-12"), pour savoir quand deux messages sont le même jour
-export function getDayKey(date: DateTime): string {
-  return toLocalDate(date).toFormat('yyyy-MM-dd')
+export function donneCleDuJour(date: DateTime): string {
+  return convertitEnDateLocale(date).toFormat('yyyy-MM-dd')
 }
 
-export function formatTime(date: DateTime): string {
-  return toLocalDate(date).toFormat('HH:mm')
+export function formateHeure(date: DateTime): string {
+  return convertitEnDateLocale(date).toFormat('HH:mm')
 }
 
 // Label du séparateur : Aujourd'hui / Hier / Lundi... / 12/10/2026
-export function getDayLabel(date: DateTime): string {
-  const daysAgo = getDaysAgo(date)
+export function donneLibelleDuJour(date: DateTime): string {
+  const daysAgo = donneNombreJoursEcoules(date)
 
   if (daysAgo === 0) {
     return "Aujourd'hui"
@@ -49,25 +49,25 @@ export function getDayLabel(date: DateTime): string {
     return 'Hier'
   }
   if (daysAgo > 1 && daysAgo < 7) {
-    const weekday = toLocalDate(date).toFormat('cccc') // "lundi"
+    const weekday = convertitEnDateLocale(date).toFormat('cccc') // "lundi"
     return weekday.charAt(0).toUpperCase() + weekday.slice(1) // "Lundi"
   }
-  return toLocalDate(date).toFormat('dd/MM/yyyy')
+  return convertitEnDateLocale(date).toFormat('dd/MM/yyyy')
 }
 
 // Texte affiché à droite dans la liste : l'heure si c'est aujourd'hui, sinon le label du jour
-export function getListTime(date: DateTime): string {
-  return getDaysAgo(date) === 0 ? formatTime(date) : getDayLabel(date)
+export function donneHeureDeLaListe(date: DateTime): string {
+  return donneNombreJoursEcoules(date) === 0 ? formateHeure(date) : donneLibelleDuJour(date)
 }
 
 // Date au format 12/10/2026
-export function formatDate(date: DateTime): string {
-  return toLocalDate(date).toFormat('dd/MM/yyyy')
+export function formateDate(date: DateTime): string {
+  return convertitEnDateLocale(date).toFormat('dd/MM/yyyy')
 }
 
 // ---------- Présentation ----------
 
-export function getInitials(fullName: string): string {
+export function donneInitiales(fullName: string): string {
   return fullName
     .split(' ')
     .filter(Boolean)
@@ -78,12 +78,12 @@ export function getInitials(fullName: string): string {
 
 // Échappe les caractères spéciaux d'une recherche LIKE / ILIKE :
 // sans cela, "%" ou "_" tapés par l'utilisateur serviraient de jokers ("%" trouverait tout)
-export function escapeLike(search: string): string {
+export function protegeCaracteresRecherche(search: string): string {
   return search.replace(/[\\%_]/g, (character) => `\\${character}`)
 }
 
 // Taille d'un fichier en texte lisible : "250 Ko", "1.4 Mo"
-export function formatFileSize(bytes: number): string {
+export function formateTailleFichier(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} o`
   }
@@ -94,7 +94,7 @@ export function formatFileSize(bytes: number): string {
 }
 
 // Texte affiché dans la liste quand un message ne contient qu'un fichier
-function getAttachmentLabel(message: Message): string {
+function donneLibelleFichierJoint(message: Message): string {
   const file = message.attachments?.[0]
   if (!file) {
     return ''
@@ -103,7 +103,7 @@ function getAttachmentLabel(message: Message): string {
 }
 // Ce message est-il le PREMIER que ce participant voit dans la conversation ?
 // (conversation sans message, ou supprimée par lui avant ce message)
-export function isFirstVisibleMessage(
+export function estPremierMessageVisible(
   previousMessage: Message | null,
   membership: UserConversation
 ): boolean {
@@ -114,20 +114,20 @@ export function isFirstVisibleMessage(
 }
 
 // Faut-il afficher un séparateur de date ("Aujourd'hui"...) avant ce message ?
-export function needsDaySeparator(
+export function besoinSeparateurDeJour(
   previousMessage: Message | null,
   message: Message,
   membership: UserConversation
 ): boolean {
-  if (previousMessage === null || isFirstVisibleMessage(previousMessage, membership)) {
+  if (previousMessage === null || estPremierMessageVisible(previousMessage, membership)) {
     return true
   }
-  return getDayKey(previousMessage.createdAt) !== getDayKey(message.createdAt)
+  return donneCleDuJour(previousMessage.createdAt) !== donneCleDuJour(message.createdAt)
 }
 // Extrait du dernier message pour la liste
 // Extrait du dernier message pour la liste.
 // Dans un groupe (showSender = true) : "Jo : le projet est rendu"
-export function buildPreview(
+export function construitApercu(
   message: Message,
   currentUserId: User['id'],
   showSender = false
@@ -135,7 +135,7 @@ export function buildPreview(
   if (message.isDeleted) {
     return 'Message supprimé'
   }
-  const text = message.content || getAttachmentLabel(message)
+  const text = message.content || donneLibelleFichierJoint(message)
 
   if (message.userId === currentUserId) {
     return `Vous : ${text}`
@@ -147,7 +147,7 @@ export function buildPreview(
 }
 
 // Données simples envoyées à la vue pour une bulle de message
-export function buildMessageView(message: Message, currentUserId: User['id'], showSender = false) {
+export function construitVueMessage(message: Message, currentUserId: User['id'], showSender = false) {
   // "statuses" contient (si chargé) les statuts des autres personnes.
   // Le message est "lu" quand TOUS les autres l'ont lu (une seule personne en conversation privée).
   const file = message.attachments?.[0]
@@ -163,20 +163,20 @@ export function buildMessageView(message: Message, currentUserId: User['id'], sh
     // Pas de colonne "modifié" : si updated_at est plus tard que created_at, le message a été modifié
     isEdited: message.updatedAt.toMillis() - message.createdAt.toMillis() > 1000,
     isRead,
-    time: formatTime(message.createdAt),
-    dayKey: getDayKey(message.createdAt),
-    dayLabel: getDayLabel(message.createdAt),
+    time: formateHeure(message.createdAt),
+    dayKey: donneCleDuJour(message.createdAt),
+    dayLabel: donneLibelleDuJour(message.createdAt),
     // Dans un groupe : nom de l'auteur affiché au-dessus des messages des autres
     senderName: showSender && !isMine ? (message.user?.fullName ?? null) : null,
     // Le fichier joint (image ou document), s'il y en a un
     attachment: file
       ? {
           name: file.fileName,
-          size: formatFileSize(file.fileSize),
+          size: formateTailleFichier(file.fileSize),
           isImage: file.mimeType.startsWith('image/'),
           url: file.filePath, // le lien d'origine : pour ouvrir l'image ou le document
-          thumbUrl: buildThumbUrl(file.filePath), // miniature légère d'une image
-          downloadUrl: buildDownloadUrl(file.filePath), // lien qui force le téléchargement
+          thumbUrl: construitLienMiniature(file.filePath), // miniature légère d'une image
+          downloadUrl: construitLienTelechargement(file.filePath), // lien qui force le téléchargement
         }
       : null,
   }
@@ -185,7 +185,7 @@ export function buildMessageView(message: Message, currentUserId: User['id'], sh
 
 // Cherche la participation de l'utilisateur à UNE conversation privée.
 // Si l'utilisateur n'en fait pas partie, .firstOrFail() renverra une erreur 404.
-export function findPrivateMembership(userId: User['id'], conversationId: number) {
+export function chercheParticipationPrivee(userId: User['id'], conversationId: number) {
   return UserConversation.query()
     .where('userId', userId)
     .where('conversationId', conversationId)
@@ -197,7 +197,7 @@ export function findPrivateMembership(userId: User['id'], conversationId: number
 }
 
 // Passe en "lu" tous les messages non lus de l'utilisateur dans une conversation
-export async function markConversationAsRead(userId: User['id'], conversationId: number) {
+export async function marqueConversationCommeLue(userId: User['id'], conversationId: number) {
   await db
     .from('message_statuses')
     .where('user_id', userId)
@@ -209,8 +209,8 @@ export async function markConversationAsRead(userId: User['id'], conversationId:
     .update({ is_read: true, status: 'read', updated_at: new Date() })
 }
 
-// Même chose que findPrivateMembership, mais pour un GROUPE
-export function findGroupMembership(userId: User['id'], conversationId: number) {
+// Même chose que chercheParticipationPrivee, mais pour un GROUPE
+export function chercheParticipationGroupe(userId: User['id'], conversationId: number) {
   return UserConversation.query()
     .where('userId', userId)
     .where('conversationId', conversationId)
@@ -223,7 +223,7 @@ export function findGroupMembership(userId: User['id'], conversationId: number) 
 
 // Nombre de messages non lus par conversation (table message_statuses).
 // (Déplacé ici depuis ConversationsController pour servir aussi aux groupes.)
-export async function getUnreadCounts(userId: User['id'], conversationIds: number[]) {
+export async function donneNombreMessagesNonLus(userId: User['id'], conversationIds: number[]) {
   const counts = new Map<number, number>()
 
   if (conversationIds.length === 0) {

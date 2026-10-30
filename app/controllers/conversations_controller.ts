@@ -4,16 +4,16 @@ import type User from '#models/user'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import {
-  buildMessageView,
-  buildPreview,
-  findPrivateMembership,
-  getInitials,
-  getListTime,
-  markConversationAsRead,
-  getUnreadCounts,
+  construitVueMessage,
+  construitApercu,
+  chercheParticipationPrivee,
+  donneInitiales,
+  donneHeureDeLaListe,
+  marqueConversationCommeLue,
+  donneNombreMessagesNonLus,
 } from '../service/chat_service.ts'
-import { markConversationAsReadAndNotify } from './../service/realtime_service.ts'
-import { hasBlocked } from '../service/block_service.ts'
+import { marqueConversationCommeLueEtPrevient } from './../service/realtime_service.ts'
+import { aBloque } from '../service/block_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'une conversation
 const MESSAGES_LIMIT = 100
@@ -55,11 +55,11 @@ export default class ConversationsController {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 
-    const membership = await findPrivateMembership(user.id, conversationId).firstOrFail()
+    const membership = await chercheParticipationPrivee(user.id, conversationId).firstOrFail()
     membership.removedAt = DateTime.now()
     await membership.save()
 
-    await markConversationAsRead(user.id, conversationId)
+    await marqueConversationCommeLue(user.id, conversationId)
 
     return response.ok({ message: 'La conversation a été supprimée.' })
   }
@@ -85,7 +85,7 @@ export default class ConversationsController {
         })
       })
 
-    const unreadCounts = await getUnreadCounts(
+    const unreadCounts = await donneNombreMessagesNonLus(
       user.id,
       memberships.map((membership) => membership.conversationId)
     )
@@ -116,11 +116,11 @@ export default class ConversationsController {
           id: membership.conversationId,
           userId: otherUser.id,
           name: otherUser.fullName,
-          initials: getInitials(otherUser.fullName),
+          initials: donneInitiales(otherUser.fullName),
           avatarUrl: otherUser.avatarUrl,
           isOnline: otherUser.isOnline,
-          preview: lastMessage ? buildPreview(lastMessage, user.id) : 'Aucun message',
-          time: lastMessage ? getListTime(lastMessage.createdAt) : '',
+          preview: lastMessage ? construitApercu(lastMessage, user.id) : 'Aucun message',
+          time: lastMessage ? donneHeureDeLaListe(lastMessage.createdAt) : '',
           unreadCount: unreadCounts.get(membership.conversationId) ?? 0,
         },
       })
@@ -134,7 +134,7 @@ export default class ConversationsController {
    * Prépare toutes les données d'une conversation ouverte
    */
   private async getChat(user: User, conversationId: number) {
-    const membership = await findPrivateMembership(user.id, conversationId)
+    const membership = await chercheParticipationPrivee(user.id, conversationId)
       .preload('conversation', (conversationQuery) => {
         conversationQuery.preload('users', (usersQuery) => {
           usersQuery.whereNot('users.id', user.id)
@@ -147,7 +147,7 @@ export default class ConversationsController {
       throw new Error('Interlocuteur introuvable pour cette conversation.')
     }
 
-    await markConversationAsReadAndNotify(user.id, conversationId)
+    await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
     // On charge les derniers messages (du plus récent au plus ancien), puis on remet dans l'ordre
     const messagesQuery = Message.query()
@@ -171,15 +171,15 @@ export default class ConversationsController {
     return {
       id: conversationId,
       // Est-ce que j'ai bloqué cet interlocuteur ? (pour le bandeau et le bouton Débloquer)
-      blockedByMe: await hasBlocked(user.id, otherUser.id),
+      blockedByMe: await aBloque(user.id, otherUser.id),
       other: {
         id: otherUser.id,
         name: otherUser.fullName,
-        initials: getInitials(otherUser.fullName),
+        initials: donneInitiales(otherUser.fullName),
         avatarUrl: otherUser.avatarUrl,
         isOnline: otherUser.isOnline,
       },
-      messages: messages.map((message) => buildMessageView(message, user.id)),
+      messages: messages.map((message) => construitVueMessage(message, user.id)),
     }
   }
 }

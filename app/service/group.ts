@@ -11,7 +11,7 @@ import { ADMIN_ROLE, GROUP_TYPE, MEMBER_ROLE } from './chat_service.ts'
  * Crée un groupe : le créateur en est l'administrateur, les autres sont "membres".
  * Transaction : tout est enregistré, ou rien.
  */
-export async function createGroup(
+export async function creeGroupe(
   creator: User,
   name: string,
   memberIds: string[]
@@ -52,7 +52,7 @@ export async function createGroup(
  * Ajoute des membres à un groupe. Ceux qui en font déjà partie sont ignorés.
  * Renvoie la liste des membres réellement ajoutés.
  */
-export async function addMembersToGroup(
+export async function ajouteMembresAuGroupe(
   conversationId: number,
   userIds: string[]
 ): Promise<string[]> {

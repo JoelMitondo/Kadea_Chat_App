@@ -19,7 +19,7 @@ export type ImageFolder = 'avatars' | 'groups' | 'messages'
 /**
 nous envoiyons l'image à cloudinary et lui nous renvoie l'image a enregistrer sur notre bdd
  */
-export async function uploadImage(
+export async function envoieImage(
   filePath: string,
   folder: ImageFolder,
   options: UploadApiOptions = {}
@@ -37,8 +37,8 @@ export async function uploadImage(
 /**
  * Photo de profil : redimensionnée en carré 512 x 512 pour économiser l'espace de stockage
  */
-export function uploadAvatar(filePath: string): Promise<string> {
-  return uploadImage(filePath, 'avatars', {
+export function envoiePhotoProfil(filePath: string): Promise<string> {
+  return envoieImage(filePath, 'avatars', {
     transformation: [{ width: 512, height: 512, crop: 'fill', gravity: 'auto' }],
   })
 }
@@ -49,12 +49,12 @@ export function uploadAvatar(filePath: string): Promise<string> {
  * - Ne touche pas aux liens qui ne viennent pas de NOTRE Cloudinary.
  * Renvoie true si le fichier a bien été supprimé.
  */
-export async function deleteFileByUrl(fileUrl: string | null | undefined): Promise<boolean> {
+export async function supprimeFichierParLien(fileUrl: string | null | undefined): Promise<boolean> {
   if (!fileUrl) {
     return false
   }
 
-  const target = extractPublicId(fileUrl)
+  const target = extraitIdentifiantCloudinary(fileUrl)
   if (target === null) {
     return false
   }
@@ -75,7 +75,7 @@ export async function deleteFileByUrl(fileUrl: string | null | undefined): Promi
 }
 
 // Ancien nom conservé : le reste de votre code (profil) continue de fonctionner
-export const deleteImageByUrl = deleteFileByUrl
+export const supprimeImageParLien = supprimeFichierParLien
 
 /**
  * Retrouve le "public_id" Cloudinary à partir du lien enregistré.
@@ -85,7 +85,7 @@ export const deleteImageByUrl = deleteFileByUrl
  * Document : https://res.cloudinary.com/mon-cloud/raw/upload/v1712345678/kadea-chat/messages/abc123.pdf
  *         → public id : kadea-chat/messages/abc123.pdf       (AVEC l'extension)
  */
-function extractPublicId(
+function extraitIdentifiantCloudinary(
   fileUrl: string
 ): { publicId: string; resourceType: 'image' | 'raw' } | null {
   let url: URL
@@ -139,7 +139,7 @@ function extractPublicId(
 // image, sans qu'on la stocke une deuxième fois. Seul le lien d'origine est enregistré en base.
 const UPLOAD_SEGMENT = '/upload/'
 
-function withTransformation(imageUrl: string, transformation: string): string {
+function ajouteTransformation(imageUrl: string, transformation: string): string {
   // Ce n'est pas un lien Cloudinary : on le renvoie tel quel
   if (!imageUrl.includes(UPLOAD_SEGMENT)) {
     return imageUrl
@@ -153,7 +153,7 @@ function withTransformation(imageUrl: string, transformation: string): string {
  * Envoie un DOCUMENT (pdf, word, excel...) vers Cloudinary.
  * Un document est envoyé en "raw" et son extension fait partie du nom (.pdf, .docx...).
  */
-export async function uploadFile(
+export async function envoieDocument(
   filePath: string,
   folder: ImageFolder,
   extension: string
@@ -167,11 +167,11 @@ export async function uploadFile(
 }
 
 // Miniature d'une image de message : 480 pixels de large au maximum (plus léger à charger)
-export function buildThumbUrl(imageUrl: string): string {
-  return withTransformation(imageUrl, 'w_480,c_limit,q_auto,f_auto')
+export function construitLienMiniature(imageUrl: string): string {
+  return ajouteTransformation(imageUrl, 'w_480,c_limit,q_auto,f_auto')
 }
 
 // Lien qui FORCE le téléchargement du fichier (au lieu de l'ouvrir dans le navigateur)
-export function buildDownloadUrl(fileUrl: string): string {
-  return withTransformation(fileUrl, 'fl_attachment')
+export function construitLienTelechargement(fileUrl: string): string {
+  return ajouteTransformation(fileUrl, 'fl_attachment')
 }

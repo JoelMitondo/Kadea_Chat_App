@@ -4,7 +4,7 @@ import type User from '#models/user'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import { updateProfileValidator } from '#validators/profile'
-import { deleteImageByUrl, uploadAvatar } from '../service/cloudinary_service.ts'
+import { supprimeImageParLien, envoiePhotoProfil } from '../service/cloudinary_service.ts'
 
 // Valeurs de la colonne "type" de conversation_types
 const TYPE_PRIVATE = 'Privee'
@@ -22,15 +22,15 @@ export default class ProfileController {
     return view.render('pages/profile', {
       profile: {
         fullName: user.fullName,
-        initials: this.getInitials(user.fullName),
+        initials: this.donneInitiales(user.fullName),
         bio: user.bio,
         avatarUrl: user.avatarUrl,
         phoneNumber: user.phoneNumber,
-        birthDateLabel: this.formatDate(user.birthDate),
+        birthDateLabel: this.formateDate(user.birthDate),
         // Le champ <input type="date"> n'accepte que le format AAAA-MM-JJ
         birthDateValue: user.birthDate ? user.birthDate.toISODate() : '',
         email: user.email,
-        createdAt: this.formatDate(user.createdAt),
+        createdAt: this.formateDate(user.createdAt),
       },
       stats: { privateChats, groups, messages },
     })
@@ -55,7 +55,7 @@ export default class ProfileController {
     const avatarTmpPath = payload.avatar?.tmpPath
     if (avatarTmpPath) {
       try {
-        newAvatarUrl = await uploadAvatar(avatarTmpPath)
+        newAvatarUrl = await envoiePhotoProfil(avatarTmpPath)
       } catch (error) {
         logger.error({ err: error }, "Échec de l'envoi de la photo vers Cloudinary")
         return this.rejectField(
@@ -78,13 +78,13 @@ export default class ProfileController {
       await user.save()
     } catch (error) {
       // La base a refusé : la nouvelle image ne sert à rien, on la supprime de Cloudinary
-      await deleteImageByUrl(newAvatarUrl)
+      await supprimeImageParLien(newAvatarUrl)
       throw error
     }
 
     // TOUt est enregistré, on peut supprimer l'ANCIENNE photo de Cloudinary
     if (newAvatarUrl) {
-      await deleteImageByUrl(oldAvatarUrl)
+      await supprimeImageParLien(oldAvatarUrl)
     }
     // Formulaire envoyé par le script : il affiche lui-même le message puis recharge la page
     // (un message flash ici s'afficherait une deuxième fois après le rechargement)
@@ -136,7 +136,7 @@ export default class ProfileController {
     return Number(result?.$extras.total ?? 0)
   }
 
-  private getInitials(fullName: string): string {
+  private donneInitiales(fullName: string): string {
     return fullName
       .split(' ')
       .filter(Boolean)
@@ -145,7 +145,7 @@ export default class ProfileController {
       .join('')
   }
 
-  private formatDate(date: DateTime | null | undefined): string {
+  private formateDate(date: DateTime | null | undefined): string {
     return date ? date.toFormat('dd/MM/yyyy') : 'Non renseignée'
   }
 

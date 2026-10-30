@@ -1,7 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import { chatWithUserValidator } from '#validators/user_list'
-import { blockUser, unblockUser } from '../service/block_service.ts'
+import { bloqueUtilisateur, debloqueUtilisateur } from '../service/block_service.ts'
 
 export default class BlocksController {
   /**
@@ -16,7 +16,7 @@ export default class BlocksController {
     }
 
     await User.findOrFail(id) // erreur 404 si cet utilisateur n'existe pas
-    await blockUser(me.id, id)
+    await bloqueUtilisateur(me.id, id)
 
     // Appel du JavaScript : on répond en JSON. Formulaire normal : on revient à la page.
     if (request.accepts(['html', 'json']) === 'json') {
@@ -33,7 +33,7 @@ export default class BlocksController {
     const me = auth.getUserOrFail()
     const { id } = await chatWithUserValidator.validate({ id: params.id })
 
-    await unblockUser(me.id, id)
+    await debloqueUtilisateur(me.id, id)
 
     if (request.accepts(['html', 'json']) === 'json') {
       return response.ok({ message: 'Utilisateur débloqué.' })

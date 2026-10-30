@@ -3,24 +3,24 @@ import User from '#models/user'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import { addMembersValidator, createGroupValidator } from '#validators/group'
-import { addMembersToGroup, createGroup } from '../service/group.ts'
-import { deleteConversationAndFiles } from '../service/deletion_service.ts'
+import { ajouteMembresAuGroupe, creeGroupe } from '../service/group.ts'
+import { supprimeConversationEtFichiers } from '../service/deletion_service.ts'
 import {
   ADMIN_ROLE,
   GROUP_TYPE,
-  buildMessageView,
-  buildPreview,
-  findGroupMembership,
-  formatDate,
-  getInitials,
-  getListTime,
-  getUnreadCounts,
+  construitVueMessage,
+  construitApercu,
+  chercheParticipationGroupe,
+  formateDate,
+  donneInitiales,
+  donneHeureDeLaListe,
+  donneNombreMessagesNonLus,
 } from '../service/chat_service.ts'
 import {
-  notifyConversationAdded,
-  notifyGroupUpdated,
-  markConversationAsReadAndNotify,
-  notifyConversationRemoved,
+  previensConversationAjoutee,
+  previensGroupeModifie,
+  marqueConversationCommeLueEtPrevient,
+  previensConversationSupprimee,
 } from '../service/realtime_service.ts'
 
 // Nombre maximum de messages chargés à l'ouverture d'un groupe
@@ -79,10 +79,10 @@ export default class GroupsController {
       })
     }
 
-    const group = await createGroup(user, name, otherIds)
+    const group = await creeGroupe(user, name, otherIds)
 
     // TEMPS RÉEL : les membres voient le nouveau groupe apparaître dans leur liste
-    await notifyConversationAdded({ conversation: group, userIds: otherIds, lastMessage: null })
+    await previensConversationAjoutee({ conversation: group, userIds: otherIds, lastMessage: null })
 
     // Le message s'affichera (toast) sur la page du groupe où le JavaScript redirige
     session.flash('success', `Le groupe « ${name} » a été créé.`)
@@ -97,7 +97,7 @@ export default class GroupsController {
     const conversationId = Number(params.id)
     const { member_ids: memberIds } = await request.validateUsing(addMembersValidator)
 
-    const membership = await findGroupMembership(user.id, conversationId)
+    const membership = await chercheParticipationGroupe(user.id, conversationId)
       .preload('role')
       .preload('conversation') // pour le nom du groupe
       .firstOrFail()
@@ -117,8 +117,8 @@ export default class GroupsController {
       })
     }
 
-    // addMembersToGroup renvoie maintenant la LISTE des identifiants réellement ajoutés
-    const addedIds = await addMembersToGroup(conversationId, memberIds)
+    // ajouteMembresAuGroupe renvoie maintenant la LISTE des identifiants réellement ajoutés
+    const addedIds = await ajouteMembresAuGroupe(conversationId, memberIds)
 
     if (addedIds.length === 0) {
       return response.unprocessableEntity({
@@ -134,7 +134,7 @@ export default class GroupsController {
       .orderBy('id', 'desc')
       .first()
 
-    await notifyConversationAdded({
+    await previensConversationAjoutee({
       conversation: membership.conversation,
       userIds: addedIds,
       lastMessage,
@@ -147,7 +147,7 @@ export default class GroupsController {
     const existingMemberIds = allMembers
       .map((row) => row.userId)
       .filter((id) => id !== user.id && !addedIds.includes(id))
-    notifyGroupUpdated(conversationId, existingMemberIds)
+    previensGroupeModifie(conversationId, existingMemberIds)
 
     const message =
       addedIds.length === 1
@@ -164,7 +164,7 @@ export default class GroupsController {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 
-    const membership = await findGroupMembership(user.id, conversationId)
+    const membership = await chercheParticipationGroupe(user.id, conversationId)
       .preload('role')
       .preload('conversation')
       .firstOrFail()
@@ -179,10 +179,10 @@ export default class GroupsController {
     const groupName = membership.conversation.title ?? 'Groupe sans nom'
 
     // Suppression du groupe, de ses messages et de ses fichiers
-    const memberIds = await deleteConversationAndFiles(conversationId)
+    const memberIds = await supprimeConversationEtFichiers(conversationId)
 
     // TEMPS RÉEL : les autres membres voient le groupe disparaître de leur liste
-    notifyConversationRemoved({
+    previensConversationSupprimee({
       userIds: memberIds.filter((memberId) => memberId !== user.id),
       conversationId,
       kind: 'group',
@@ -212,7 +212,7 @@ export default class GroupsController {
         messageQuery.preload('attachments') // pour afficher "Image" s'il n'y a que un fichier
       })
 
-    const unreadCounts = await getUnreadCounts(
+    const unreadCounts = await donneNombreMessagesNonLus(
       user.id,
       memberships.map((membership) => membership.conversationId)
     )
@@ -226,9 +226,9 @@ export default class GroupsController {
         view: {
           id: membership.conversationId,
           name,
-          initials: getInitials(name),
-          preview: lastMessage ? buildPreview(lastMessage, user.id, true) : 'Aucun message',
-          time: lastMessage ? getListTime(lastMessage.createdAt) : '',
+          initials: donneInitiales(name),
+          preview: lastMessage ? construitApercu(lastMessage, user.id, true) : 'Aucun message',
+          time: lastMessage ? donneHeureDeLaListe(lastMessage.createdAt) : '',
           unreadCount: unreadCounts.get(membership.conversationId) ?? 0,
         },
       }
@@ -247,7 +247,7 @@ export default class GroupsController {
     return users.map((person) => ({
       id: person.id,
       fullName: person.fullName,
-      initials: getInitials(person.fullName),
+      initials: donneInitiales(person.fullName),
       avatarUrl: person.avatarUrl,
       isOnline: person.isOnline,
     }))
@@ -258,7 +258,7 @@ export default class GroupsController {
    */
   private async getChat(user: User, conversationId: number) {
     // Seuls les membres du groupe peuvent l'ouvrir (sinon : erreur 404)
-    const membership = await findGroupMembership(user.id, conversationId)
+    const membership = await chercheParticipationGroupe(user.id, conversationId)
       .preload('role')
       .preload('conversation', (conversationQuery) => {
         conversationQuery.preload('creator')
@@ -279,7 +279,7 @@ export default class GroupsController {
       .map((row) => ({
         id: row.user.id,
         fullName: row.user.fullName,
-        initials: getInitials(row.user.fullName),
+        initials: donneInitiales(row.user.fullName),
         avatarUrl: row.user.avatarUrl,
         isOnline: row.user.isOnline,
         isAdmin: row.role.title === ADMIN_ROLE,
@@ -288,7 +288,7 @@ export default class GroupsController {
       .sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin) || a.fullName.localeCompare(b.fullName))
 
     // Ouvrir le groupe = lire ses messages
-    await markConversationAsReadAndNotify(user.id, conversationId)
+    await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
     const queriedMessages = await Message.query()
       .where('conversationId', conversationId)
@@ -309,15 +309,15 @@ export default class GroupsController {
       id: conversationId,
       group: {
         name: groupName,
-        initials: getInitials(groupName),
-        createdAt: formatDate(conversation.createdAt),
+        initials: donneInitiales(groupName),
+        createdAt: formateDate(conversation.createdAt),
         creatorName: conversation.creator?.fullName ?? 'Utilisateur supprimé',
         membersCount: members.length,
         isAdmin,
       },
       members,
       candidates,
-      messages: messages.map((message) => buildMessageView(message, user.id, true)),
+      messages: messages.map((message) => construitVueMessage(message, user.id, true)),
     }
   }
 }

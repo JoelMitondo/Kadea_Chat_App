@@ -1,9 +1,9 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import BlockedUser from '#models/blocked_user'
-import { getInitials } from '../service/chat_service.ts'
+import { donneInitiales } from '../service/chat_service.ts'
 import User from '#models/user'
 import { deleteAccountValidator } from '#validators/account'
-import { deleteUserAccount } from '../service/deletion_service.ts'
+import { supprimeCompteUtilisateur } from '../service/deletion_service.ts'
 
 export default class SettingsController {
   /**
@@ -21,7 +21,7 @@ export default class SettingsController {
     const blockedUsers = blockedRows.map((row) => ({
       id: row.blocked.id,
       fullName: row.blocked.fullName,
-      initials: getInitials(row.blocked.fullName),
+      initials: donneInitiales(row.blocked.fullName),
       avatarUrl: row.blocked.avatarUrl,
     }))
 
@@ -61,7 +61,7 @@ export default class SettingsController {
     }
 
     // ÉTAPE 2 : suppression du compte et de ses données
-    await deleteUserAccount(user)
+    await supprimeCompteUtilisateur(user)
 
     // ÉTAPE 3 : déconnexion (le compte n'existe plus)
     await auth.use('web').logout()

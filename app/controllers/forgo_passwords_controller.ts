@@ -2,7 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import ForgoPassword from '#models/forgo_password'
 import { forgoPassewordValidator, newPassewordValidator } from '#validators/forgo_password'
-import { generateUniqueCode } from './../service/code_generation.ts'
+import { genereCodeUnique } from './../service/code_generation.ts'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import mail from '@adonisjs/mail/services/main'
@@ -19,7 +19,7 @@ export default class ForgoPasswordsController {
     const user = await User.findBy('email', email)
 
     if (user) {
-      const codeAleatoire = await generateUniqueCode(ForgoPassword)
+      const codeAleatoire = await genereCodeUnique(ForgoPassword)
       const identite = await ForgoPassword.updateOrCreate(
         { email: user.email },
         {
