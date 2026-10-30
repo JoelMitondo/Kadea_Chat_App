@@ -7,7 +7,7 @@ export default class BlocksController {
   /**
    * Bloquer un utilisateur
    */
-  async store({ auth, params, request, response, session }: HttpContext) {
+  async bloque({ auth, params, request, response, session }: HttpContext) {
     const me = auth.getUserOrFail()
     const { id } = await chatWithUserValidator.validate({ id: params.id })
 
@@ -29,7 +29,7 @@ export default class BlocksController {
   /**
    * Débloquer un utilisateur
    */
-  async destroy({ auth, params, request, response, session }: HttpContext) {
+  async debloque({ auth, params, request, response, session }: HttpContext) {
     const me = auth.getUserOrFail()
     const { id } = await chatWithUserValidator.validate({ id: params.id })
 

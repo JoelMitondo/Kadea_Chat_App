@@ -30,27 +30,27 @@ export default class MessagesController {
   /**
    * Envoie un message dans une conversation PRIVÉE
    */
-  async store(ctx: HttpContext) {
+  async enregistreMessagePrive(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
     const membership = await chercheParticipationPrivee(user.id, Number(ctx.params.id)).firstOrFail()
-    return this.sendMessage(ctx, membership, 'private')
+    return this.envoieMessage(ctx, membership, 'private')
   }
 
   /**
    * Envoie un message dans un GROUPE (tous les membres peuvent écrire)
    */
-  async storeInGroup(ctx: HttpContext) {
+  async enregistreMessageGroupe(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
     const membership = await chercheParticipationGroupe(user.id, Number(ctx.params.id))
       .preload('conversation') // pour connaître le nom du groupe
       .firstOrFail()
-    return this.sendMessage(ctx, membership, 'group')
+    return this.envoieMessage(ctx, membership, 'group')
   }
 
   /**
    * Modifie un message (uniquement par son auteur)
    */
-  async update({ auth, params, request, response, view }: HttpContext) {
+  async modifieMessage({ auth, params, request, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const { content } = await request.validateUsing(updateMessageValidator)
     const message = await Message.findOrFail(params.id)
@@ -70,10 +70,10 @@ export default class MessagesController {
       statusQuery.whereNot('userId', user.id)
     })
 
-    const data = await this.buildMessageResponse(message, user.id, view)
+    const data = await this.construitReponseMessage(message, user.id, view)
 
     // TEMPS RÉEL : les autres participants voient la modification tout de suite
-    await this.notifyOthers(message, user, data.isLast)
+    await this.previensAutresParticipants(message, user, data.isLast)
 
     return response.ok(data)
   }
@@ -81,7 +81,7 @@ export default class MessagesController {
   /**
    * Supprime un message (uniquement par son auteur) : suppression "douce"
    */
-  async destroy({ auth, params, response, view }: HttpContext) {
+  async supprimeMessage({ auth, params, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const message = await Message.findOrFail(params.id)
 
@@ -98,10 +98,10 @@ export default class MessagesController {
       await supprimeFichierParLien(file.filePath)
     }
     await MessageAttachment.query().where('messageId', message.id).delete()
-    const data = await this.buildMessageResponse(message, user.id, view)
+    const data = await this.construitReponseMessage(message, user.id, view)
 
     // TEMPS RÉEL : le message devient "Ce message a été supprimé" chez les autres
-    await this.notifyOthers(message, user, data.isLast)
+    await this.previensAutresParticipants(message, user, data.isLast)
 
     return response.ok(data)
   }
@@ -114,7 +114,7 @@ export default class MessagesController {
   /**
    * Enregistre un nouveau message (conversation privée OU groupe), avec ou sans fichier
    */
-  private async sendMessage(
+  private async envoieMessage(
     ctx: HttpContext,
     membership: UserConversation,
     kind: ConversationKind
@@ -240,7 +240,7 @@ export default class MessagesController {
 
     // Réponse à celui qui vient d'écrire
     const showSeparator = besoinSeparateurDeJour(previousMessage, message, membership)
-    const data = await this.buildMessageResponse(message, user.id, view, showSeparator)
+    const data = await this.construitReponseMessage(message, user.id, view, showSeparator)
 
     // TEMPS RÉEL : les autres participants reçoivent le message tout de suite
     await message.load('user')
@@ -259,7 +259,7 @@ export default class MessagesController {
   /**
    * Prévient les autres participants qu'un message a été modifié ou supprimé
    */
-  private async notifyOthers(message: Message, sender: User, isLast: boolean) {
+  private async previensAutresParticipants(message: Message, sender: User, isLast: boolean) {
     // Est-ce une conversation privée ou un groupe ?
     const conversation = await Conversation.query()
       .where('id', message.conversationId)
@@ -279,7 +279,7 @@ export default class MessagesController {
   /**
    * Réponse JSON commune : la bulle déjà fabriquée en HTML + de quoi mettre la liste à jour
    */
-  private async buildMessageResponse(
+  private async construitReponseMessage(
     message: Message,
     userId: User['id'],
     view: HttpContext['view'],

@@ -22,9 +22,9 @@ export default class ConversationsController {
   /**
    * Page de messagerie, sans conversation ouverte
    */
-  async index({ auth, view }: HttpContext) {
+  async donnePageMessages({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
-    const conversations = await this.getConversationList(user)
+    const conversations = await this.donneListeConversations(user)
 
     return view.render('pages/message', { conversations, chat: null })
   }
@@ -34,16 +34,16 @@ export default class ConversationsController {
    * - Appel depuis le JavaScript de la page : on renvoie seulement le panneau de discussion.
    * - Ouverture directe de l'adresse (rechargement, lien) : on renvoie la page complète.
    */
-  async show({ auth, params, request, view }: HttpContext) {
+  async donneConversation({ auth, params, request, view }: HttpContext) {
     const user = auth.getUserOrFail()
-    const chat = await this.getChat(user, Number(params.id))
+    const chat = await this.donneDiscussion(user, Number(params.id))
 
     if (request.header('x-requested-with') === 'XMLHttpRequest') {
       return view.render('partials/chat-panel', { chat })
     }
 
-    // La liste est chargée APRÈS getChat() : les messages sont déjà passés en "lu"
-    const conversations = await this.getConversationList(user, chat.id)
+    // La liste est chargée APRÈS donneDiscussion() : les messages sont déjà passés en "lu"
+    const conversations = await this.donneListeConversations(user, chat.id)
     return view.render('pages/message', { conversations, chat })
   }
 
@@ -51,7 +51,7 @@ export default class ConversationsController {
    * Supprime la conversation DE LA LISTE de l'utilisateur (l'autre personne la garde).
    * On renseigne removed_at : les anciens messages ne sont plus affichés.
    */
-  async destroy({ auth, params, response }: HttpContext) {
+  async supprimeConversation({ auth, params, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 
@@ -68,7 +68,7 @@ export default class ConversationsController {
 
   // Liste des conversations privées de l'utilisateur, la plus récente en premier
 
-  private async getConversationList(user: User, openConversationId: number | null = null) {
+  private async donneListeConversations(user: User, openConversationId: number | null = null) {
     const memberships = await UserConversation.query()
       .where('userId', user.id)
       .whereHas('conversation', (conversationQuery) => {
@@ -133,7 +133,7 @@ export default class ConversationsController {
   /**
    * Prépare toutes les données d'une conversation ouverte
    */
-  private async getChat(user: User, conversationId: number) {
+  private async donneDiscussion(user: User, conversationId: number) {
     const membership = await chercheParticipationPrivee(user.id, conversationId)
       .preload('conversation', (conversationQuery) => {
         conversationQuery.preload('users', (usersQuery) => {

@@ -12,7 +12,7 @@ export default class UsersController {
    * - Appel du JavaScript (recherche en direct) : on renvoie seulement la liste.
    * - Ouverture normale de la page : on renvoie la page complète.
    */
-  async index({ auth, request, view }: HttpContext) {
+  async donnePageUtilisateurs({ auth, request, view }: HttpContext) {
     const currentUser = auth.getUserOrFail()
     const { q, page } = await request.validateUsing(searchUsersValidator)
     const search = q ?? ''
@@ -61,7 +61,7 @@ export default class UsersController {
   /**
    * Bouton "Discuter" : ouvre la conversation privée existante, ou la crée, puis redirige
    */
-  async chat({ auth, params, response, session }: HttpContext) {
+  async ouvreDiscussion({ auth, params, response, session }: HttpContext) {
     const currentUser = auth.getUserOrFail()
     const { id } = await chatWithUserValidator.validate({ id: params.id })
 

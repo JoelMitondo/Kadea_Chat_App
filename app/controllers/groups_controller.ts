@@ -30,10 +30,10 @@ export default class GroupsController {
   /**
    * Page Groupes, sans groupe ouvert
    */
-  async index({ auth, view }: HttpContext) {
+  async donnePageGroupes({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
-    const groups = await this.getGroupList(user)
-    const candidates = await this.getCandidates([user.id]) // pour la popup de création
+    const groups = await this.donneListeGroupes(user)
+    const candidates = await this.donneCandidats([user.id]) // pour la popup de création
 
     return view.render('pages/groups', { groups, chat: null, candidates })
   }
@@ -42,23 +42,23 @@ export default class GroupsController {
    * Ouvre un groupe (même principe que les conversations privées :
    * panneau seul pour le JavaScript, page complète sinon)
    */
-  async show({ auth, params, request, view }: HttpContext) {
+  async donneGroupe({ auth, params, request, view }: HttpContext) {
     const user = auth.getUserOrFail()
-    const chat = await this.getChat(user, Number(params.id))
+    const chat = await this.donneDiscussion(user, Number(params.id))
 
     if (request.header('x-requested-with') === 'XMLHttpRequest') {
       return view.render('partials/group-panel', { chat })
     }
 
-    const groups = await this.getGroupList(user)
-    const candidates = await this.getCandidates([user.id])
+    const groups = await this.donneListeGroupes(user)
+    const candidates = await this.donneCandidats([user.id])
     return view.render('pages/groups', { groups, chat, candidates })
   }
 
   /**
    * Crée un groupe
    */
-  async store({ auth, request, response, session }: HttpContext) {
+  async enregistreGroupe({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const { name, member_ids: memberIds } = await request.validateUsing(createGroupValidator)
 
@@ -92,7 +92,7 @@ export default class GroupsController {
   /**
    * Ajoute des membres à un groupe (réservé à l'administrateur)
    */
-  async addMembers({ auth, params, request, response, session }: HttpContext) {
+  async ajouteMembres({ auth, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
     const { member_ids: memberIds } = await request.validateUsing(addMembersValidator)
@@ -160,7 +160,7 @@ export default class GroupsController {
   /**
    * Supprime un groupe, pour TOUS ses membres (réservé à l'administrateur)
    */
-  async destroy({ auth, params, response, session }: HttpContext) {
+  async supprimeGroupe({ auth, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 
@@ -198,7 +198,7 @@ export default class GroupsController {
   /**
    * Liste des groupes de l'utilisateur, le plus récent en premier
    */
-  private async getGroupList(user: User) {
+  private async donneListeGroupes(user: User) {
     const memberships = await UserConversation.query()
       .where('userId', user.id)
       .whereHas('conversation', (conversationQuery) => {
@@ -241,7 +241,7 @@ export default class GroupsController {
   /**
    * Utilisateurs qu'on peut ajouter (tous, sauf ceux de la liste d'exclusion)
    */
-  private async getCandidates(excludedIds: User['id'][]) {
+  private async donneCandidats(excludedIds: User['id'][]) {
     const users = await User.query().whereNotIn('id', excludedIds).orderBy('fullName', 'asc')
 
     return users.map((person) => ({
@@ -256,7 +256,7 @@ export default class GroupsController {
   /**
    * Prépare toutes les données d'un groupe ouvert
    */
-  private async getChat(user: User, conversationId: number) {
+  private async donneDiscussion(user: User, conversationId: number) {
     // Seuls les membres du groupe peuvent l'ouvrir (sinon : erreur 404)
     const membership = await chercheParticipationGroupe(user.id, conversationId)
       .preload('role')
@@ -303,7 +303,7 @@ export default class GroupsController {
     const messages = queriedMessages.reverse()
 
     // Seul l'administrateur peut ajouter des membres : lui seul a besoin de la liste
-    const candidates = isAdmin ? await this.getCandidates(members.map((member) => member.id)) : []
+    const candidates = isAdmin ? await this.donneCandidats(members.map((member) => member.id)) : []
 
     return {
       id: conversationId,

@@ -12,12 +12,12 @@ const TYPE_GROUP = 'Publique'
 
 export default class ProfileController {
   // Affichage de la page profil
-  async show({ auth, view }: HttpContext) {
+  async donneProfil({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
 
-    const privateChats = await this.countConversations(user.id, TYPE_PRIVATE)
-    const groups = await this.countConversations(user.id, TYPE_GROUP)
-    const messages = await this.countMessages(user.id)
+    const privateChats = await this.compteConversations(user.id, TYPE_PRIVATE)
+    const groups = await this.compteConversations(user.id, TYPE_GROUP)
+    const messages = await this.compteMessages(user.id)
 
     return view.render('pages/profile', {
       profile: {
@@ -37,14 +37,14 @@ export default class ProfileController {
   }
 
   // Enregistre les modifications faites dans la modale (y compris la nouvelle photo)
-  async update(ctx: HttpContext) {
+  async modifieProfil(ctx: HttpContext) {
     const { auth, request, response, session, logger } = ctx
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(updateProfileValidator)
 
     // 18 ans minimum
-    if (!this.isAdult(payload.birth_date)) {
-      return this.rejectField(ctx, 'birth_date', 'Vous devez avoir au moins 18 ans.')
+    if (!this.estMajeur(payload.birth_date)) {
+      return this.refuseChamp(ctx, 'birth_date', 'Vous devez avoir au moins 18 ans.')
     }
 
     const oldAvatarUrl = user.avatarUrl
@@ -58,7 +58,7 @@ export default class ProfileController {
         newAvatarUrl = await envoiePhotoProfil(avatarTmpPath)
       } catch (error) {
         logger.error({ err: error }, "Échec de l'envoi de la photo vers Cloudinary")
-        return this.rejectField(
+        return this.refuseChamp(
           ctx,
           'avatar',
           "Impossible d'envoyer la photo pour le moment. Réessayez dans un instant."
@@ -98,7 +98,7 @@ export default class ProfileController {
   // Renvoie une erreur sur un champ précis (JSON pour le formulaire AJAX, message flash sinon).
   // Avant, une redirection était renvoyée même au script : il la suivait, recevait un code 200
   // et affichait "Votre profil a été mis à jour" alors que rien n'avait été enregistré.
-  private rejectField(ctx: HttpContext, field: string, message: string) {
+  private refuseChamp(ctx: HttpContext, field: string, message: string) {
     if (ctx.request.accepts(['html', 'json']) === 'json') {
       return ctx.response.unprocessableEntity({ errors: [{ field, message }] })
     }
@@ -107,7 +107,7 @@ export default class ProfileController {
   }
 
   //Nombre de conversations de l'utilisateur pour un type donné
-  private async countConversations(userId: User['id'], typeName: string): Promise<number> {
+  private async compteConversations(userId: User['id'], typeName: string): Promise<number> {
     const result = await UserConversation.query()
       .where('userId', userId)
       .whereHas('conversation', (conversationQuery) => {
@@ -122,7 +122,7 @@ export default class ProfileController {
   }
 
   // Messages envoyés et reçus : tous les messages des conversations de l'utilisateur
-  private async countMessages(userId: User['id']): Promise<number> {
+  private async compteMessages(userId: User['id']): Promise<number> {
     const myConversations = UserConversation.query()
       .select('conversation_id')
       .where('user_id', userId)
@@ -149,7 +149,7 @@ export default class ProfileController {
     return date ? date.toFormat('dd/MM/yyyy') : 'Non renseignée'
   }
 
-  private isAdult(birthDate: DateTime): boolean {
+  private estMajeur(birthDate: DateTime): boolean {
     return birthDate <= DateTime.now().minus({ years: 18 })
   }
 }

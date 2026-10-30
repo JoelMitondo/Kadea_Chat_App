@@ -8,15 +8,15 @@ import hash from '@adonisjs/core/services/hash'
 import { APP_TIMEZONE } from '../service/chat_service.ts'
 
 export default class InscriptionsController {
-  async show({ view }: HttpContext) {
+  async donnePageInscription({ view }: HttpContext) {
     return view.render('pages/auth/register')
   }
-  async store({ request, response, session }: HttpContext) {
+  async enregistreInscription({ request, response, session }: HttpContext) {
     const payload = await request.validateUsing(inscriptionValidator)
 
     // Vérification de la majorité (avant tout le reste : inutile de générer un code pour rien)
     // Format { errors: [{ field, message }] } : le formulaire affiche l'erreur sous le bon champ
-    if (!this.isMajeur(payload.birth_date)) {
+    if (!this.estMajeur(payload.birth_date)) {
       return response.unprocessableEntity({
         errors: [
           { field: 'birth_date', message: 'Vous devez avoir au moins 18 ans pour vous inscrire' },
@@ -103,7 +103,7 @@ export default class InscriptionsController {
     }
   }
 
-  private isMajeur(dateNaissance: DateTime): boolean {
+  private estMajeur(dateNaissance: DateTime): boolean {
     // Récupère la date et l'heure actuelles du serveur backend
     const now = DateTime.now()
 

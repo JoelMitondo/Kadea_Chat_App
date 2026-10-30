@@ -9,7 +9,7 @@ export default class SettingsController {
   /**
    * Page Paramètres : mot de passe + liste des utilisateurs bloqués
    */
-  async index({ auth, view }: HttpContext) {
+  async donnePageParametres({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
 
     // Les personnes que j'ai bloquées, avec leurs informations
@@ -33,7 +33,7 @@ export default class SettingsController {
    * on le déconnecte et on l'envoie sur la page "Mot de passe oublié",
    * qui fait tout le reste (envoi du lien par e-mail, nouveau mot de passe).
    */
-  async startPasswordChange({ auth, response, session }: HttpContext) {
+  async demarreChangementMotDePasse({ auth, response, session }: HttpContext) {
     await auth.use('web').logout()
 
     session.flash(
@@ -47,7 +47,7 @@ export default class SettingsController {
   /**
    * Supprime définitivement le compte de l'utilisateur connecté
    */
-  async deleteAccount({ auth, request, response }: HttpContext) {
+  async supprimeCompte({ auth, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const { password } = await request.validateUsing(deleteAccountValidator)
 

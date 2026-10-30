@@ -9,7 +9,7 @@ export default class RealtimeController {
    * Nombre de messages non lus, pour les pastilles de la barre de navigation
    * Réponse : { private: 3, group: 1 }
    */
-  async unreadCounts({ auth, response }: HttpContext) {
+  async donneCompteursNonLus({ auth, response }: HttpContext) {
     const user = auth.getUserOrFail()
 
     const rows = await db
@@ -40,7 +40,7 @@ export default class RealtimeController {
    * Appelé par le navigateur quand un message arrive dans la conversation que l'utilisateur
    * est en train de regarder : il est lu immédiatement, l'expéditeur voit les coches bleues.
    */
-  async markRead({ auth, params, response }: HttpContext) {
+  async marqueCommeLu({ auth, params, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 

@@ -8,9 +8,9 @@ import { ERROR_PAGES, affichePageErreur } from '../service/error_page.ts'
 
 export default class NewAccountController {
   //function pour envoyer les information d'une invitation lors de l'enregistrement de l'utilisateur
-  async create(ctx: HttpContext) {
+  async donnePageCreationCompte(ctx: HttpContext) {
     const { view, params } = ctx
-    const result = await this.findInscription(params.id, params.code)
+    const result = await this.chercheInscription(params.id, params.code)
 
     // Lien invalide ou expiré : page d'erreur du site qui explique quoi faire
     if (result.error) {
@@ -29,11 +29,11 @@ export default class NewAccountController {
     })
   }
 
-  async store(ctx: HttpContext) {
+  async enregistreCompte(ctx: HttpContext) {
     const { request, response, auth, params } = ctx
     const payload = await request.validateUsing(confirmationCompteValidator)
 
-    const result = await this.findInscription(params.id, params.code)
+    const result = await this.chercheInscription(params.id, params.code)
     if (result.error) {
       return affichePageErreur(ctx, ERROR_PAGES[result.error])
     }
@@ -69,7 +69,7 @@ export default class NewAccountController {
    * Retrouve la demande d'inscription du lien reçu par e-mail.
    * Renvoie soit l'inscription, soit le type d'erreur à afficher.
    */
-  private async findInscription(
+  private async chercheInscription(
     id: string,
     code: string
   ): Promise<

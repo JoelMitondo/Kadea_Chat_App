@@ -9,7 +9,7 @@ import { GROUP_TYPE, protegeCaracteresRecherche, formateHeure, donneLibelleDuJou
 const RESULTS_LIMIT = 50
 
 export default class SearchController {
-  async index({ auth, request, view }: HttpContext) {
+  async donnePageRecherche({ auth, request, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const { q } = await request.validateUsing(searchMessagesValidator)
     const search = q ?? ''
@@ -68,7 +68,7 @@ export default class SearchController {
     const results = rows.map((row) => {
       const isGroup = row.type === GROUP_TYPE
       const date = DateTime.fromJSDate(row.created_at)
-      const parts = this.cutAroundMatch(row.content as string, search)
+      const parts = this.decoupeAutourDuMot(row.content as string, search)
 
       return {
         isGroup,
@@ -92,7 +92,7 @@ export default class SearchController {
    * Découpe le message en 3 morceaux autour du mot trouvé,
    * pour pouvoir surligner le mot : "...avant" + "MOT" + "après..."
    */
-  private cutAroundMatch(content: string, search: string) {
+  private decoupeAutourDuMot(content: string, search: string) {
     const index = content.toLowerCase().indexOf(search.toLowerCase())
 
     // Par sécurité (ne devrait pas arriver) : on renvoie le début du message
