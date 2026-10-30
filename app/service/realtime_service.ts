@@ -44,7 +44,10 @@ export function donneCanalUtilisateur(userId: string): string {
 // Envoie un événement au navigateur d'UN utilisateur.
 // Un problème de temps réel ne doit JAMAIS faire échouer l'action de l'utilisateur
 // (par exemple l'envoi d'un message) : on note l'erreur dans les logs et on continue.
-function envoieAUtilisateur(userId: string, event: NonNullable<Parameters<typeof transmit.broadcast>[1]>) {
+function envoieAUtilisateur(
+  userId: string,
+  event: NonNullable<Parameters<typeof transmit.broadcast>[1]>
+) {
   try {
     transmit.broadcast(donneCanalUtilisateur(userId), event)
   } catch (error) {

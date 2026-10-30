@@ -3,7 +3,12 @@ import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import UserConversation from '#models/user_conversation'
 import { searchMessagesValidator } from '#validators/search'
-import { GROUP_TYPE, protegeCaracteresRecherche, formateHeure, donneLibelleDuJour } from '../service/chat_service.ts'
+import {
+  GROUP_TYPE,
+  protegeCaracteresRecherche,
+  formateHeure,
+  donneLibelleDuJour,
+} from '../service/chat_service.ts'
 
 // Nombre maximum de résultats affichés
 const RESULTS_LIMIT = 50

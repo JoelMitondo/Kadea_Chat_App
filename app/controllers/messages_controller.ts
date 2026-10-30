@@ -23,7 +23,11 @@ import {
   besoinSeparateurDeJour,
 } from '../service/chat_service.ts'
 import { aBloque } from '../service/block_service.ts'
-import { supprimeFichierParLien, envoieDocument, envoieImage } from '../service/cloudinary_service.ts'
+import {
+  supprimeFichierParLien,
+  envoieDocument,
+  envoieImage,
+} from '../service/cloudinary_service.ts'
 import {
   previensMessageModifie,
   previensNouveauMessage,
@@ -36,7 +40,10 @@ export default class MessagesController {
    */
   async enregistreMessagePrive(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
-    const membership = await chercheParticipationPrivee(user.id, Number(ctx.params.id)).firstOrFail()
+    const membership = await chercheParticipationPrivee(
+      user.id,
+      Number(ctx.params.id)
+    ).firstOrFail()
     return this.envoieMessage(ctx, membership, 'private')
   }
 

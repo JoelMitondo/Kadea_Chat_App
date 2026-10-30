@@ -153,7 +153,11 @@ export function construitApercu(
 }
 
 // Données simples envoyées à la vue pour une bulle de message
-export function construitVueMessage(message: Message, currentUserId: User['id'], showSender = false) {
+export function construitVueMessage(
+  message: Message,
+  currentUserId: User['id'],
+  showSender = false
+) {
   // "statuses" contient (si chargé) les statuts des autres personnes.
   // Le message est "lu" quand TOUS les autres l'ont lu (une seule personne en conversation privée).
   const file = message.attachments?.[0]

@@ -16,22 +16,32 @@ import transmit from '@adonisjs/transmit/services/main'
 router.get('/ping', [controllers.HealthChecks, 'verifieServeur']).as('health_checks.ping')
 router.on('/').render('pages/home').as('home')
 
-router.post('/register', [controllers.Inscriptions, 'enregistreInscription']).as('inscriptions.store')
+router
+  .post('/register', [controllers.Inscriptions, 'enregistreInscription'])
+  .as('inscriptions.store')
 router.get('register', [controllers.Inscriptions, 'donnePageInscription']).as('New_compte.register')
 
 router
   .group(() => {
-    router.get('signup/:id/:code', [controllers.NewAccount, 'donnePageCreationCompte']).as('new_account.create')
-    router.post('signup/:id/:code', [controllers.NewAccount, 'enregistreCompte']).as('new_account.store')
+    router
+      .get('signup/:id/:code', [controllers.NewAccount, 'donnePageCreationCompte'])
+      .as('new_account.create')
+    router
+      .post('signup/:id/:code', [controllers.NewAccount, 'enregistreCompte'])
+      .as('new_account.store')
 
     router.get('login', [controllers.Session, 'donnePageConnexion']).as('session.create')
     router.post('login', [controllers.Session, 'connecte']).as('session.store')
 
-    router.get('forgoPassword', [controllers.ForgoPasswords, 'donnePageMotDePasseOublie']).as('forgotPassword.get')
+    router
+      .get('forgoPassword', [controllers.ForgoPasswords, 'donnePageMotDePasseOublie'])
+      .as('forgotPassword.get')
     router
       .post('forgoPassword', [controllers.ForgoPasswords, 'enregistreDemandeReinitialisation'])
       .as('forgoPassword.post')
-    router.get('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'donnePageNouveauMotDePasse']).as('forgo_passwords.index_page_new_password')
+    router
+      .get('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'donnePageNouveauMotDePasse'])
+      .as('forgo_passwords.index_page_new_password')
     router
       .post('forgoPassword/:id/:code', [controllers.ForgoPasswords, 'enregistreNouveauMotDePasse'])
       .as('forgot_password.reset')
@@ -50,12 +60,16 @@ router
     router.post('/profile', [controllers.Profile, 'modifieProfil']).as('profile.update')
 
     router.get('/messages', [controllers.Conversations, 'donnePageMessages']).as('messages')
-    router.get('/conversations/:id', [controllers.Conversations, 'donneConversation']).as('conversations.show')
+    router
+      .get('/conversations/:id', [controllers.Conversations, 'donneConversation'])
+      .as('conversations.show')
     router
       .delete('/conversations/:id', [controllers.Conversations, 'supprimeConversation'])
       .as('conversations.destroy')
 
-    router.post('/conversations/:id/messages', [controllers.Messages, 'enregistreMessagePrive']).as('messages.store')
+    router
+      .post('/conversations/:id/messages', [controllers.Messages, 'enregistreMessagePrive'])
+      .as('messages.store')
     router.put('/messages/:id', [controllers.Messages, 'modifieMessage']).as('messages.update')
     router.delete('/messages/:id', [controllers.Messages, 'supprimeMessage']).as('messages.destroy')
 
@@ -76,8 +90,12 @@ router
       .post('/groups/:id/messages', [controllers.Messages, 'enregistreMessageGroupe'])
       .as('groups.messages.store')
 
-    router.get('/unread-counts', [controllers.Realtime, 'donneCompteursNonLus']).as('realtime.unread')
-    router.post('/conversations/:id/read', [controllers.Realtime, 'marqueCommeLu']).as('realtime.read')
+    router
+      .get('/unread-counts', [controllers.Realtime, 'donneCompteursNonLus'])
+      .as('realtime.unread')
+    router
+      .post('/conversations/:id/read', [controllers.Realtime, 'marqueCommeLu'])
+      .as('realtime.read')
 
     router.get('/settings', [controllers.Settings, 'donnePageParametres']).as('settings')
     router
