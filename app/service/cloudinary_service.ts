@@ -133,7 +133,6 @@ function extractPublicId(
   return { publicId: decodeURIComponent(publicId), resourceType }
 }
 
-
 // ---------- Versions d'une même image ----------
 // Dans un lien Cloudinary, ce qui suit "/upload/" décrit une transformation à appliquer.
 // En insérant un texte à cet endroit, Cloudinary fabrique et sert une autre version de la MÊME

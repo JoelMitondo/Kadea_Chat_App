@@ -21,7 +21,6 @@ transmit.authorize(PRESENCE_CHANNEL, (ctx) => {
   return ctx.auth.user !== undefined
 })
 
-
 // ===== 2. SUIVI DES UTILISATEURS EN LIGNE =====
 // Un utilisateur est "en ligne" tant qu'au moins une de ses pages est ouverte
 // (donc tant qu'il a au moins une connexion Transmit ouverte).
