@@ -17,6 +17,5 @@ export const controllers = {
   Search: () => import('#controllers/search_controller'),
   Session: () => import('#controllers/session_controller'),
   Settings: () => import('#controllers/settings_controller'),
-  Stories: () => import('#controllers/stories_controller'),
   Users: () => import('#controllers/users_controller'),
 }

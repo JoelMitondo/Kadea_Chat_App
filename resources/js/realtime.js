@@ -66,10 +66,6 @@ async function demarrer() {
   await canalPresence.create()
   canalPresence.onMessage(traiterEvenement)
 
-  // Le canal des stories
-  let canalStories = transmit.subscription('stories')
-  await canalStories.create()
-  canalStories.onMessage(traiterEvenement)
 }
 
 demarrer()
@@ -100,14 +96,6 @@ function traiterEvenement(donnees) {
     kcNotifier.info('Vous avez été ajouté au groupe « ' + donnees.conversationName + ' ».')
   }
 
-    if (donnees.type === 'story:new') {
-    // Sur la page Stories, stories.js met la liste à jour tout seul.
-    // Ailleurs, on prévient simplement (sauf pour sa propre story).
-    let surPageStories = document.getElementById('stories-page') !== null
-    if (!surPageStories && donnees.userId !== idUtilisateur) {
-      kcNotifier.info(donnees.authorName + ' a ajouté une story.')
-    }
-  }
     if (donnees.type === 'conversation:removed') {
     // Une conversation ou un groupe vient d'être supprimé : on explique pourquoi
     kcNotifier.info(donnees.message)

@@ -175,16 +175,8 @@
             </svg>
           @end
 
-          {{-- Stories --}}
-          @component('components/nav-item', { href: '/stories', label: 'Stories', active: $props.get('active') === 'stories', delay: 400 })
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="9" stroke-dasharray="4 3" />
-              <circle cx="12" cy="12" r="4" />
-            </svg>
-          @end
-
           {{-- Mon profil (poussé en bas de la barre sur ordinateur grâce à md:mt-auto) --}}
-          @component('components/nav-item', { href: '/profile', label: 'Mon profil', active: $props.get('active') === 'profile', delay: 500, class: 'md:mt-auto' })
+          @component('components/nav-item', { href: '/profile', label: 'Mon profil', active: $props.get('active') === 'profile', delay: 400, class: 'md:mt-auto' })
             <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />

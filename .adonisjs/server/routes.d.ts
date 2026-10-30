@@ -36,8 +36,6 @@ export type ScannedRoutes = {
     'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
     'realtime.read': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'stories': { paramsTuple?: []; params?: {} }
-    'stories.store': { paramsTuple?: []; params?: {} }
     'settings': { paramsTuple?: []; params?: {} }
     'settings.password': { paramsTuple?: []; params?: {} }
     'users.block': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -62,7 +60,6 @@ export type ScannedRoutes = {
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
-    'stories': { paramsTuple?: []; params?: {} }
     'settings': { paramsTuple?: []; params?: {} }
     'search': { paramsTuple?: []; params?: {} }
     'event_stream': { paramsTuple?: []; params?: {} }
@@ -82,7 +79,6 @@ export type ScannedRoutes = {
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
-    'stories': { paramsTuple?: []; params?: {} }
     'settings': { paramsTuple?: []; params?: {} }
     'search': { paramsTuple?: []; params?: {} }
     'event_stream': { paramsTuple?: []; params?: {} }
@@ -102,7 +98,6 @@ export type ScannedRoutes = {
     'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.read': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'stories.store': { paramsTuple?: []; params?: {} }
     'settings.password': { paramsTuple?: []; params?: {} }
     'users.block': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users.unblock': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }

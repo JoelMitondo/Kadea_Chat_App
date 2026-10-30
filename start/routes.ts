@@ -70,9 +70,6 @@ router
     router.get('/unread-counts', [controllers.Realtime, 'unreadCounts']).as('realtime.unread')
     router.post('/conversations/:id/read', [controllers.Realtime, 'markRead']).as('realtime.read')
 
-    router.get('/stories', [controllers.Stories, 'index']).as('stories')
-    router.post('/stories', [controllers.Stories, 'store']).as('stories.store')
-
     router.get('/settings', [controllers.Settings, 'index']).as('settings')
     router
       .post('/settings/password', [controllers.Settings, 'startPasswordChange'])
