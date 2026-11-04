@@ -50,7 +50,7 @@ Projet de fin de formation · Kadea Academy
 | Présentation (Canva) | [`https://www.canva.com`](https://canva.link/6sky2nlgir7lk05) |
 | Maquettes (Figma) | [`https://www.figma.com`](https://www.figma.com/design/hTThi75OAXNNjJtiz2gVSU/Kadea-Chat-Final?node-id=0-1&t=vpy0dWdvBXb6JpBq-1) |
 | Modélisation (MCD / MLD / MPD) | [`docs/modelisation`](docs/modelisation) ou [`lien externe`](https://VOTRE-LIEN) |
-| Architecture C4 | [`docs/c4`](docs/c4) ou [`lien externe`](https://VOTRE-LIEN) |
+| Architecture C4 (Structurizr) | [`docs/c4/workspace.dsl`](docs/c4/workspace.dsl) ou [`voir les diagrammes en ligne`](https://playground.structurizr.com/?src=https://raw.githubusercontent.com/JoelMitondo/Kadea_Chat_App/main/docs/c4/workspace.dsl) |
 | Cahier des charges | [`docs/cahier-des-charges.pdf`](docs/cahier-des-charges.pdf) |
 | Vidéo de démonstration | [`https://VOTRE-LIEN`](https://VOTRE-LIEN) |
 
@@ -136,7 +136,17 @@ flowchart LR
 | Vues | `resources/views/` | Affichage (layouts, composants, partiels) |
 | Scripts | `resources/js/` | Comportements côté navigateur |
 
-> Les diagrammes détaillés (contexte, conteneurs, composants) se trouvent dans [`docs/c4`](docs/c4).
+### Modèle C4
+
+L'architecture est décrite avec le [modèle C4](https://c4model.com) et l'outil [Structurizr](https://structurizr.com). La source unique est [`docs/c4/workspace.dsl`](docs/c4/workspace.dsl). Elle produit trois vues :
+
+| Niveau | Vue | Ce qu'elle montre |
+|---|---|---|
+| 1 | Contexte | L'utilisateur, Kadea Chat et les services externes (Cloudinary, Brevo) |
+| 2 | Conteneurs | Navigateur, application AdonisJS, base PostgreSQL, et les protocoles (HTTPS, SSE, SQL) |
+| 3 | Composants | L'intérieur d'AdonisJS : controllers, auth, services, temps réel, modèles Lucid |
+
+**[Ouvrir les diagrammes C4 en ligne](https://playground.structurizr.com/?src=https://raw.githubusercontent.com/JoelMitondo/Kadea_Chat_App/main/docs/c4/workspace.dsl)** (choisir la vue dans la liste en bas du playground).
 
 ---
 
