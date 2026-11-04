@@ -1,7 +1,3 @@
-// STOCKAGE DES FICHIERS
-// Les images et documents ne sont pas gardés sur notre serveur : on les envoie à Cloudinary,
-// qui nous renvoie un lien. La base de données n'enregistre que ce lien.
-
 import { v2 as cloudinary, type UploadApiOptions } from 'cloudinary'
 import logger from '@adonisjs/core/services/logger'
 import env from '#start/env'
@@ -20,9 +16,7 @@ const ROOT_FOLDER = 'kadea-chat'
 
 export type ImageFolder = 'avatars' | 'groups' | 'messages'
 
-/**
-nous envoiyons l'image à cloudinary et lui nous renvoie l'image a enregistrer sur notre bdd
- */
+// Envoie une image vers Cloudinary et return d'un lien public
 export async function envoieImage(
   filePath: string,
   folder: ImageFolder,
@@ -38,21 +32,17 @@ export async function envoieImage(
   return result.secure_url
 }
 
-/**
- * Photo de profil : redimensionnée en carré 512 x 512 pour économiser l'espace de stockage
- */
+// Photo de profil : redimensionnée en carré 512 x 512 pour économiser l'espace de stockage
+
 export function envoiePhotoProfil(filePath: string): Promise<string> {
   return envoieImage(filePath, 'avatars', {
     transformation: [{ width: 512, height: 512, crop: 'fill', gravity: 'auto' }],
   })
 }
 
-/**
- * Supprime sur Cloudinary le fichier (image OU document) correspondant à un lien.
- * - Ne lance JAMAIS d'erreur : un échec de suppression ne doit pas bloquer l'utilisateur.
- * - Ne touche pas aux liens qui ne viennent pas de NOTRE Cloudinary.
- * Renvoie true si le fichier a bien été supprimé.
- */
+// Suppression sur Cloudinary le fichier (image ou document) correspondant à un lien.
+// Renvoie true si le fichier a bien été supprimé.
+
 export async function supprimeFichierParLien(fileUrl: string | null | undefined): Promise<boolean> {
   if (!fileUrl) {
     return false
@@ -81,14 +71,7 @@ export async function supprimeFichierParLien(fileUrl: string | null | undefined)
 // Ancien nom conservé : le reste de votre code (profil) continue de fonctionner
 export const supprimeImageParLien = supprimeFichierParLien
 
-/**
- * Retrouve le "public_id" Cloudinary à partir du lien enregistré.
- *
- * Image : https://res.cloudinary.com/mon-cloud/image/upload/v1712345678/kadea-chat/avatars/abc123.jpg
- *         → public id : kadea-chat/avatars/abc123            (sans l'extension)
- * Document : https://res.cloudinary.com/mon-cloud/raw/upload/v1712345678/kadea-chat/messages/abc123.pdf
- *         → public id : kadea-chat/messages/abc123.pdf       (AVEC l'extension)
- */
+// Extrait l'identifiant Cloudinary à partir du lien enregistré
 function extraitIdentifiantCloudinary(
   fileUrl: string
 ): { publicId: string; resourceType: 'image' | 'raw' } | null {

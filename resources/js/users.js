@@ -1,5 +1,3 @@
-// Page Utilisateurs
-
 // Beaucoup de petites requêtes pendant la frappe : pas de chargeur plein écran
 document.body.dataset.loaderFetch = 'off'
 
@@ -62,7 +60,7 @@ formulaire.addEventListener('submit', function (evenement) {
   rechercher()
 })
 
-// 2. Popup "Voir plus"
+// Popup Voir plus
 
 let imageAvatar = document.getElementById('user-modal-avatar')
 

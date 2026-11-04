@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temps réel expliqué</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1f2328; --muted:#59636e; --line:#d8dee4; --code-bg:#f1f3f5; --accent:#2563eb; --note-bg:#eef4ff; --warn-bg:#fff6e5; --warn-line:#e0a400; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15181c; --fg:#e6e8eb; --muted:#9aa4ae; --line:#30363d; --code-bg:#1f242a; --accent:#6ea8ff; --note-bg:#17233a; --warn-bg:#2b2412; --warn-line:#b88a12; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 80px; }
+  h1 { font-size:1.9rem; line-height:1.25; margin:0 0 8px; }
+  h2 { font-size:1.4rem; margin:48px 0 12px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:1.1rem; margin:28px 0 8px; }
+  p, li { max-width:72ch; }
+  a { color:var(--accent); }
+  .subtitle, .file { color:var(--muted); }
+  .file { font-size:0.9rem; }
+  code { font:0.9em/1.5 ui-monospace,"Cascadia Code",Consolas,monospace; background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; margin:12px 0; }
+  pre code { background:none; padding:0; font-size:0.85rem; }
+  .table-wrap { overflow-x:auto; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; font-size:0.93rem; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); }
+  .note, .warn { border-radius:8px; padding:12px 16px; margin:16px 0; }
+  .note { background:var(--note-bg); border-left:4px solid var(--accent); }
+  .warn { background:var(--warn-bg); border-left:4px solid var(--warn-line); }
+  .note p, .warn p { margin:6px 0; }
+  .toc { border:1px solid var(--line); border-radius:8px; padding:12px 20px; }
+  .toc ol { margin:6px 0; padding-left:20px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Le temps réel de Kadea Chat expliqué ligne par ligne</h1>
+<p class="subtitle">Fichiers : <code>start/transmit.ts</code> · <code>app/service/realtime_service.ts</code> · <code>app/controllers/realtime_controller.ts</code> · <code>resources/js/realtime.js</code> · <code>resources/js/message.js</code> (partie 8)</p>
+
+<p>Le « temps réel », c'est ce qui fait qu'un message, une coche bleue ou une puce verte apparaissent <strong>sans recharger la page</strong>. Il repose sur plusieurs fichiers qui travaillent ensemble. On commence par le principe, puis on suit chaque fichier.</p>
+
+<nav class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li><a href="#principe">Le principe : SSE, Transmit et canaux</a></li>
+    <li><a href="#transmit">start/transmit.ts : qui écoute quoi, qui est en ligne</a></li>
+    <li><a href="#service">realtime_service.ts : envoyer les événements</a></li>
+    <li><a href="#controller">realtime_controller.ts : compteurs et lecture</a></li>
+    <li><a href="#navigateur">realtime.js : recevoir dans le navigateur</a></li>
+    <li><a href="#page">message.js : mettre la page à jour</a></li>
+    <li><a href="#evenements">Tableau de tous les événements</a></li>
+    <li><a href="#parcours">Le parcours complet d'un message</a></li>
+    <li><a href="#remarques">Ce qui a été remarqué</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="principe">1. Le principe : SSE, Transmit et canaux</h2>
+
+<p>Normalement, le web fonctionne ainsi : <strong>le navigateur demande, le serveur répond</strong>. Le serveur ne peut jamais parler le premier. Pour qu'un message arrive tout seul, il faut une connexion qui reste ouverte.</p>
+
+<p>Ton projet utilise <strong>Transmit</strong>, le module temps réel d'AdonisJS, qui repose sur les <strong>SSE</strong> (<em>Server-Sent Events</em>) :</p>
+<ol>
+  <li>à l'ouverture d'une page, le navigateur ouvre une connexion vers <code>/__transmit/events</code> ;</li>
+  <li>le serveur ne la ferme pas : elle reste ouverte tant que la page est affichée ;</li>
+  <li>dès que le serveur a quelque chose à dire, il l'écrit dans cette connexion, et le navigateur le reçoit immédiatement.</li>
+</ol>
+
+<p>Les données circulent sur des <strong>canaux</strong>, comme des stations de radio. Un navigateur s'<strong>abonne</strong> aux canaux qui l'intéressent, et ne reçoit que ce qui y est diffusé. Ton application en utilise deux sortes :</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Canal</th><th>Qui l'écoute</th><th>Ce qui y passe</th></tr>
+  <tr><td><code>users/&lt;id sans tirets&gt;</code></td><td>Seulement son propriétaire</td><td>Ses nouveaux messages, modifications, coches bleues, ajouts à un groupe...</td></tr>
+  <tr><td><code>presence</code></td><td>Toutes les personnes connectées</td><td>« Untel vient de passer en ligne / hors ligne »</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <p><strong>SSE ou WebSocket ?</strong> Les SSE ne vont que dans un sens : du serveur vers le navigateur. C'est suffisant ici, car pour parler au serveur (envoyer un message, signaler une lecture), le navigateur utilise de simples requêtes <code>fetch</code>.</p>
+</div>
+
+<p>Dans <span class="file">start/routes.ts</span>, Transmit ajoute ses routes, protégées par l'authentification :</p>
+<pre><code>// Transmit ajoute 3 routes (/__transmit/events, subscribe, unsubscribe).
+transmit.registerRoutes((route) =&gt; {
+  route.middleware(middleware.auth())
+})</code></pre>
+<p><code>registerRoutes</code> crée trois routes : ouvrir la connexion (<code>events</code>), s'abonner à un canal (<code>subscribe</code>) et se désabonner (<code>unsubscribe</code>). Le callback ajoute le middleware <code>auth</code> à chacune : sans être connecté, impossible d'ouvrir la connexion.</p>
+
+<p>Et dans <span class="file">config/transmit.ts</span> :</p>
+<pre><code>export default defineConfig({
+  pingInterval: '30s',
+  transport: null,
+})</code></pre>
+<ul>
+  <li><strong><code>pingInterval: '30s'</code> :</strong> toutes les 30 secondes, le serveur envoie un petit « ping » dans chaque connexion. Sans ça, certains proxys ou hébergeurs couperaient une connexion qui semble inactive.</li>
+  <li><strong><code>transport: null</code> :</strong> aucun relais entre plusieurs serveurs (comme Redis). Les événements ne circulent qu'à l'intérieur d'<strong>un seul</strong> processus serveur (voir les remarques).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="transmit">2. <code>start/transmit.ts</code> : qui écoute quoi, qui est en ligne</h2>
+
+<p>Ce fichier est chargé au démarrage du serveur. Il fait trois choses : protéger les canaux, suivre qui est en ligne, et remettre tout le monde hors ligne au démarrage.</p>
+
+<pre><code>import db from '@adonisjs/lucid/services/db'
+import logger from '@adonisjs/core/services/logger'
+import transmit from '@adonisjs/transmit/services/main'
+import { PRESENCE_CHANNEL, annoncePresence, convertitEnIdentifiantCanal } from '../app/service/realtime_service.ts'</code></pre>
+<p><code>db</code> pour mettre à jour la colonne <code>is_online</code>, <code>logger</code> pour noter les erreurs, <code>transmit</code> pour le temps réel, et trois outils de <code>realtime_service.ts</code> (expliqués au point 3).</p>
+
+<h3>Partie 1 : qui a le droit de s'abonner à quel canal ?</h3>
+
+<pre><code>transmit.authorize&lt;{ id: string }&gt;('users/:id', (ctx, { id }) =&gt; {
+  const currentUser = ctx.auth.user
+  return currentUser !== undefined &amp;&amp; convertitEnIdentifiantCanal(currentUser.id) === id
+})</code></pre>
+<ul>
+  <li><strong><code>transmit.authorize(motif, règle)</code> :</strong> appelée à chaque demande d'abonnement à un canal qui correspond au motif. Si la règle renvoie <code>false</code>, l'abonnement est refusé.</li>
+  <li><strong><code>'users/:id'</code> :</strong> comme une route, <code>:id</code> capture la partie variable du nom. Pour <code>users/3f2a9c1e...</code>, <code>id</code> vaut <code>'3f2a9c1e...'</code>.</li>
+  <li><strong><code>&lt;{ id: string }&gt;</code> :</strong> dit à TypeScript que les paramètres contiennent un <code>id</code> texte.</li>
+  <li><strong>La règle :</strong> il faut être connecté <strong>et</strong> que l'<code>id</code> du canal soit le tien (sans tirets). <strong>C'est la protection essentielle</strong> : sans elle, n'importe qui pourrait écouter le canal d'un autre et lire ses messages en direct.</li>
+</ul>
+
+<pre><code>transmit.authorize(PRESENCE_CHANNEL, (ctx) =&gt; {
+  return ctx.auth.user !== undefined
+})</code></pre>
+<p>Le canal <code>presence</code> est ouvert à toute personne connectée.</p>
+
+<h3>Partie 2 : suivre qui est en ligne</h3>
+
+<p>Règle choisie : <strong>un utilisateur est « en ligne » tant qu'au moins une de ses pages est ouverte</strong>, donc tant qu'il a au moins une connexion Transmit. Trois dictionnaires (<code>Map</code>) gardent cet état <strong>en mémoire</strong> :</p>
+
+<pre><code>// uid de la connexion → identifiant de l'utilisateur
+const connectionOwners = new Map&lt;string, string&gt;()
+
+// identifiant de l'utilisateur → nombre de connexions ouvertes (un onglet = une connexion)
+const connectionCounts = new Map&lt;string, number&gt;()
+
+// identifiant de l'utilisateur → minuteur avant de le passer "hors ligne"
+const offlineTimers = new Map&lt;string, NodeJS.Timeout&gt;()</code></pre>
+<div class="table-wrap">
+<table>
+  <tr><th>Dictionnaire</th><th>Exemple</th><th>Pourquoi</th></tr>
+  <tr><td><code>connectionOwners</code></td><td><code>'abc-uid' → 'user-5'</code></td><td>À la fermeture, Transmit ne donne que l'<code>uid</code> de la connexion : il faut retrouver à qui elle appartenait.</td></tr>
+  <tr><td><code>connectionCounts</code></td><td><code>'user-5' → 2</code></td><td>Avec deux onglets, fermer l'un ne doit pas te passer hors ligne.</td></tr>
+  <tr><td><code>offlineTimers</code></td><td><code>'user-5' → minuteur</code></td><td>Pour annuler le passage hors ligne si tu reviens vite.</td></tr>
+</table>
+</div>
+
+<pre><code>const OFFLINE_DELAY_MS = 8000</code></pre>
+<p>Quand tu changes de page, l'ancienne connexion se ferme et la nouvelle s'ouvre une fraction de seconde après. Sans délai, ta puce clignoterait (hors ligne, puis en ligne) à chaque clic. On attend donc 8 secondes avant de déclarer quelqu'un hors ligne.</p>
+
+<pre><code>async function changeStatutEnLigne(userId: string, isOnline: boolean) {
+  try {
+    await db.from('users').where('id', userId).update({ is_online: isOnline })
+    annoncePresence(userId, isOnline) // tout le monde est prévenu
+  } catch (error) {
+    logger.error({ err: error, userId }, 'Échec de la mise à jour du statut en ligne')
+  }
+}</code></pre>
+<p>Change le statut en deux temps : <strong>en base</strong> (pour que les pages chargées ensuite affichent le bon état) puis <strong>en direct</strong> sur le canal <code>presence</code> (pour les pages déjà ouvertes). En cas d'erreur, on note dans les logs sans faire planter le serveur.</p>
+
+<h3>Une connexion s'ouvre</h3>
+<pre><code>transmit.on('connect', async ({ uid, context }) =&gt; {
+  const userId = context.auth.user?.id
+  if (!userId) {
+    return
+  }
+
+  connectionOwners.set(uid, userId)</code></pre>
+<p><code>transmit.on('connect', ...)</code> est appelée à chaque nouvelle connexion (page ouverte). On retrouve l'utilisateur, puis on note que cette connexion lui appartient.</p>
+
+<pre><code>  const pendingTimer = offlineTimers.get(userId)
+  const wasOnline = (connectionCounts.get(userId) ?? 0) &gt; 0 || pendingTimer !== undefined
+
+  connectionCounts.set(userId, (connectionCounts.get(userId) ?? 0) + 1)</code></pre>
+<ul>
+  <li><strong><code>wasOnline</code> :</strong> il était déjà considéré en ligne s'il avait déjà une connexion, <strong>ou</strong> si un minuteur « hors ligne » était en attente (il vient juste de changer de page).</li>
+  <li>On ajoute 1 à son nombre de connexions. Le <code>?? 0</code> gère le cas où il n'en avait aucune.</li>
+</ul>
+
+<pre><code>  if (pendingTimer !== undefined) {
+    clearTimeout(pendingTimer)
+    offlineTimers.delete(userId)
+  }
+
+  if (!wasOnline) {
+    await changeStatutEnLigne(userId, true)
+  }
+})</code></pre>
+<p>S'il est revenu avant la fin des 8 secondes, on <strong>annule</strong> le passage hors ligne. Et on n'annonce « en ligne » que s'il ne l'était pas déjà : inutile de prévenir tout le monde à chaque changement de page.</p>
+
+<h3>Une connexion se ferme</h3>
+<pre><code>transmit.on('disconnect', ({ uid }) =&gt; {
+  const userId = connectionOwners.get(uid)
+  if (!userId) {
+    return
+  }
+  connectionOwners.delete(uid)
+
+  const remaining = (connectionCounts.get(userId) ?? 1) - 1
+
+  if (remaining &gt; 0) {
+    connectionCounts.set(userId, remaining)
+    return
+  }</code></pre>
+<p>On retrouve le propriétaire grâce à l'<code>uid</code>, on oublie cette connexion, puis on retire 1 à son compteur. S'il lui reste d'autres onglets, il reste en ligne et on s'arrête là.</p>
+
+<pre><code>  connectionCounts.delete(userId)
+  offlineTimers.set(
+    userId,
+    setTimeout(async () =&gt; {
+      offlineTimers.delete(userId)
+      await changeStatutEnLigne(userId, false)
+    }, OFFLINE_DELAY_MS)
+  )
+})</code></pre>
+<p>C'était sa dernière connexion : on programme son passage hors ligne dans 8 secondes, et on garde le minuteur pour pouvoir l'annuler s'il revient (voir <code>connect</code>).</p>
+
+<h3>Partie 3 : au démarrage du serveur</h3>
+<pre><code>try {
+  await db.from('users').update({ is_online: false })
+} catch (error) {
+  logger.warn({ err: error }, 'Impossible de réinitialiser les statuts en ligne au démarrage')
+}</code></pre>
+<p>Si le serveur s'est arrêté brutalement, des utilisateurs sont restés <code>is_online = true</code> en base, alors que plus personne n'est connecté. Au démarrage, on remet donc <strong>tout le monde</strong> hors ligne. Ils repasseront en ligne en rouvrant une page.</p>
+
+<!-- ============================================================ -->
+<h2 id="service">3. <code>realtime_service.ts</code> : envoyer les événements</h2>
+
+<p>Le commentaire en tête résume le principe, toujours le même :</p>
+<ol>
+  <li>le contrôleur enregistre d'abord en base de données ;</li>
+  <li>il appelle une fonction <code>previens...</code> de ce fichier ;</li>
+  <li>l'événement part sur le canal personnel de chaque destinataire ;</li>
+  <li>dans le navigateur, <code>realtime.js</code> le reçoit et <code>message.js</code> met la page à jour.</li>
+</ol>
+<p>Et un choix important : <strong>le HTML est fabriqué ici, côté serveur</strong>, avec les mêmes vues Edge qu'au chargement de la page.</p>
+
+<h3>Les imports</h3>
+<pre><code>import edge from 'edge.js'
+import db from '@adonisjs/lucid/services/db'
+import logger from '@adonisjs/core/services/logger'
+import transmit from '@adonisjs/transmit/services/main'
+import type Conversation from '#models/conversation'
+import type Message from '#models/message'
+import type User from '#models/user'
+import type UserConversation from '#models/user_conversation'
+import { construitVueMessage, construitApercu, donneInitiales, donneHeureDeLaListe,
+         estPremierMessageVisible, besoinSeparateurDeJour } from './chat_service.ts'</code></pre>
+<ul>
+  <li><strong><code>edge</code> :</strong> le moteur de vues, utilisé directement. Dans un contrôleur on a <code>view</code> (lié à la requête) ; ici on fabrique du HTML pour <strong>d'autres</strong> personnes que celle qui a fait la requête, donc on utilise <code>edge</code> sans contexte.</li>
+  <li><strong>Les modèles :</strong> importés avec <code>type</code>, car ils ne servent qu'à décrire les paramètres.</li>
+  <li><strong>Les outils de <code>chat_service.ts</code> :</strong> les mêmes qu'au chargement de la page, pour que tout s'affiche à l'identique.</li>
+</ul>
+
+<pre><code>export const PRESENCE_CHANNEL = 'presence'
+export type ConversationKind = 'private' | 'group'</code></pre>
+<p>Le nom du canal de présence, partagé avec <code>start/transmit.ts</code> pour ne pas l'écrire deux fois, et le type « privée ou groupe ».</p>
+
+<h3>Les canaux</h3>
+<pre><code>export function convertitEnIdentifiantCanal(userId: string): string {
+  return userId.replaceAll('-', '')
+}
+
+export function donneCanalUtilisateur(userId: string): string {
+  return `users/${convertitEnIdentifiantCanal(userId)}`
+}</code></pre>
+<p>Un nom de canal ne peut contenir que des lettres, des chiffres et <code>/</code>. Tes identifiants sont des uuid avec des tirets : on les retire. Exemple : <code>3f2a9c1e-7b4d-...</code> donne le canal <code>users/3f2a9c1e7b4d...</code>. Le navigateur applique exactement la même règle dans <code>realtime.js</code>.</p>
+
+<pre><code>function envoieAUtilisateur(
+  userId: string,
+  event: NonNullable&lt;Parameters&lt;typeof transmit.broadcast&gt;[1]&gt;
+) {
+  try {
+    transmit.broadcast(donneCanalUtilisateur(userId), event)
+  } catch (error) {
+    logger.error({ err: error, userId }, "Échec de l'envoi d'un événement temps réel")
+  }
+}</code></pre>
+<ul>
+  <li><strong><code>transmit.broadcast(canal, données)</code> :</strong> envoie les données à tous les navigateurs abonnés à ce canal. Pour un canal personnel, ce sont tous les onglets de cet utilisateur.</li>
+  <li><strong>Le type de <code>event</code> :</strong> se lit de l'intérieur vers l'extérieur. <code>typeof transmit.broadcast</code> = le type de la fonction ; <code>Parameters&lt;...&gt;</code> = la liste de ses paramètres ; <code>[1]</code> = le deuxième (les données) ; <code>NonNullable</code> = sans <code>null</code> ni <code>undefined</code>. Bref : « exactement ce que <code>broadcast</code> accepte », sans le recopier.</li>
+  <li><strong>Le <code>try/catch</code> :</strong> un problème de temps réel ne doit <strong>jamais</strong> faire échouer l'action de l'utilisateur. Le message est déjà enregistré en base ; au pire, l'autre le verra en rechargeant.</li>
+  <li>Pas d'<code>export</code> : seules les fonctions de ce fichier l'utilisent.</li>
+</ul>
+
+<h3>Présence</h3>
+<pre><code>export function annoncePresence(userId: string, isOnline: boolean) {
+  try {
+    transmit.broadcast(PRESENCE_CHANNEL, { type: 'presence', userId, isOnline })
+  } catch (error) {
+    logger.error({ err: error }, "Échec de l'annonce de présence")
+  }
+}</code></pre>
+<p>Diffuse sur le canal commun <code>presence</code> : tout le monde apprend que <code>userId</code> est en ligne ou non. Appelée par <code>changeStatutEnLigne</code> dans <code>start/transmit.ts</code>.</p>
+
+<h3>Nouveau message : <code>previensNouveauMessage</code></h3>
+<p>Appelée par <code>messages_controller.ts</code> après l'enregistrement d'un message.</p>
+<pre><code>export async function previensNouveauMessage(options: {
+  message: Message
+  sender: User
+  kind: ConversationKind
+  conversationName: string | null
+  previousMessage: Message | null
+  recipients: UserConversation[]
+}) {
+  const { message, sender, kind, conversationName, previousMessage, recipients } = options
+  const isGroup = kind === 'group'</code></pre>
+<p>Un seul paramètre <code>options</code> regroupe six valeurs. À l'appel, on écrit <code>{ message, sender, ... }</code> avec des noms, ce qui évite de se tromper d'ordre. La première ligne les extrait en variables.</p>
+
+<pre><code>  for (const recipient of recipients) {
+    try {</code></pre>
+<p>Une boucle sur chaque destinataire, avec un <code>try/catch</code> <strong>par destinataire</strong> : si la préparation échoue pour l'un, les autres sont quand même prévenus.</p>
+
+<pre><code>      const html = await edge.render('partials/message-item', {
+        message: construitVueMessage(message, recipient.userId, isGroup),
+        showSeparator: besoinSeparateurDeJour(previousMessage, message, recipient),
+      })</code></pre>
+<p>La bulle est fabriquée <strong>pour chaque destinataire</strong>, car elle n'est pas la même pour tout le monde :</p>
+<ul>
+  <li><strong><code>construitVueMessage(message, recipient.userId, isGroup)</code> :</strong> vu par le destinataire, le message n'est pas « le sien » (<code>isMine: false</code>), donc bulle à gauche sans boutons ; dans un groupe (<code>isGroup</code>), le nom de l'auteur s'affiche au-dessus.</li>
+  <li><strong><code>besoinSeparateurDeJour(previousMessage, message, recipient)</code> :</strong> faut-il un séparateur « Aujourd'hui » avant ? Ça dépend du destinataire : s'il avait supprimé la conversation (<code>removedAt</code>), le message précédent lui est invisible, et ce nouveau message est son premier.</li>
+</ul>
+
+<pre><code>      const preview = construitApercu(message, recipient.userId, isGroup)
+      const time = donneHeureDeLaListe(message.createdAt)</code></pre>
+<p>L'aperçu (« Salut », ou « Ana : Salut » dans un groupe) et l'heure, pour la liste des conversations.</p>
+
+<pre><code>      let itemHtml: string | null = null
+      if (estPremierMessageVisible(previousMessage, recipient)) {</code></pre>
+<p><strong><code>estPremierMessageVisible</code></strong> (de <span class="file">chat_service.ts</span>) renvoie <code>true</code> s'il n'y a pas de message précédent, ou si le précédent est antérieur au <code>removedAt</code> du destinataire. Dans ce cas, la conversation <strong>n'est pas encore dans sa liste</strong> : il faut lui envoyer la ligne complète.</p>
+
+<pre><code>        const item = isGroup
+          ? {
+              id: message.conversationId,
+              name: conversationName ?? 'Groupe sans nom',
+              initials: donneInitiales(conversationName ?? 'Groupe'),
+              preview,
+              time,
+              unreadCount: 0,
+            }
+          : {
+              id: message.conversationId,
+              userId: sender.id,
+              name: sender.fullName,
+              initials: donneInitiales(sender.fullName),
+              avatarUrl: sender.avatarUrl,
+              isOnline: sender.isOnline,
+              preview,
+              time,
+              unreadCount: 0,
+            }
+        itemHtml = await afficheLigneListe(item, isGroup)
+      }</code></pre>
+<p>Les données de la ligne : pour un groupe, son nom ; pour une conversation privée, l'expéditeur (c'est lui « l'autre personne » vue par le destinataire). <code>unreadCount: 0</code> parce que le navigateur ajoutera lui-même 1 en recevant le message (voir <code>incrementerBadge</code> dans <code>message.js</code>). <code>afficheLigneListe</code> fabrique le HTML (voir plus bas).</p>
+
+<pre><code>      envoieAUtilisateur(recipient.userId, {
+        type: 'message:new',
+        kind,
+        conversationId: message.conversationId,
+        conversationName,
+        messageId: message.id,
+        senderName: sender.fullName,
+        preview,
+        time,
+        html,
+        itemHtml,
+      })
+    } catch (error) {
+      logger.error({ err: error, userId: recipient.userId }, 'Échec de la notification de message')
+    }
+  }
+}</code></pre>
+<p>L'événement envoyé. <code>type</code> dit au navigateur de quoi il s'agit ; <code>messageId</code> lui permet d'éviter les doublons ; <code>senderName</code> et <code>conversationName</code> servent à la petite notification en haut de l'écran.</p>
+
+<h3>Message modifié ou supprimé : <code>previensMessageModifie</code></h3>
+<pre><code>export async function previensMessageModifie(options: {
+  message: Message
+  kind: ConversationKind
+  isLast: boolean
+  recipients: UserConversation[]
+}) {
+  const { message, kind, isLast, recipients } = options
+  const isGroup = kind === 'group'
+
+  for (const recipient of recipients) {
+    try {
+      const html = await edge.render('partials/message-item', {
+        message: construitVueMessage(message, recipient.userId, isGroup),
+        showSeparator: false,
+      })
+
+      envoieAUtilisateur(recipient.userId, {
+        type: 'message:updated',
+        kind,
+        conversationId: message.conversationId,
+        messageId: message.id,
+        html,
+        isLast,
+        preview: construitApercu(message, recipient.userId, isGroup),
+        time: donneHeureDeLaListe(message.createdAt),
+      })
+    } catch (error) {
+      logger.error({ err: error, userId: recipient.userId }, 'Échec de la notification de modification')
+    }
+  }
+}</code></pre>
+<p>Même principe, mais pour <strong>remplacer</strong> une bulle existante :</p>
+<ul>
+  <li><strong><code>showSeparator: false</code> :</strong> la bulle existe déjà à sa place, son séparateur aussi.</li>
+  <li><strong><code>isLast</code> :</strong> si c'était le dernier message, l'aperçu de la liste doit aussi changer (par exemple en « Message supprimé »).</li>
+  <li>Le HTML contient la nouvelle version : texte modifié avec la mention « modifié », ou « Ce message a été supprimé ».</li>
+</ul>
+
+<h3>Groupes</h3>
+<pre><code>export async function previensConversationAjoutee(options: {
+  conversation: Conversation
+  userIds: string[]
+  lastMessage: Message | null
+}) {
+  const { conversation, userIds, lastMessage } = options
+  const name = conversation.title ?? 'Groupe sans nom'
+
+  for (const userId of userIds) {
+    try {
+      const itemHtml = await afficheLigneListe(
+        {
+          id: conversation.id,
+          name,
+          initials: donneInitiales(name),
+          preview: lastMessage ? construitApercu(lastMessage, userId, true) : 'Aucun message',
+          time: lastMessage ? donneHeureDeLaListe(lastMessage.createdAt) : '',
+          unreadCount: 0,
+        },
+        true
+      )
+
+      envoieAUtilisateur(userId, {
+        type: 'conversation:added',
+        kind: 'group',
+        conversationId: conversation.id,
+        conversationName: name,
+        itemHtml,
+      })
+    } catch (error) {
+      logger.error({ err: error, userId }, "Échec de la notification d'ajout au groupe")
+    }
+  }
+}</code></pre>
+<p>Appelée par <code>groups_controller.ts</code> à la création d'un groupe ou à l'ajout de membres. Chaque nouveau membre reçoit la ligne du groupe toute prête : le groupe apparaît dans sa liste sans recharger, et une notification « Vous avez été ajouté au groupe » s'affiche. À la création, <code>lastMessage</code> vaut <code>null</code>, d'où « Aucun message ».</p>
+
+<pre><code>export function previensGroupeModifie(conversationId: number, userIds: string[]) {
+  for (const userId of userIds) {
+    envoieAUtilisateur(userId, { type: 'group:updated', kind: 'group', conversationId })
+  }
+}</code></pre>
+<p>Prévient les membres <strong>déjà présents</strong> que la composition du groupe a changé. L'événement ne contient pas de HTML : la page qui affiche ce groupe recharge simplement son panneau. Pas de <code>async</code> ni de <code>try/catch</code> ici, car rien n'est fabriqué et <code>envoieAUtilisateur</code> gère déjà les erreurs.</p>
+
+<h3>Lecture des messages : <code>marqueConversationCommeLueEtPrevient</code></h3>
+<p>Appelée quand quelqu'un ouvre une conversation, ou reçoit un message alors qu'il la regarde.</p>
+
+<pre><code>export async function marqueConversationCommeLueEtPrevient(userId: string, conversationId: number) {
+  const unreadRows = await db
+    .from('message_statuses')
+    .where('user_id', userId)
+    .where('is_read', false)
+    .whereIn('message_id', db.from('messages').select('id').where('conversation_id', conversationId))
+    .select('message_id')
+
+  if (unreadRows.length === 0) {
+    return
+  }
+
+  const messageIds = unreadRows.map((row) =&gt; row.message_id as number)</code></pre>
+<p><strong>1.</strong> On cherche tes statuts non lus pour les messages de cette conversation (la sous-requête donne la liste des messages de la conversation). S'il n'y en a aucun, on s'arrête : pas de requête inutile. Sinon, on garde la liste de leurs identifiants. <code>as number</code> indique à TypeScript le type de la colonne, car <code>db.from</code> renvoie des lignes sans type précis.</p>
+
+<pre><code>  await db
+    .from('message_statuses')
+    .where('user_id', userId)
+    .whereIn('message_id', messageIds)
+    .update({ is_read: true, status: 'read', updated_at: new Date() })</code></pre>
+<p><strong>2.</strong> On les passe à « lu », en une seule requête <code>UPDATE</code>.</p>
+
+<pre><code>  const fullyReadMessages = await db
+    .from('messages')
+    .whereIn('id', messageIds)
+    .whereNotExists((query) =&gt; {
+      query
+        .from('message_statuses')
+        .whereRaw('message_statuses.message_id = messages.id')
+        .where('message_statuses.is_read', false)
+    })
+    .select('id', 'user_id')</code></pre>
+<p><strong>3.</strong> Parmi ces messages, lesquels sont maintenant lus par <strong>tous</strong> leurs destinataires ? <code>whereNotExists</code> garde les messages pour lesquels il <strong>n'existe plus</strong> aucun statut non lu. <code>whereRaw('message_statuses.message_id = messages.id')</code> relie la sous-requête au message en cours d'examen. En privé, il n'y a qu'un destinataire, donc tous passent. Dans un groupe, la coche ne devient bleue que quand tout le monde a lu.</p>
+
+<pre><code>  const idsByAuthor = new Map&lt;string, number[]&gt;()
+  for (const row of fullyReadMessages) {
+    const authorId = row.user_id as string
+    idsByAuthor.set(authorId, [...(idsByAuthor.get(authorId) ?? []), row.id as number])
+  }</code></pre>
+<p><strong>4.</strong> On regroupe les messages par auteur. Pour chaque ligne, on reprend la liste déjà connue de cet auteur (ou une liste vide), on y ajoute l'identifiant avec <code>[...ancienne, nouveau]</code>, et on la range. Résultat par exemple : <code>{ 'ana' → [41, 42], 'jo' → [43] }</code>.</p>
+
+<pre><code>  for (const [authorId, ids] of idsByAuthor) {
+    envoieAUtilisateur(authorId, { type: 'messages:read', conversationId, messageIds: ids })
+  }
+}</code></pre>
+<p><strong>5.</strong> Chaque auteur reçoit un seul événement avec la liste de ses messages lus, et ses coches passent au bleu. <code>for (const [clé, valeur] of map)</code> parcourt une <code>Map</code> en décomposant chaque paire.</p>
+
+<h3>L'outil <code>afficheLigneListe</code></h3>
+<pre><code>function afficheLigneListe(item: Record&lt;string, unknown&gt;, isGroup: boolean): Promise&lt;string&gt; {
+  return edge.render('partials/list-item', {
+    item,
+    chatUrl: isGroup ? '/groups' : '/conversations',
+    isGroup,
+    canDelete: !isGroup,
+  })
+}</code></pre>
+<p>Fabrique le HTML d'une ligne de la liste, avec le même partial <code>list-item</code> qu'au chargement. <code>Record&lt;string, unknown&gt;</code> = « un objet avec des clés texte et des valeurs de n'importe quel type ». <code>chatUrl</code> donne le début du lien de la ligne, et <code>canDelete</code> n'autorise le bouton supprimer que pour une conversation privée. La fonction n'a pas de <code>async</code> : elle renvoie directement la promesse de <code>edge.render</code>, que l'appelant attend avec <code>await</code>.</p>
+
+<h3>Conversation supprimée : <code>previensConversationSupprimee</code></h3>
+<pre><code>export function previensConversationSupprimee(options: {
+  userIds: string[]
+  conversationId: number
+  kind: ConversationKind
+  message: string
+}) {
+  for (const userId of options.userIds) {
+    envoieAUtilisateur(userId, {
+      type: 'conversation:removed',
+      kind: options.kind,
+      conversationId: options.conversationId,
+      message: options.message,
+    })
+  }
+}</code></pre>
+<p>Appelée par <code>groups_controller.ts</code> et <code>deletion_service.ts</code> (par exemple quand un groupe est supprimé ou un compte effacé). La conversation disparaît de la liste des personnes concernées, et <code>message</code> leur explique pourquoi.</p>
+
+<!-- ============================================================ -->
+<h2 id="controller">4. <code>realtime_controller.ts</code> : compteurs et lecture</h2>
+
+<p>Deux routes appelées par le JavaScript, dans <span class="file">start/routes.ts</span> :</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Requête</th><th>Méthode</th><th>Rôle</th></tr>
+  <tr><td><code>GET /unread-counts</code></td><td><code>donneCompteursNonLus</code></td><td>Les chiffres des pastilles de la barre de navigation</td></tr>
+  <tr><td><code>POST /conversations/:id/read</code></td><td><code>marqueCommeLu</code></td><td>« Je viens de lire cette conversation »</td></tr>
+</table>
+</div>
+
+<h3><code>donneCompteursNonLus</code></h3>
+<pre><code>async donneCompteursNonLus({ auth, response }: HttpContext) {
+  const user = auth.getUserOrFail()
+
+  const rows = await db
+    .from('message_statuses')
+    .join('messages', 'messages.id', 'message_statuses.message_id')
+    .join('conversations', 'conversations.id', 'messages.conversation_id')
+    .join('conversation_types', 'conversation_types.id', 'conversations.conversation_type_id')
+    .where('message_statuses.user_id', user.id)
+    .where('message_statuses.is_read', false)
+    .where('messages.is_deleted', false)
+    .select('conversation_types.type')
+    .count('* as total')
+    .groupBy('conversation_types.type')</code></pre>
+<p>On part de tes statuts non lus et on remonte, avec trois jointures : statut → message → conversation → type de conversation. On exclut les messages supprimés. <code>groupBy</code> sur le type donne <strong>un total par type</strong>, en une seule requête. Résultat par exemple :</p>
+<pre><code>[ { type: 'Privee', total: '3' }, { type: 'Publique', total: '1' } ]</code></pre>
+
+<pre><code>  const counts = { private: 0, group: 0 }
+  for (const row of rows) {
+    if (row.type === GROUP_TYPE) {
+      counts.group = Number(row.total)
+    } else {
+      counts.private = Number(row.total)
+    }
+  }
+
+  return response.ok(counts)
+}</code></pre>
+<p>On part de zéro (un type sans non-lus n'apparaît pas dans les lignes), on convertit les totaux en nombres (PostgreSQL les renvoie en texte) et on répond <code>{ private: 3, group: 1 }</code> en JSON.</p>
+
+<h3><code>marqueCommeLu</code></h3>
+<pre><code>async marqueCommeLu({ auth, params, response }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const conversationId = Number(params.id)
+
+  await UserConversation.query()
+    .where('userId', user.id)
+    .where('conversationId', conversationId)
+    .firstOrFail()
+
+  await marqueConversationCommeLueEtPrevient(user.id, conversationId)
+
+  return response.noContent()
+}</code></pre>
+<ul>
+  <li><strong>Sécurité :</strong> tu dois faire partie de la conversation, sinon <code>firstOrFail()</code> donne une 404. On ne garde pas le résultat : la requête ne sert qu'à vérifier. Elle accepte privée et groupe, puisque cette route sert aux deux.</li>
+  <li><strong><code>marqueConversationCommeLueEtPrevient</code> :</strong> passe tes messages à « lu » et fait passer les coches au bleu chez leurs auteurs.</li>
+  <li><strong><code>response.noContent()</code> :</strong> code <strong>204</strong>, « réussi, rien à renvoyer ».</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="navigateur">5. <code>realtime.js</code> : recevoir dans le navigateur</h2>
+
+<p>Ce script est chargé sur toutes les pages de l'application (par le layout). Il ouvre la connexion, s'abonne aux canaux et réagit aux événements.</p>
+
+<pre><code>import { Transmit } from '@adonisjs/transmit-client'
+
+const idUtilisateur = document.body.dataset.userId
+const jetonCsrf = document.querySelector('meta[name="csrf-token"]').content</code></pre>
+<ul>
+  <li><strong><code>Transmit</code> :</strong> la bibliothèque côté navigateur qui parle au Transmit du serveur. Comme le fichier utilise <code>import</code>, il passe par Vite.</li>
+  <li><strong><code>idUtilisateur</code> :</strong> lu dans l'attribut <code>data-user-id</code> de <code>&lt;body&gt;</code>, écrit par le layout. Il sert à construire le nom de ton canal.</li>
+  <li><strong><code>jetonCsrf</code> :</strong> le jeton anti-CSRF, dans une balise <code>&lt;meta&gt;</code>. Le serveur l'exige pour toute requête <code>POST</code>, y compris l'abonnement à un canal.</li>
+</ul>
+
+<h3>1. Connexion au serveur</h3>
+<pre><code>const transmit = new Transmit({
+  baseUrl: window.location.origin,
+
+  uidGenerator: function () {
+    if (window.crypto &amp;&amp; window.crypto.randomUUID) {
+      return window.crypto.randomUUID()
+    }
+    return Date.now().toString(36) + Math.random().toString(36).slice(2)
+  },
+
+  beforeSubscribe: function (requete) {
+    requete.headers.set('X-CSRF-TOKEN', jetonCsrf)
+  },
+
+  onSubscribeFailed: function (reponse) {
+    console.error("Abonnement au temps réel refusé (code " + reponse.status + ")")
+  },
+})</code></pre>
+<ul>
+  <li><strong><code>baseUrl</code> :</strong> l'adresse du serveur, ici celle de la page (par exemple <code>https://monsite.com</code>).</li>
+  <li><strong><code>uidGenerator</code> :</strong> fabrique l'identifiant unique de cette connexion (c'est le <code>uid</code> reçu par <code>connect</code> et <code>disconnect</code> côté serveur). <code>crypto.randomUUID()</code> n'existe que sur une page sécurisée (HTTPS ou localhost) : sur un téléphone testé via une adresse IP en HTTP, on utilise une solution de secours (date + nombre aléatoire en base 36).</li>
+  <li><strong><code>beforeSubscribe</code> :</strong> ajoute le jeton CSRF avant chaque abonnement.</li>
+  <li><strong><code>onSubscribeFailed</code> :</strong> si le serveur refuse l'abonnement (par exemple un 403 de <code>transmit.authorize</code>), on l'écrit dans la console.</li>
+</ul>
+
+<pre><code>let dejaConnecte = false
+
+transmit.on('connected', function () {
+  if (dejaConnecte) {
+    document.dispatchEvent(new CustomEvent('kc:reconnecte'))
+    programmerRafraichissement()
+  }
+  dejaConnecte = true
+})</code></pre>
+<p><code>'connected'</code> se déclenche à la première connexion <strong>et</strong> à chaque reconnexion (réseau coupé, ordinateur en veille...). La première fois, on note seulement qu'on est connecté. Les fois suivantes, on a pu rater des événements pendant la coupure : on prévient la page (<code>kc:reconnecte</code>) et on recharge les compteurs.</p>
+
+<h3>2. Abonnement aux canaux</h3>
+<pre><code>async function demarrer() {
+  let canalPersonnel = transmit.subscription('users/' + idUtilisateur.replaceAll('-', ''))
+  await canalPersonnel.create()
+  canalPersonnel.onMessage(traiterEvenement)
+
+  let canalPresence = transmit.subscription('presence')
+  await canalPresence.create()
+  canalPresence.onMessage(traiterEvenement)
+}
+
+demarrer()</code></pre>
+<ul>
+  <li><strong><code>transmit.subscription(nom)</code> :</strong> prépare l'abonnement à un canal. Le nom suit la même règle que <code>donneCanalUtilisateur</code> côté serveur (sans tirets).</li>
+  <li><strong><code>create()</code> :</strong> envoie la demande au serveur, qui la vérifie avec <code>transmit.authorize</code>.</li>
+  <li><strong><code>onMessage(traiterEvenement)</code> :</strong> chaque événement reçu sur ce canal appellera <code>traiterEvenement</code>.</li>
+</ul>
+
+<h3>3. Réaction aux événements</h3>
+<pre><code>function traiterEvenement(donnees) {
+  document.dispatchEvent(new CustomEvent('kc:evenement', { detail: donnees }))</code></pre>
+<p>Premier réflexe : relayer l'événement à toute la page sous la forme d'un <strong>événement du navigateur</strong> nommé <code>kc:evenement</code>, avec les données dans <code>detail</code>. <code>message.js</code> l'écoute. Ainsi, les deux fichiers n'ont pas besoin de se connaître : <code>realtime.js</code> diffuse, <code>message.js</code> écoute s'il est présent sur la page.</p>
+
+<pre><code>  if (donnees.type === 'presence') {
+    appliquerPresence(donnees.userId, donnees.isOnline)
+  }
+
+  if (donnees.type === 'message:new') {
+    if (!conversationOuverte(donnees.conversationId)) {
+      afficherNotification(donnees)
+    }
+    programmerRafraichissement()
+  }
+
+  if (donnees.type === 'message:updated') {
+    programmerRafraichissement()
+  }
+
+  if (donnees.type === 'conversation:added') {
+    kcNotifier.info('Vous avez été ajouté au groupe « ' + donnees.conversationName + ' ».')
+  }
+
+  if (donnees.type === 'conversation:removed') {
+    kcNotifier.info(donnees.message)
+    programmerRafraichissement()
+  }
+}</code></pre>
+<p>Ensuite, ce que <code>realtime.js</code> fait lui-même, sur <strong>toutes</strong> les pages :</p>
+<ul>
+  <li><strong>Présence :</strong> met à jour les puces vertes et les textes « En ligne ».</li>
+  <li><strong>Nouveau message :</strong> affiche une notification, sauf si tu regardes déjà cette conversation, et met à jour les pastilles.</li>
+  <li><strong>Message modifié :</strong> met à jour les pastilles (un message supprimé ne compte plus comme non lu).</li>
+  <li><strong>Ajout à un groupe / conversation supprimée :</strong> affiche une notification explicative.</li>
+</ul>
+<p><code>kcNotifier.info</code> vient de <code>notifications.js</code> : c'est la petite fenêtre (« toast ») en haut de l'écran.</p>
+
+<pre><code>function conversationOuverte(idConversation) {
+  let page = document.getElementById('messages-page')
+  return page !== null &amp;&amp; page.dataset.activeId === String(idConversation)
+}</code></pre>
+<p>Vrai si on est sur la page Messages ou Groupes (<code>#messages-page</code> existe) <strong>et</strong> que la conversation ouverte (<code>data-active-id</code>) est celle de l'événement. <code>String(...)</code> car les attributs <code>data-</code> sont toujours du texte.</p>
+
+<pre><code>function afficherNotification(donnees) {
+  if (donnees.kind === 'group') {
+    kcNotifier.info(donnees.conversationName + ' — ' + donnees.preview)
+  } else {
+    kcNotifier.info(donnees.senderName + ' : ' + donnees.preview)
+  }
+}</code></pre>
+<p>Groupe : « Projet Kadea — Ana : c'est rendu ». Privé : « Ana : Salut ».</p>
+
+<h3>4. Statut en ligne / hors ligne</h3>
+<pre><code>function appliquerPresence(idPersonne, enLigne) {
+  let elements = document.querySelectorAll('[data-presence-user="' + idPersonne + '"]')
+
+  elements.forEach(function (element) {
+    element.dataset.online = enLigne ? 'true' : 'false'
+
+    let puceEnLigne = element.querySelector('[data-presence-online]')
+    let puceHorsLigne = element.querySelector('[data-presence-offline]')
+
+    if (puceEnLigne !== null) {
+      puceEnLigne.classList.toggle('hidden', !enLigne)
+    }
+    if (puceHorsLigne !== null) {
+      let afficherGrise = !enLigne &amp;&amp; element.dataset.showOffline === 'true'
+      puceHorsLigne.classList.toggle('hidden', !afficherGrise)
+    }
+  })</code></pre>
+<p>Dans le HTML, chaque avatar porte l'identifiant de son utilisateur dans <code>data-presence-user</code>. On les trouve tous (liste, en-tête, page Utilisateurs...) et on met à jour leurs puces. <code>classList.toggle('hidden', condition)</code> ajoute la classe si la condition est vraie, la retire sinon. La puce grise n'apparaît que pour les avatars qui l'ont demandée (<code>data-show-offline="true"</code>).</p>
+
+<pre><code>  let libelles = document.querySelectorAll('[data-presence-label="' + idPersonne + '"]')
+
+  libelles.forEach(function (libelle) {
+    let texte = libelle.querySelector('[data-presence-text]')
+    let puceClignotante = libelle.querySelector('[data-presence-pulse]')
+
+    if (texte !== null) {
+      texte.textContent = enLigne ? 'En ligne' : 'Hors ligne'
+    }
+    if (puceClignotante !== null) {
+      puceClignotante.classList.toggle('hidden', !enLigne)
+    }
+    libelle.classList.toggle('font-medium', enLigne)
+    libelle.classList.toggle('text-success', enLigne)
+    libelle.classList.toggle('text-fg-subtle', !enLigne)
+  })
+}</code></pre>
+<p>Même chose pour les textes « En ligne / Hors ligne », comme celui de l'en-tête de <code>chat-panel.edge</code> : texte, puce clignotante et couleur (vert en ligne, gris sinon).</p>
+
+<h3>5. Pastilles de messages non lus</h3>
+<pre><code>let minuteurRafraichissement = null
+
+function programmerRafraichissement() {
+  clearTimeout(minuteurRafraichissement)
+  minuteurRafraichissement = setTimeout(rafraichirCompteurs, 300)
+}</code></pre>
+<p>Le même <strong>debounce</strong> que pour la recherche d'utilisateurs : si 5 messages arrivent d'un coup, une seule requête part, 300 ms après le dernier.</p>
+
+<pre><code>async function rafraichirCompteurs() {
+  try {
+    let reponse = await fetch('/unread-counts', {
+      noLoader: true,
+      headers: { Accept: 'application/json' },
+    })
+    if (!reponse.ok) { return }
+
+    let compteurs = await reponse.json()
+    afficherPastille('private', compteurs.private)
+    afficherPastille('group', compteurs.group)
+  } catch (erreurReseau) {
+    // Pas de connexion : on réessaiera au prochain événement
+  }
+}</code></pre>
+<p>Demande les vrais chiffres au serveur (<code>donneCompteursNonLus</code>), sans afficher le chargeur plein écran (<code>noLoader</code>, géré par <code>loader.js</code>). On lit la réponse avec <code>json()</code>, car le serveur renvoie un objet. Les erreurs réseau sont ignorées : le prochain événement réessaiera.</p>
+
+<div class="note">
+  <p><strong>Pourquoi demander au serveur plutôt que compter soi-même ?</strong> Le navigateur ne voit pas tout : messages lus dans un autre onglet, messages supprimés, conversations retirées... La base de données, elle, a toujours le bon chiffre.</p>
+</div>
+
+<pre><code>function afficherPastille(type, nombre) {
+  document.querySelectorAll('[data-nav-badge="' + type + '"]').forEach(function (pastille) {
+    pastille.textContent = nombre &gt; 99 ? '99+' : String(nombre)
+    pastille.classList.toggle('hidden', nombre === 0)
+  })
+}
+
+document.addEventListener('kc:rafraichir-compteurs', programmerRafraichissement)
+
+programmerRafraichissement()</code></pre>
+<p>Écrit le chiffre dans les pastilles de la barre de navigation (« 99+ » au-delà de 99) et les cache à zéro. Les pages peuvent demander un rafraîchissement avec l'événement <code>kc:rafraichir-compteurs</code> (par exemple après avoir lu des messages). Et au chargement de chaque page, on rafraîchit une première fois.</p>
+
+<!-- ============================================================ -->
+<h2 id="page">6. <code>message.js</code> : mettre la page à jour</h2>
+
+<p>Sur les pages Messages et Groupes, <code>message.js</code> écoute <code>kc:evenement</code> et met à jour la <strong>liste</strong> et la <strong>discussion</strong>.</p>
+
+<h3>Le point d'entrée</h3>
+<pre><code>document.addEventListener('kc:evenement', function (evenement) {
+  let donnees = evenement.detail
+
+  if (donnees.kind !== undefined &amp;&amp; donnees.kind !== page.dataset.kind) { return }
+
+  if (donnees.type === 'message:new') { traiterNouveauMessage(donnees) }
+  if (donnees.type === 'message:updated') { traiterMessageModifie(donnees) }
+  if (donnees.type === 'messages:read') { traiterLecture(donnees) }
+  if (donnees.type === 'group:updated') { traiterGroupeModifie(donnees) }
+  if (donnees.type === 'conversation:removed') { traiterConversationSupprimee(donnees) }
+
+  if (donnees.type === 'conversation:added' &amp;&amp; trouverElementListe(donnees.conversationId) === null) {
+    ajouterElementListe(donnees.itemHtml)
+  }
+})</code></pre>
+<p>La page Messages ne s'occupe que des conversations privées, la page Groupes que des groupes : on ignore les événements dont le <code>kind</code> ne correspond pas. Ceux qui n'ont pas de <code>kind</code> (comme <code>messages:read</code>) passent toujours. Ensuite, chaque type appelle sa fonction.</p>
+
+<h3>Un nouveau message arrive : <code>traiterNouveauMessage</code></h3>
+<pre><code>function traiterNouveauMessage(donnees) {
+  let idConversation = String(donnees.conversationId)
+  let estOuverte = page.dataset.activeId === idConversation
+
+  if (document.querySelector('[data-message-id="' + donnees.messageId + '"]') !== null) { return }
+
+  if (trouverElementListe(idConversation) === null &amp;&amp; donnees.itemHtml) {
+    ajouterElementListe(donnees.itemHtml)
+  }
+
+  mettreAJourListe(idConversation, donnees.preview, donnees.time)
+
+  if (estOuverte) {
+    retirerMessageVide()
+    document.getElementById('messages-list').insertAdjacentHTML('beforeend', donnees.html)
+    defilerEnBas()
+
+    if (document.visibilityState === 'visible') {
+      signalerLecture(idConversation)
+    }
+  } else {
+    incrementerBadge(idConversation)
+  }
+}</code></pre>
+<ol>
+  <li><strong>Anti-doublon :</strong> si une bulle porte déjà ce <code>data-message-id</code>, on ne fait rien.</li>
+  <li><strong>Conversation absente de la liste :</strong> on insère la ligne toute prête (<code>itemHtml</code>) en haut.</li>
+  <li><strong>Liste :</strong> l'aperçu et l'heure changent, la conversation remonte en haut.</li>
+  <li><strong>Conversation ouverte :</strong> on retire « Aucun message », on ajoute la bulle à la fin (<code>insertAdjacentHTML('beforeend', ...)</code>) et on fait défiler vers le bas. Si l'onglet est visible, on signale aussitôt la lecture au serveur : l'expéditeur voit ses coches bleues.</li>
+  <li><strong>Autre conversation :</strong> son badge de non-lus augmente de 1 (c'est pour ça que <code>itemHtml</code> est envoyé avec <code>unreadCount: 0</code>).</li>
+</ol>
+
+<pre><code>async function signalerLecture(idConversation) {
+  await envoyer('/conversations/' + idConversation + '/read', 'POST')
+  document.dispatchEvent(new CustomEvent('kc:rafraichir-compteurs'))
+}</code></pre>
+<p>Appelle <code>marqueCommeLu</code> sur le serveur, puis demande à <code>realtime.js</code> de rafraîchir les pastilles.</p>
+
+<h3>Les autres événements</h3>
+<pre><code>function traiterMessageModifie(donnees) {
+  let bulle = document.querySelector('[data-message-id="' + donnees.messageId + '"]')
+  if (bulle !== null) {
+    bulle.outerHTML = donnees.html
+  }
+  if (donnees.isLast) {
+    mettreAJourListe(donnees.conversationId, donnees.preview, donnees.time)
+  }
+}</code></pre>
+<p><code>outerHTML</code> remplace <strong>toute</strong> la bulle (l'élément lui-même, pas seulement son contenu) par la nouvelle version. Si c'était le dernier message, l'aperçu de la liste change aussi.</p>
+
+<pre><code>function traiterLecture(donnees) {
+  donnees.messageIds.forEach(function (idMessage) {
+    let bulle = document.querySelector('[data-message-id="' + idMessage + '"]')
+    if (bulle === null) { return }
+
+    let cocheEnvoye = bulle.querySelector('[data-tick-sent]')
+    let cocheLu = bulle.querySelector('[data-tick-read]')
+    if (cocheEnvoye !== null) { cocheEnvoye.classList.add('hidden') }
+    if (cocheLu !== null) { cocheLu.classList.remove('hidden') }
+  })
+}</code></pre>
+<p>Pour chaque message lu : on cache la coche simple et on affiche la double coche bleue. Les deux coches existent déjà dans la bulle (<code>message-bubble.edge</code>), une seule est visible.</p>
+
+<pre><code>function traiterGroupeModifie(donnees) {
+  if (page.dataset.activeId !== String(donnees.conversationId)) { return }
+
+  let fenetreInfos = document.getElementById('group-info-modal')
+  let champ = document.querySelector('#composer [name="content"]')
+  let fenetreOuverte = fenetreInfos !== null &amp;&amp; fenetreInfos.open
+  let messageEnCours = champ !== null &amp;&amp; champ.value !== ''
+
+  if (!fenetreOuverte &amp;&amp; !messageEnCours) {
+    ouvrirConversation(donnees.conversationId)
+  }
+}</code></pre>
+<p>Si tu regardes ce groupe, son panneau est rechargé, <strong>sauf</strong> si la fenêtre d'infos est ouverte ou si tu es en train d'écrire : on ne veut pas te faire perdre ton texte.</p>
+
+<pre><code>function traiterConversationSupprimee(donnees) {
+  let element = trouverElementListe(donnees.conversationId)
+  if (element !== null) {
+    element.remove()
+  }
+  verifierListeVide()
+
+  if (page.dataset.activeId === String(donnees.conversationId)) {
+    if (history.state !== null &amp;&amp; history.state.vue === 'chat') {
+      history.back()
+    } else {
+      fermerChat()
+    }
+  }
+}</code></pre>
+<p>La ligne disparaît de la liste. Si tu regardais cette conversation, elle se ferme : avec <code>history.back()</code> si l'historique contient l'entrée « liste » (l'événement <code>popstate</code> ferme alors le panneau), sinon directement.</p>
+
+<h3>Retour sur l'onglet et reconnexion</h3>
+<pre><code>document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' &amp;&amp; page.dataset.activeId !== '') {
+    signalerLecture(page.dataset.activeId)
+  }
+})</code></pre>
+<p>Un message reçu pendant que l'onglet était caché n'est pas marqué lu tout de suite (tu ne l'as pas vu). Quand tu reviens sur l'onglet, la lecture est signalée.</p>
+
+<pre><code>document.addEventListener('kc:reconnecte', function () {
+  let champ = document.querySelector('#composer [name="content"]')
+  if (champ === null || champ.value === '') {
+    window.location.reload()
+  }
+})</code></pre>
+<p>Après une coupure, des événements ont pu être perdus : la page se recharge pour repartir d'un état juste, sauf si un message est en cours d'écriture.</p>
+
+<!-- ============================================================ -->
+<h2 id="evenements">7. Tableau de tous les événements</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Type</th><th>Envoyé par</th><th>Déclenché quand</th><th>Effet dans le navigateur</th></tr>
+  <tr><td><code>presence</code></td><td><code>annoncePresence</code></td><td>Première page ouverte / dernière page fermée depuis 8 s</td><td>Puces vertes et textes « En ligne »</td></tr>
+  <tr><td><code>message:new</code></td><td><code>previensNouveauMessage</code></td><td>Envoi d'un message</td><td>Bulle ajoutée ou badge +1, liste à jour, notification, pastilles</td></tr>
+  <tr><td><code>message:updated</code></td><td><code>previensMessageModifie</code></td><td>Modification ou suppression d'un message</td><td>Bulle remplacée, aperçu si dernier, pastilles</td></tr>
+  <tr><td><code>messages:read</code></td><td><code>marqueConversationCommeLueEtPrevient</code></td><td>Le destinataire a lu</td><td>Coches bleues chez l'auteur</td></tr>
+  <tr><td><code>conversation:added</code></td><td><code>previensConversationAjoutee</code></td><td>Ajout à un groupe</td><td>Groupe ajouté à la liste, notification</td></tr>
+  <tr><td><code>group:updated</code></td><td><code>previensGroupeModifie</code></td><td>Membres du groupe modifiés</td><td>Panneau du groupe rechargé</td></tr>
+  <tr><td><code>conversation:removed</code></td><td><code>previensConversationSupprimee</code></td><td>Groupe ou conversation supprimés</td><td>Ligne retirée, discussion fermée, notification</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="parcours">8. Le parcours complet d'un message</h2>
+<pre><code>Ana envoie "Salut" à Jo
+  → messages_controller : enregistrement en base (statut "non lu" pour Jo)
+  → previensNouveauMessage : bulle HTML fabriquée pour Jo
+  → envoieAUtilisateur → transmit.broadcast('users/&lt;id de Jo&gt;', { type: 'message:new', ... })
+
+Dans le navigateur de Jo (connexion SSE déjà ouverte)
+  → realtime.js : traiterEvenement
+      → relaie 'kc:evenement' à la page
+      → notification si la conversation n'est pas ouverte, pastilles rafraîchies
+  → message.js : traiterNouveauMessage
+      → conversation ouverte et onglet visible : bulle ajoutée + POST /conversations/12/read
+
+Sur le serveur
+  → realtime_controller.marqueCommeLu → marqueConversationCommeLueEtPrevient
+  → transmit.broadcast('users/&lt;id d'Ana&gt;', { type: 'messages:read', messageIds: [...] })
+
+Dans le navigateur d'Ana
+  → message.js : traiterLecture → les coches passent au bleu</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="remarques">9. Ce qui a été remarqué</h2>
+<div class="warn">
+  <p><strong>Un seul serveur à la fois :</strong> la présence est suivie dans des <code>Map</code> en mémoire, et <code>transport: null</code> ne relie pas plusieurs processus. Si l'application tournait un jour sur deux instances, un message envoyé sur l'une n'atteindrait pas les connexions ouvertes sur l'autre, et les statuts en ligne seraient faux. Il faudrait alors un transport comme Redis. Avec une seule instance, comme actuellement, tout fonctionne.</p>
+  <p><strong>Redémarrage du serveur :</strong> au démarrage, tout le monde passe hors ligne. Les navigateurs encore ouverts se reconnectent automatiquement et repassent en ligne, mais <code>kc:reconnecte</code> rechargera alors aussi les pages Messages et Groupes.</p>
+  <p><strong>Événements perdus pendant une coupure :</strong> les SSE de Transmit ne rejouent pas les événements manqués. C'est pour ça que la page se recharge après une reconnexion ; les autres pages ne rafraîchissent que les pastilles.</p>
+  <p><strong>La présence est visible par tous :</strong> toute personne connectée reçoit les changements de statut de tout le monde sur le canal <code>presence</code>, même de personnes avec qui elle n'a jamais parlé. C'est cohérent avec la page Utilisateurs, qui les affiche déjà.</p>
+  <p><strong>Identifiant non numérique :</strong> comme ailleurs, <code>Number(params.id)</code> dans <code>marqueCommeLu</code> peut donner <code>NaN</code>, avec probablement une erreur 500 au lieu d'une 404.</p>
+</div>
+
+</main>
+</body>
+</html>

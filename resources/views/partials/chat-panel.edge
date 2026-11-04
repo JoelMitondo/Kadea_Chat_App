@@ -14,7 +14,7 @@
 
       @!component('components/user-avatar', { initials: chat.other.initials, src: chat.other.avatarUrl, online: chat.other.isOnline, userId: chat.other.id, size: 'sm' })
 
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <p class="truncate font-semibold text-fg">{{ chat.other.name }}</p>
 
         {{-- data-presence-label : realtime.js change ce texte en direct --}}

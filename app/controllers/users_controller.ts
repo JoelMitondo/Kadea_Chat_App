@@ -7,11 +7,6 @@ import { protegeCaracteresRecherche, formateDate, donneInitiales } from '../serv
 const USERS_PER_PAGE = 20
 
 export default class UsersController {
-  /**
-   * Liste des utilisateurs (avec recherche et pagination)
-   * - Appel du JavaScript (recherche en direct) : on renvoie seulement la liste.
-   * - Ouverture normale de la page : on renvoie la page complète.
-   */
   async donnePageUtilisateurs({ auth, request, view }: HttpContext) {
     const currentUser = auth.getUserOrFail()
     const { q, page } = await request.validateUsing(searchUsersValidator)

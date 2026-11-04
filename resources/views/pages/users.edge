@@ -25,13 +25,13 @@
       >
     </form>
 
-    {{-- Résultats : ce bloc est remplacé à chaque recherche --}}
+    {{-- Résultats, ce bloc est remplacé à chaque recherche --}}
     <div id="users-results" class="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
       @include('partials/users-list')
     </div>
   </div>
 
-  {{-- ===== POPUP "VOIR PLUS" (remplie par users.js) ===== --}}
+  {{-- POPUP "VOIR PLUS" (remplie par users.js) --}}
   <dialog
     id="user-modal"
     aria-labelledby="user-modal-name"

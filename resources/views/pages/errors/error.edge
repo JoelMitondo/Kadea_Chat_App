@@ -1,10 +1,6 @@
 {{--
   Page d'erreur unique de Kadea Chat (404, 403, 500, lien invalide ou expiré...).
   Les textes sont préparés côté serveur dans app/service/error_page.ts.
-
-  ATTENTION : cette page doit pouvoir s'afficher même quand la session, l'authentification
-  et le jeton CSRF n'existent pas (adresse inconnue, panne du serveur...).
-  On n'y utilise donc ni flashMessages, ni csrfField(), ni le layout auth/app.
 --}}
 <!DOCTYPE html>
 <html lang="fr">
@@ -16,7 +12,7 @@
   <meta name="theme-color" content="#2563eb">
   <link rel="icon" href="https://i.ibb.co/1YhrGKHz/logo-Kadea.png" type="image/png">
 
-  {{-- Thème clair ou sombre appliqué avant l'affichage, comme sur les autres pages --}}
+  {{-- Thème clair ou sombre appliqué avant l'affichage --}}
   <script>
     try {
       let themeSauvegarde = localStorage.getItem('theme')
@@ -105,7 +101,7 @@
         </div>
       </div>
 
-      {{-- Référence utile pour signaler un problème (jamais le détail technique de l'erreur) --}}
+      {{-- Référence utile pour signaler un problème --}}
       @if(page.reference)
         <p class="mt-4 text-xs text-fg-subtle">Référence de l'erreur : {{ page.reference }}</p>
       @end

@@ -1,5 +1,3 @@
-// CONVERSATIONS PRIVÉES : liste, ouverture, suppression.
-
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import type User from '#models/user'
@@ -38,6 +36,7 @@ export default class ConversationsController {
    */
   async donneConversation({ auth, params, request, view }: HttpContext) {
     const user = auth.getUserOrFail()
+    // donneDiscussion verifie qu'une personne fait partie d'une discussion
     const chat = await this.donneDiscussion(user, Number(params.id))
 
     if (request.header('x-requested-with') === 'XMLHttpRequest') {

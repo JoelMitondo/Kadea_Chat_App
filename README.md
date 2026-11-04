@@ -48,8 +48,8 @@ Projet de fin de formation · Kadea Academy
 |---|---|
 | Site en ligne | [`https://www.kadeaChat.com`](https://agora-chat-app-1.onrender.com/) |
 | Présentation (Canva) | [`https://www.canva.com`](https://canva.link/6sky2nlgir7lk05) |
-| Maquettes (Figma) | [`https://www.figma.com`](https://www.figma.com/design/hTThi75OAXNNjJtiz2gVSU/Kadea-Chat-Final?node-id=0-1&t=vpy0dWdvBXb6JpBq-1) |
-| Modélisation (MCD / MLD / MPD) | [`docs/modelisation`](docs/modelisation) ou [`lien externe`](https://VOTRE-LIEN) |
+| Maquettes (Figma) | [`Kadea Chat`](https://www.figma.com/design/hTThi75OAXNNjJtiz2gVSU/Kadea-Chat-Final?node-id=0-1&p=f&t=Tgk3rswckWaMcmbz-0) |
+| Modélisation (dictionnaire / MCD / MLD) | [`docs/modelisation`](docs/modelisation) ou [`version interactive (draw.io)`](https://viewer.diagrams.net/?nav=1&title=Kadea%20Chat%20-%20Mod%C3%A9lisation#Uhttps%3A%2F%2Fraw.githubusercontent.com%2FJoelMitondo%2FKadea_Chat_App%2Fmain%2Fdocs%2Fmodelisation%2Fkadea_chat_modelisation.drawio) |
 | Architecture C4 (Structurizr) | [`docs/c4/workspace.dsl`](docs/c4/workspace.dsl) ou [`voir les diagrammes en ligne`](https://playground.structurizr.com/?src=https://raw.githubusercontent.com/JoelMitondo/Kadea_Chat_App/main/docs/c4/workspace.dsl) |
 | Cahier des charges | [`docs/cahier-des-charges.pdf`](docs/cahier-des-charges.pdf) |
 | Vidéo de démonstration | [`https://VOTRE-LIEN`](https://VOTRE-LIEN) |
@@ -325,7 +325,7 @@ kadea-chat/
 │   ├── migrations/         Création et évolution des tables
 │   └── seeders/            Données de référence
 ├── docs/
-│   ├── modelisation/       MCD, MLD, MPD
+│   ├── modelisation/       Dictionnaire, MCD, MLD (.drawio, .svg, .png)
 │   ├── c4/                 Diagrammes C4 (contexte, conteneurs, composants)
 │   └── maquettes/          Exports des maquettes Figma
 ├── resources/
@@ -375,14 +375,40 @@ La liste exacte et à jour s'obtient avec `node ace list:routes`.
 
 ## Base de données
 
-Le modèle complet (MCD, MLD, MPD) est dans [`docs/modelisation`](docs/modelisation).
+La modélisation suit la méthode Merise et correspond exactement aux migrations de `database/migrations/`.
+
+| Document | Image | Fichier source |
+|---|---|---|
+| Dictionnaire des données (13 tables, 92 attributs) | [PNG](docs/modelisation/dictionnaire_donnees.png) · [SVG](docs/modelisation/dictionnaire_donnees.svg) | [`kadea_chat_modelisation.drawio`](docs/modelisation/kadea_chat_modelisation.drawio) |
+| MCD — modèle conceptuel | [PNG](docs/modelisation/mcd.png) · [SVG](docs/modelisation/mcd.svg) | même fichier, page « MCD » |
+| MLD — modèle logique | [PNG](docs/modelisation/mld.png) · [SVG](docs/modelisation/mld.svg) | même fichier, page « MLD » |
+
+- **Version interactive** (zoom, navigation entre les pages, sans compte) : [ouvrir dans draw.io](https://viewer.diagrams.net/?nav=1&title=Kadea%20Chat%20-%20Mod%C3%A9lisation#Uhttps%3A%2F%2Fraw.githubusercontent.com%2FJoelMitondo%2FKadea_Chat_App%2Fmain%2Fdocs%2Fmodelisation%2Fkadea_chat_modelisation.drawio). Le lien lit le fichier `.drawio` de la branche `main` : il fonctionne dès que le dépôt est public.
+- **Modifier les schémas** : ouvrir `kadea_chat_modelisation.drawio` sur [app.diagrams.net](https://app.diagrams.net) (*Fichier → Ouvrir depuis → Cet appareil*) ou avec l'extension VS Code « Draw.io Integration ».
+
+### MCD
+
+![MCD de Kadea Chat](docs/modelisation/mcd.png)
+
+### MLD
+
+![MLD de Kadea Chat](docs/modelisation/mld.png)
+
+<details>
+<summary><b>Dictionnaire des données</b> (cliquer pour afficher)</summary>
+
+![Dictionnaire des données de Kadea Chat](docs/modelisation/dictionnaire_donnees.png)
+
+</details>
+
+### Rôle de chaque table
 
 | Table | Contenu |
 |---|---|
 | `users` | Comptes utilisateurs, statut en ligne |
 | `inscriptions` | Inscriptions en attente de confirmation (temporaire) |
 | `forgo_passwords` | Demandes de réinitialisation (jeton haché, expiration) |
-| `conversation_types` | Référence : `private`, `group` |
+| `conversation_types` | Référence : `Privee` (à deux), `Publique` (groupe) |
 | `conversations` | Discussions privées et groupes (même table) |
 | `role_conversations` | Référence : `admin`, `membre` |
 | `user_conversations` | Participants, rôle, date d'arrivée, dernier message lu |
