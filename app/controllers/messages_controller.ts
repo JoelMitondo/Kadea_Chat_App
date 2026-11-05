@@ -2,11 +2,11 @@ import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import User from '#models/user'
+import ConversationPolicy from '#policies/conversation_policy'
 import Conversation from '#models/conversation'
 import Message from '#models/message'
 import MessageAttachment from '#models/message_attachment'
 import MessageStatus from '#models/message_status'
-import MessageType from '#models/message_type'
 import UserConversation from '#models/user_conversation'
 import { IMAGE_EXTENSIONS, sendMessageValidator, updateMessageValidator } from '#validators/message'
 import {
@@ -17,20 +17,17 @@ import {
   construitApercu,
   chercheParticipationGroupe,
   chercheParticipationPrivee,
+  donneDernierMessage,
+  donneTypeMessage,
   donneHeureDeLaListe,
   besoinSeparateurDeJour,
-} from '../service/chat_service.ts'
-import { aBloque } from '../service/block_service.ts'
-import {
-  supprimeFichierParLien,
-  envoieDocument,
-  envoieImage,
-} from '../service/cloudinary_service.ts'
+} from '#services/chat_service'
+import { supprimeFichierParLien, envoieDocument, envoieImage } from '#services/cloudinary_service'
 import {
   previensMessageModifie,
   previensNouveauMessage,
   type ConversationKind,
-} from '../service/realtime_service.ts'
+} from '#services/realtime_service'
 
 export default class MessagesController {
   // Envoie un message dans une conversation PRIVÉE
@@ -55,14 +52,13 @@ export default class MessagesController {
 
   // Modifie un message (uniquement par son auteur)
 
-  async modifieMessage({ auth, params, request, response, view }: HttpContext) {
+  async modifieMessage({ auth, bouncer, params, request, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const { content } = await request.validateUsing(updateMessageValidator)
     const message = await Message.findOrFail(params.id)
 
-    if (message.userId !== user.id) {
-      return response.forbidden({ message: 'Vous ne pouvez modifier que vos propres messages.' })
-    }
+    // Règle d'autorisation : app/policies/conversation_policy.ts (403 si ce n'est pas l'auteur)
+    await bouncer.with(ConversationPolicy).authorize('modifierMessage', message)
     if (message.isDeleted) {
       return response.badRequest({ message: 'Ce message a été supprimé.' })
     }
@@ -87,13 +83,11 @@ export default class MessagesController {
   // La ligne reste (pour afficher « Ce message a été supprimé » à sa place dans la discussion),
   // mais son TEXTE est effacé de la base : rien du contenu supprimé n'est conservé.
 
-  async supprimeMessage({ auth, params, response, view }: HttpContext) {
+  async supprimeMessage({ auth, bouncer, params, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const message = await Message.findOrFail(params.id)
 
-    if (message.userId !== user.id) {
-      return response.forbidden({ message: 'Vous ne pouvez supprimer que vos propres messages.' })
-    }
+    await bouncer.with(ConversationPolicy).authorize('supprimerMessage', message)
 
     message.merge({ isDeleted: true, deletedAt: DateTime.now(), content: null })
     await message.save()
@@ -119,7 +113,7 @@ export default class MessagesController {
     membership: UserConversation,
     kind: ConversationKind
   ) {
-    const { auth, request, response, view, logger } = ctx
+    const { auth, bouncer, request, response, view, logger } = ctx
     const user = auth.getUserOrFail()
     const { content, attachment } = await request.validateUsing(sendMessageValidator)
     const conversationId = membership.conversationId
@@ -139,10 +133,7 @@ export default class MessagesController {
     // ÉTAPE 2 : BLOCAGE (conversations privées) :
     // si l'autre personne m'a bloqué, je ne peux plus lui écrire
     if (kind === 'private' && otherMemberships.length > 0) {
-      const isBlocked = await aBloque(otherMemberships[0].userId, user.id)
-      if (isBlocked) {
-        return response.forbidden({ message: "Impossible d'envoyer ce message à cet utilisateur." })
-      }
+      await bouncer.with(ConversationPolicy).authorize('ecrireA', otherMemberships[0].userId)
     }
 
     // Qui est en ligne en ce moment ? Pour eux, le message arrive tout de suite (statut « reçu »).
@@ -182,17 +173,10 @@ export default class MessagesController {
       }
     }
 
-    const messageType = await MessageType.firstOrCreate(
-      { type: messageTypeName },
-      { type: messageTypeName }
-    )
+    const messageType = await donneTypeMessage(messageTypeName)
 
     // Dernier message existant : sert à décider du séparateur de date
-    const previousMessage = await Message.query()
-      .where('conversationId', conversationId)
-      .orderBy('createdAt', 'desc')
-      .orderBy('id', 'desc')
-      .first()
+    const previousMessage = await donneDernierMessage(conversationId)
 
     // ÉTAPE 4 : enregistrement en base. Transaction : soit TOUT est enregistré, soit RIEN.
     // Transaction : le message, son fichier, ses statuts et le "dernier message" sont enregistrés ensemble.
@@ -297,11 +281,7 @@ export default class MessagesController {
     view: HttpContext['view'],
     showSeparator = false
   ) {
-    const lastMessage = await Message.query()
-      .where('conversationId', message.conversationId)
-      .orderBy('createdAt', 'desc')
-      .orderBy('id', 'desc')
-      .first()
+    const lastMessage = await donneDernierMessage(message.conversationId)
 
     const html = await view.render('partials/message-item', {
       message: construitVueMessage(message, userId),

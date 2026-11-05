@@ -27,7 +27,7 @@ router
   .post('/register', [controllers.Inscriptions, 'enregistreInscription'])
   .as('inscriptions.store')
   .use(limiteEnvoiEmail)
-router.get('register', [controllers.Inscriptions, 'donnePageInscription']).as('New_compte.register')
+router.get('register', [controllers.Inscriptions, 'donnePageInscription']).as('inscriptions.create')
 
 router
   .group(() => {
@@ -114,6 +114,9 @@ router
 
     // ----- Groupes -----
     router.get('/groups', [controllers.Groups, 'donnePageGroupes']).as('groups')
+    router
+      .get('/groups/candidates', [controllers.Groups, 'donneCandidatsRecherche'])
+      .as('groups.candidates')
     router
       .get('/groups/:id', [controllers.Groups, 'donneGroupe'])
       .where('id', ID_NUMERIQUE)

@@ -3,9 +3,9 @@ import { test } from '@japa/runner'
 import testUtils from '@adonisjs/core/services/test_utils'
 import Message from '#models/message'
 import MessageStatus from '#models/message_status'
-import { chercheOuCreeConversationPrivee } from '../../app/service/conversation_service.ts'
-import { MESSAGES_PER_PAGE } from '../../app/service/chat_service.ts'
-import { marqueMessagesCommeRecus } from '../../app/service/realtime_service.ts'
+import { chercheOuCreeConversationPrivee } from '#services/conversation_service'
+import { MESSAGES_PER_PAGE } from '#services/chat_service'
+import { marqueMessagesCommeRecus } from '#services/realtime_service'
 import { creeMessages, creeUtilisateur } from '../helpers.ts'
 
 test.group('Messages : historique complet (pagination)', (group) => {

@@ -3,8 +3,8 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import UserConversation from '#models/user_conversation'
-import { GROUP_TYPE } from '../service/chat_service.ts'
-import { marqueConversationCommeLueEtPrevient } from '../service/realtime_service.ts'
+import { GROUP_TYPE } from '#services/chat_service'
+import { marqueConversationCommeLueEtPrevient } from '#services/realtime_service'
 
 export default class RealtimeController {
   /**

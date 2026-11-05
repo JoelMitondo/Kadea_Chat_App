@@ -1,8 +1,8 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import { searchUsersValidator, chatWithUserValidator } from '#validators/user_list'
-import { chercheOuCreeConversationPrivee } from '../service/conversation_service.ts'
-import { protegeCaracteresRecherche, formateDate, donneInitiales } from '../service/chat_service.ts'
+import { chercheOuCreeConversationPrivee } from '#services/conversation_service'
+import { protegeCaracteresRecherche, formateDate, donneInitiales } from '#services/chat_service'
 
 const USERS_PER_PAGE = 20
 

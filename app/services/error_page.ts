@@ -3,7 +3,7 @@
 
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
-import { APP_TIMEZONE } from './chat_service.ts'
+import { APP_TIMEZONE } from '#services/chat_service'
 
 // Une action proposée sur la page d'erreur (bouton)
 interface ErrorAction {

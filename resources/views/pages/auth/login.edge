@@ -11,8 +11,6 @@
       route: 'session.store',
       method: 'POST',
       class: 'mt-6 space-y-5',
-      'x-data': '{ submitting: false }',
-      'x-on:submit': 'submitting = true',
     })
 
       {{-- Adresse e-mail --}}
@@ -53,11 +51,8 @@
         @!field.error({ class: 'mt-1.5 text-sm text-danger' })
       @end
 
-      {{-- Bouton avec changement (Alpine) --}}
       <button
         type="submit"
-        x-bind:disabled="submitting"
-        x-text="submitting ? 'Connexion en cours…' : 'Se connecter'"
         class="w-full cursor-pointer rounded-lg bg-primary px-4 py-3 font-semibold text-on-primary hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         Se connecter
@@ -68,7 +63,7 @@
     {{-- Lien vers l'inscription --}}
     <p class="mt-6 text-center text-sm text-fg-muted">
       Pas encore de compte ?
-      @link({ route: 'New_compte.register', class: 'font-medium text-link hover:underline' })
+      @link({ route: 'inscriptions.create', class: 'font-medium text-link hover:underline' })
         Créer un compte
       @end
     </p>

@@ -47,10 +47,8 @@
     "@japa/plugin-adonisjs": "^5.2.0",
     "@japa/runner": "^5.3.0",
     "@poppinss/ts-exec": "^1.4.4",
-    "@types/alpinejs": "^3.13.11",
     "@types/luxon": "^3.7.5",
     "@types/node": "~26.6.2",
-    "alpinejs": "^3.17.4",
     "eslint": "^10.11.0",
     "hot-hook": "^1.0.0",
     "pino-pretty": "^13.1.3",
@@ -74,8 +72,6 @@
     "@adonisjs/vite": "^6.0.2",
     "@tailwindcss/cli": "^4.3.3",
     "@vinejs/vine": "^4.4.0",
-    "argon2": "^0.45.1",
-    "better-sqlite3": "^13.0.3",
     "cloudinary": "^2.11.0",
     "edge-iconify": "^2.0.2",
     "edge.js": "^6.5.1",
@@ -92,7 +88,6 @@
   },
   "allowScripts": {
     "@swc/core": true,
-    "better-sqlite3": true,
     "esbuild": true,
     "fsevents": true,
     "@parcel/watcher@2.5.1": true

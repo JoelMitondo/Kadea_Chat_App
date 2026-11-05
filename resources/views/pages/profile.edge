@@ -19,12 +19,12 @@
             <span class="flex h-full w-full items-center justify-center rounded-full border-4 border-surface bg-surface-2 text-3xl font-bold text-on-primary-soft">
               {{ profile.initials }}
             </span>
-            {{--onerror gère la suppression lorsque la photo n'existe pas--}}
+            {{-- data-remove-on-error : l'image est retirée si la photo n'existe plus (partials/head-script.edge) --}}
             @if(profile.avatarUrl)
               <img
                 src="{{ profile.avatarUrl }}"
                 alt="Photo de {{ profile.fullName }}"
-                onerror="this.remove()" 
+                data-remove-on-error
                 class="absolute inset-0 h-full w-full rounded-full border-4 border-surface object-cover"
               >
             @end
@@ -194,7 +194,7 @@
               src="{{ profile.avatarUrl }}"
               data-current="{{ profile.avatarUrl }}"
               alt=""
-              onerror="this.classList.add('hidden')"
+              data-hide-on-error
               class="absolute inset-0 h-full w-full rounded-full object-cover"
             >
           </span>

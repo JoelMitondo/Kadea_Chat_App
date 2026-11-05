@@ -13,13 +13,7 @@
   <link rel="icon" href="https://i.ibb.co/1YhrGKHz/logo-Kadea.png" type="image/png">
 
   {{-- Thème clair ou sombre appliqué avant l'affichage --}}
-  <script>
-    try {
-      let themeSauvegarde = localStorage.getItem('theme')
-      let themeDuSysteme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-      document.documentElement.dataset.theme = themeSauvegarde || themeDuSysteme
-    } catch (erreur) {}
-  </script>
+  @include('partials/head-script')
 
   @vite(['resources/css/compiles/app.css'])
 </head>

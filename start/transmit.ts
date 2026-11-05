@@ -13,7 +13,7 @@ import {
   annoncePresence,
   convertitEnIdentifiantCanal,
   marqueMessagesCommeRecus,
-} from '../app/service/realtime_service.ts'
+} from '#services/realtime_service'
 
 // ===== 1. QUI A LE DROIT DE S'ABONNER À QUEL CANAL ? =====
 // Sans règle, n'importe qui pourrait écouter n'importe quel canal. On les protège.

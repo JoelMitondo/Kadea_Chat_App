@@ -18,7 +18,7 @@
   </span>
 
   @if($props.get('src'))
-    <img src="{{ $props.get('src') }}" alt="" onerror="this.remove()" class="absolute inset-0 h-full w-full rounded-full object-cover">
+    <img src="{{ $props.get('src') }}" alt="" data-remove-on-error class="absolute inset-0 h-full w-full rounded-full object-cover">
   @end
 
   {{-- Puce verte qui clignote : en ligne --}}

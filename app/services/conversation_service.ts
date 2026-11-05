@@ -6,9 +6,8 @@
 import db from '@adonisjs/lucid/services/db'
 import type User from '#models/user'
 import Conversation from '#models/conversation'
-import ConversationType from '#models/conversation_type'
-import RoleConversation from '#models/role_conversation'
 import UserConversation from '#models/user_conversation'
+import { MEMBER_ROLE, PRIVATE_TYPE, donneRole, donneTypeConversation } from '#services/chat_service'
 
 // Renvoie la conversation privée entre deux utilisateurs.
 // Si elle n'existe pas encore, elle est créée (avec les deux participants).
@@ -18,7 +17,7 @@ export async function chercheOuCreeConversationPrivee(
   otherUser: User
 ): Promise<Conversation> {
   // Récupérer le type de conversation "Privee" une seule fois
-  const privateType = await ConversationType.firstOrCreate({ type: 'Privee' }, { type: 'Privee' })
+  const privateType = await donneTypeConversation(PRIVATE_TYPE)
 
   // Chercher s'il existe déjà une conversation privée commune aux deux utilisateurs
   const existingConversation = await Conversation.query()
@@ -47,7 +46,7 @@ export async function chercheOuCreeConversationPrivee(
   }
 
   // Sinon, on la crée proprement dans une transaction
-  const memberRole = await RoleConversation.firstOrCreate({ title: 'membre' }, { title: 'membre' })
+  const memberRole = await donneRole(MEMBER_ROLE)
 
   // TRANSACTION : plusieurs écritures traitées comme une seule.
   // Si l'une échoue, tout est annulé : on n'aura jamais une conversation sans ses participants.

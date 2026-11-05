@@ -8,7 +8,7 @@ import { confirmationCompteValidator } from '#validators/user'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
-import { ERROR_PAGES, affichePageErreur } from '../service/error_page.ts'
+import { ERROR_PAGES, affichePageErreur } from '#services/error_page'
 
 export default class NewAccountController {
   //function pour envoyer les information d'une invitation lors de l'enregistrement de l'utilisateur

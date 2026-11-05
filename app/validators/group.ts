@@ -12,6 +12,13 @@ export const addMembersValidator = vine.create({
   member_ids: vine.array(vine.string().uuid()).minLength(1).maxLength(100).distinct(),
 })
 
+// Recherche de personnes à ajouter : /groups/candidates?q=marie&group=12
+// group (facultatif) : on exclut les membres de ce groupe
+export const searchCandidatesValidator = vine.create({
+  q: vine.string().trim().maxLength(100).optional(),
+  group: vine.number().withoutDecimals().positive().optional(),
+})
+
 // Messages d'erreur en français (si l'un d'eux reste en anglais, sa clé n'a pas été reconnue).
 // Les messages communs (validationMessages) sont repris : ce fournisseur remplace le global.
 createGroupValidator.messagesProvider = new SimpleMessagesProvider(

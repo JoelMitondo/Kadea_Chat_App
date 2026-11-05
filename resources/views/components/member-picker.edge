@@ -1,7 +1,9 @@
-{{-- Sélecteur de membres avec recherche. Prop : candidates (id, fullName, initials, avatarUrl, isOnline) --}}
+{{-- Sélecteur de membres avec recherche.
+     Props : candidates (les premières personnes proposées), searchUrl (adresse de la recherche).
+     La liste n'affiche jamais tout le monde : taper un nom interroge le serveur (groupe.js). --}}
 @let(candidates = $props.get('candidates'))
 
-<div data-member-picker class="space-y-3">
+<div data-member-picker data-search-url="{{ $props.get('searchUrl') }}" class="space-y-3">
   @if(candidates.length === 0)
     <p class="rounded-xl border border-line px-4 py-6 text-center text-sm text-fg-subtle">Aucun utilisateur disponible.</p>
   @else
@@ -14,15 +16,9 @@
       class="w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5 text-fg placeholder:text-fg-subtle focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
     >
 
-    <ul class="max-h-56 divide-y divide-line overflow-y-auto rounded-xl border border-line">
+    <ul data-member-list class="max-h-56 divide-y divide-line overflow-y-auto rounded-xl border border-line">
       @each(person in candidates)
-        <li data-member-item data-name="{{ person.fullName.toLowerCase() }}">
-          <label class="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-surface-2">
-            <input type="checkbox" data-member-checkbox value="{{ person.id }}" class="h-4 w-4 flex-none cursor-pointer accent-primary">
-            @!component('components/user-avatar', { initials: person.initials, src: person.avatarUrl, online: person.isOnline, showOffline: true, size: 'sm' })
-            <span class="min-w-0 flex-1 truncate font-medium text-fg">{{ person.fullName }}</span>
-          </label>
-        </li>
+        @!component('components/member-item', { person })
       @end
     </ul>
 

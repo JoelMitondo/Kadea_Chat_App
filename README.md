@@ -131,7 +131,9 @@ flowchart LR
 | Middlewares | `app/middleware/` | Autoriser ou refuser la suite de la requête |
 | Validateurs | `app/validators/` | Vérifier la forme des données |
 | Contrôleurs | `app/controllers/` | Orchestrer une action |
-| Services | `app/service/` | Règles métier réutilisables |
+| Policies | `app/policies/` | Décider qui a le droit de faire quoi (Bouncer) |
+| Services | `app/services/` (alias `#services/...`) | Règles métier réutilisables |
+| E-mails | `app/mails/` + `resources/views/emails/` | Contenu des e-mails envoyés |
 | Modèles | `app/models/` | Tables et relations |
 | Vues | `resources/views/` | Affichage (layouts, composants, partiels) |
 | Scripts | `resources/js/` | Comportements côté navigateur |
@@ -330,7 +332,9 @@ kadea-chat/
 │   ├── controllers/        Un contrôleur par domaine (messages, groupes…)
 │   ├── middleware/         auth, guest, auth silencieuse, liaisons du conteneur
 │   ├── models/             Modèles Lucid (users, conversations, messages…)
-│   ├── service/            Règles métier (Cloudinary, temps réel, groupes, suppression…)
+│   ├── services/           Règles métier (Cloudinary, temps réel, groupes, suppression…)
+│   ├── policies/           Autorisations Bouncer (ConversationPolicy, GroupPolicy)
+│   ├── mails/              Classes d'e-mails (le contenu est dans resources/views/emails/)
 │   ├── validators/         Schémas VineJS
 │   └── exceptions/         Gestionnaire d'erreurs et pages 404 / 500
 ├── config/                 Réglages (base, session, hash, mail, Transmit, shield…)
@@ -347,8 +351,8 @@ kadea-chat/
 │       ├── components/     Composants réutilisables (layouts, bulles, avatars…)
 │       ├── partials/       Fragments renvoyés par le serveur (panneaux de chat)
 │       └── pages/          Pages complètes
-├── start/                  routes, kernel, validator, view, transmit
-├── tests/                  functional/ (contrôle d'accès, mot de passe) + helpers.ts
+├── start/                  routes, kernel, limiter, validator, view, transmit
+├── tests/                  functional/ (accès, policies, historique, sécurité, mot de passe) + helpers.ts
 ├── adonisrc.ts             Providers, preloads, suites de tests
 └── vite.config.ts          Points d'entrée JavaScript
 ```
@@ -374,6 +378,7 @@ kadea-chat/
 | GET / POST | `/groups` | Liste / création | Connecté |
 | GET / DELETE | `/groups/:id` | Ouvrir / supprimer | Membre / admin |
 | GET | `/groups/:id/messages?before=` | Messages précédents du groupe (JSON) | Membre |
+| GET | `/groups/candidates?q=&group=` | Recherche des personnes à ajouter (20 au plus) | Connecté / membre |
 | POST | `/groups/:id/members` | Ajouter des membres | Admin |
 | DELETE | `/groups/:id/members/:userId` | Retirer un membre | Admin |
 | POST | `/groups/:id/messages` | Écrire dans un groupe | Membre |
@@ -456,11 +461,12 @@ La modélisation suit la méthode Merise et correspond aux migrations de `databa
 | Liens secrets | Hachés, à usage unique, avec expiration (48 h inscription, 1 h réinitialisation), construits à partir de `APP_URL` |
 | CSRF | Jeton obligatoire sur tous les formulaires (`@adonisjs/shield`) |
 | Validation | Toutes les entrées passent par VineJS côté serveur |
-| Droits | Vérifiés par le serveur : 404 pour un non-membre, 403 sans droit |
+| Droits | Vérifiés par le serveur : 404 pour un non-membre (on ne révèle pas qu'une conversation existe), puis policies Bouncer pour ce qu'un membre peut faire (403 avec un message clair) : `ConversationPolicy` (modifier / supprimer son message, écrire à quelqu'un qui ne nous a pas bloqué), `GroupPolicy` (ajouter, retirer, supprimer : administrateur seulement) |
 | Injection SQL | Requêtes paramétrées (Lucid / Knex) |
 | XSS | Échappement du HTML (`{{ }}` d'Edge), jamais de HTML fabriqué à partir d'un texte utilisateur |
 | Cookies | `httpOnly`, `sameSite=lax`, `secure` en production |
 | En-têtes | HSTS, anti-clickjacking, anti-sniffing |
+| CSP | Politique de sécurité du contenu (`config/shield.ts`) : scripts de notre domaine uniquement, scripts en ligne seulement avec le nonce de la requête, aucun attribut `onerror=`/`onclick=`, images limitées à Cloudinary et au logo, connexions limitées à notre serveur |
 | Réponses neutres | Connexion et blocage ne révèlent rien d'inutile |
 | Actions sensibles | Mot de passe actuel redemandé pour changer de mot de passe et pour supprimer le compte |
 | Force brute | `@adonisjs/limiter` (`start/limiter.ts`) : 5 essais de connexion par minute (e-mail + IP), 5 vérifications du mot de passe actuel par minute (par compte), 5 envois d'e-mail par quart d'heure (par IP). Au-delà : code 429 et message clair |
@@ -494,6 +500,7 @@ node ace test functional  # tests de routes
 | `tests/functional/access_control.spec.ts` | Visiteur redirigé vers `/login` ; un non-membre ne peut **ni lire ni écrire** dans une conversation privée ou un groupe (404) ; on ne supprime pas le message d'un autre (403) ; la recherche n'expose pas les messages d'autrui ; seul l'administrateur ajoute ou retire des membres ; un membre retiré perd immédiatement l'accès |
 | `tests/functional/password_change.spec.ts` | Ancien mot de passe obligatoire, confirmation identique, nouveau mot de passe stocké haché |
 | `tests/functional/messages_history.spec.ts` | Historique par pages de 50 avec « messages précédents » (et 404 pour un non-membre) ; texte effacé à la suppression ; statut « reçu » pour un destinataire en ligne puis à la connexion |
+| `tests/functional/policies.spec.ts` | Refus d'une policy avec son message français (écrire à quelqu'un qui nous a bloqué, supprimer un groupe sans être administrateur) ; recherche de membres filtrée et réservée aux membres du groupe ; en-tête CSP présent et nonce sur le script en ligne |
 | `tests/functional/security.spec.ts` | Identifiant non numérique → 404 ; arrivée sur `/messages` après la connexion ; 6ᵉ essai de connexion refusé (429) ; e-mail de réinitialisation construit sur `APP_URL` avec le nom échappé |
 
 ---
@@ -572,10 +579,10 @@ Conformément aux règles du projet, l'usage d'assistants d'IA est déclaré ici
 
 | Outil | Usage | Parties concernées |
 |---|---|---|
-| Claude (Claude Code, Anthropic) | Audit du code par rapport au cahier des charges, corrections et revue | Retrait de membres d'un groupe, changement direct du mot de passe, liens e-mail construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README ; puis (branche `fix/p1`) historique paginé, statut « reçu », effacement du texte supprimé, limiteur de requêtes, e-mails en vues Edge, routes à identifiant numérique, migration de clés étrangères et d'index, redirection après connexion |
+| Claude (Claude Code, Anthropic) | Audit du code par rapport au cahier des charges, corrections et revue | Retrait de membres d'un groupe, changement direct du mot de passe, liens e-mail construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README ; puis (branche `fix/p1`) historique paginé, statut « reçu », effacement du texte supprimé, limiteur de requêtes, e-mails en vues Edge, routes à identifiant numérique, migration de clés étrangères et d'index, redirection après connexion ; puis (branche `fix/p2`) suppression des duplications, policies Bouncer, dossier `app/services`, suppression du code mort, CSP, recherche de membres côté serveur |
 | Claude (Claude Code, Anthropic) — branche `UpdateClaude` | Documentation, modélisation et refactorisation, relues puis fusionnées dans `main` | Dictionnaire des données, MCD et MLD ; modèle C4 (Structurizr) ; commentaires explicatifs des services, contrôleurs et du temps réel ; noms de méthodes et de routes plus clairs ; contrainte `NOT NULL` sur `expired_at` ; correction de la page d'accueil et ajustements des vues |
 
-**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude`, `fix/p0` et `fix/p1`).
+**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude`, `fix/p0`, `fix/p1` et `fix/p2`).
 
 ---
 

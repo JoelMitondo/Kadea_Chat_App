@@ -7,12 +7,7 @@ import { BaseSeeder } from '@adonisjs/lucid/seeders'
 import ConversationType from '#models/conversation_type'
 import RoleConversation from '#models/role_conversation'
 import MessageType from '#models/message_type'
-import {
-  ADMIN_ROLE,
-  GROUP_TYPE,
-  MEMBER_ROLE,
-  PRIVATE_TYPE,
-} from '../../app/service/chat_service.ts'
+import { ADMIN_ROLE, GROUP_TYPE, MEMBER_ROLE, PRIVATE_TYPE } from '#services/chat_service'
 
 // Tables de référence remplies par ce seeder (identifiant auto-incrémenté "id")
 const REFERENCE_TABLES = ['conversation_types', 'role_conversations', 'message_types']

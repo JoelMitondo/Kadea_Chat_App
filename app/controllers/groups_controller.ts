@@ -1,15 +1,16 @@
-// GROUPES : liste, ouverture, création, ajout et retrait de membres, suppression.
-// Les actions sensibles vérifient d'abord le rôle : seul l'administrateur peut ajouter, retirer ou supprimer.
-
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
-import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
-import { addMembersValidator, createGroupValidator } from '#validators/group'
-import { ajouteMembresAuGroupe, creeGroupe, retireMembreDuGroupe } from '../service/group.ts'
+import GroupPolicy from '#policies/group_policy'
+import {
+  addMembersValidator,
+  createGroupValidator,
+  searchCandidatesValidator,
+} from '#validators/group'
+import { ajouteMembresAuGroupe, creeGroupe, retireMembreDuGroupe } from '#services/group'
 import { chatWithUserValidator } from '#validators/user_list'
 import { olderMessagesValidator } from '#validators/message'
-import { supprimeConversationEtFichiers } from '../service/deletion_service.ts'
+import { supprimeConversationEtFichiers } from '#services/deletion_service'
 import {
   ADMIN_ROLE,
   GROUP_TYPE,
@@ -17,23 +18,27 @@ import {
   construitApercu,
   chargePageMessages,
   chercheParticipationGroupe,
+  donneDernierMessage,
   memeJourQueLePremierAffiche,
   formateDate,
   donneInitiales,
   donneHeureDeLaListe,
   donneNombreMessagesNonLus,
-} from '../service/chat_service.ts'
+  protegeCaracteresRecherche,
+} from '#services/chat_service'
 import {
   previensConversationAjoutee,
   previensGroupeModifie,
   marqueConversationCommeLueEtPrevient,
   previensConversationSupprimee,
-} from '../service/realtime_service.ts'
+} from '#services/realtime_service'
+
+// Nombre maximum de personnes proposées dans la liste « ajouter des membres »
+const CANDIDATES_LIMIT = 20
 
 export default class GroupsController {
-  /**
-   * Page Groupes, sans groupe ouvert
-   */
+  // Page Groupes, sans groupe ouvert
+
   async donnePageGroupes({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const groups = await this.donneListeGroupes(user)
@@ -42,10 +47,9 @@ export default class GroupsController {
     return view.render('pages/groups', { groups, chat: null, candidates })
   }
 
-  /**
-   * Ouvre un groupe (même principe que les conversations privées :
-   * panneau seul pour le JavaScript, page complète sinon)
-   */
+  // Ouvre un groupe (même principe que les conversations privées :
+  // panneau seul pour le JavaScript, page complète sinon)
+
   async donneGroupe({ auth, params, request, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const chat = await this.donneDiscussion(user, Number(params.id))
@@ -59,9 +63,8 @@ export default class GroupsController {
     return view.render('pages/groups', { groups, chat, candidates })
   }
 
-  /**
-   * « Messages précédents » d'un groupe (même principe que pour une conversation privée)
-   */
+  // « Messages précédents » d'un groupe (même principe que pour une conversation privée)
+
   async donneMessagesPrecedents({ auth, params, request, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
@@ -83,8 +86,31 @@ export default class GroupsController {
   }
 
   /**
-   * Crée un groupe
+   * Recherche de personnes à ajouter (création d'un groupe ou ajout de membres).
+   * On ne charge jamais TOUS les utilisateurs : au plus CANDIDATES_LIMIT, filtrés par le nom tapé.
+   * Réponse : les lignes de la liste déjà fabriquées en HTML (groupe.js les insère).
    */
+  async donneCandidatsRecherche({ auth, request, view }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const { q, group } = await searchCandidatesValidator.validate(request.qs())
+
+    let excludedIds: User['id'][] = [user.id]
+
+    // Ajout à un groupe existant : on exclut ses membres (il faut en faire partie, sinon 404)
+    if (group !== undefined) {
+      await chercheParticipationGroupe(user.id, group).firstOrFail()
+      const members = await UserConversation.query()
+        .where('conversationId', group)
+        .select('user_id')
+      excludedIds = members.map((member) => member.userId)
+    }
+
+    const candidates = await this.donneCandidats(excludedIds, q)
+    return view.render('partials/member-items', { candidates })
+  }
+
+  // Crée un groupe
+
   async enregistreGroupe({ auth, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const { name, member_ids: memberIds } = await request.validateUsing(createGroupValidator)
@@ -116,10 +142,9 @@ export default class GroupsController {
     return response.created({ id: group.id })
   }
 
-  /**
-   * Ajoute des membres à un groupe (réservé à l'administrateur)
-   */
-  async ajouteMembres({ auth, params, request, response, session }: HttpContext) {
+  // Ajoute des membres à un groupe (réservé à l'administrateur)
+
+  async ajouteMembres({ auth, bouncer, params, request, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
     const { member_ids: memberIds } = await request.validateUsing(addMembersValidator)
@@ -129,11 +154,8 @@ export default class GroupsController {
       .preload('conversation') // pour le nom du groupe
       .firstOrFail()
 
-    if (membership.role.title !== ADMIN_ROLE) {
-      return response.forbidden({
-        message: "Seul l'administrateur du groupe peut ajouter des membres.",
-      })
-    }
+    // Réservé à l'administrateur (règle dans app/policies/group_policy.ts, sinon 403)
+    await bouncer.with(GroupPolicy).authorize('ajouterMembres', membership)
 
     const existingUsers = await User.query().whereIn('id', memberIds).select('id')
     if (existingUsers.length !== memberIds.length) {
@@ -154,12 +176,7 @@ export default class GroupsController {
     }
 
     // TEMPS RÉEL 1 : les nouveaux membres voient le groupe apparaître dans leur liste
-    const lastMessage = await Message.query()
-      .where('conversationId', conversationId)
-      .preload('user')
-      .orderBy('createdAt', 'desc')
-      .orderBy('id', 'desc')
-      .first()
+    const lastMessage = await donneDernierMessage(conversationId, { withAuthor: true })
 
     await previensConversationAjoutee({
       conversation: membership.conversation,
@@ -184,11 +201,10 @@ export default class GroupsController {
     return response.ok({ message })
   }
 
-  /**
-   * Retire un membre du groupe (réservé à l'administrateur).
-   * Le membre retiré ne peut plus lire ni écrire dans le groupe : sa participation est supprimée.
-   */
-  async retireMembre({ auth, params, response, session }: HttpContext) {
+  // Retire un membre du groupe (réservé à l'administrateur).
+  // Le membre retiré ne peut plus lire ni écrire dans le groupe : sa participation est supprimée.
+
+  async retireMembre({ auth, bouncer, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
     const { id: memberId } = await chatWithUserValidator.validate({ id: params.userId })
@@ -199,13 +215,9 @@ export default class GroupsController {
       .preload('conversation')
       .firstOrFail()
 
-    // 2. ... et administrateur (sinon 403). La règle est vérifiée ici, côté serveur :
+    // 2. ... et administrateur (sinon 403). La règle est vérifiée côté serveur, par la policy :
     // masquer le bouton dans la page ne suffit pas.
-    if (membership.role.title !== ADMIN_ROLE) {
-      return response.forbidden({
-        message: "Seul l'administrateur du groupe peut retirer des membres.",
-      })
-    }
+    await bouncer.with(GroupPolicy).authorize('retirerMembres', membership)
 
     // 3. L'administrateur ne se retire pas lui-même (le groupe n'aurait plus d'administrateur)
     if (memberId === user.id) {
@@ -225,9 +237,7 @@ export default class GroupsController {
     if (!target) {
       return response.notFound({ message: 'Cette personne ne fait pas partie du groupe.' })
     }
-    if (target.role.title === ADMIN_ROLE) {
-      return response.forbidden({ message: 'Un administrateur ne peut pas être retiré.' })
-    }
+    await bouncer.with(GroupPolicy).authorize('retirerCeMembre', target)
 
     await retireMembreDuGroupe(conversationId, memberId)
 
@@ -256,10 +266,9 @@ export default class GroupsController {
     return response.ok({ message })
   }
 
-  /**
-   * Supprime un groupe, pour TOUS ses membres (réservé à l'administrateur)
-   */
-  async supprimeGroupe({ auth, params, response, session }: HttpContext) {
+  // Supprime un groupe, pour TOUS ses membres (réservé à l'administrateur)
+
+  async supprimeGroupe({ auth, bouncer, params, response, session }: HttpContext) {
     const user = auth.getUserOrFail()
     const conversationId = Number(params.id)
 
@@ -269,11 +278,7 @@ export default class GroupsController {
       .firstOrFail()
 
     // Seul l'administrateur peut supprimer le groupe
-    if (membership.role.title !== ADMIN_ROLE) {
-      return response.forbidden({
-        message: "Seul l'administrateur du groupe peut le supprimer.",
-      })
-    }
+    await bouncer.with(GroupPolicy).authorize('supprimer', membership)
 
     const groupName = membership.conversation.title ?? 'Groupe sans nom'
 
@@ -294,9 +299,8 @@ export default class GroupsController {
   }
   // ---------- Méthodes privées ----------
 
-  /**
-   * Liste des groupes de l'utilisateur, le plus récent en premier
-   */
+  // Liste des groupes de l'utilisateur, le plus récent en premier
+
   private async donneListeGroupes(user: User) {
     const memberships = await UserConversation.query()
       .where('userId', user.id)
@@ -338,10 +342,18 @@ export default class GroupsController {
   }
 
   /**
-   * Utilisateurs qu'on peut ajouter (tous, sauf ceux de la liste d'exclusion)
+   * Utilisateurs qu'on peut ajouter (sauf ceux de la liste d'exclusion), filtrés par nom,
+   * limités à CANDIDATES_LIMIT : la page reste légère même avec des milliers d'inscrits.
    */
-  private async donneCandidats(excludedIds: User['id'][]) {
-    const users = await User.query().whereNotIn('id', excludedIds).orderBy('fullName', 'asc')
+  private async donneCandidats(excludedIds: User['id'][], search?: string) {
+    const query = User.query()
+      .whereNotIn('id', excludedIds)
+      .orderBy('fullName', 'asc')
+      .limit(CANDIDATES_LIMIT)
+    if (search) {
+      query.whereILike('fullName', `%${protegeCaracteresRecherche(search)}%`)
+    }
+    const users = await query
 
     return users.map((person) => ({
       id: person.id,
@@ -352,9 +364,8 @@ export default class GroupsController {
     }))
   }
 
-  /**
-   * Prépare toutes les données d'un groupe ouvert
-   */
+  // Prépare toutes les données d'un groupe ouvert
+
   private async donneDiscussion(user: User, conversationId: number) {
     // Seuls les membres du groupe peuvent l'ouvrir (sinon : erreur 404)
     const membership = await chercheParticipationGroupe(user.id, conversationId)
@@ -413,9 +424,8 @@ export default class GroupsController {
     }
   }
 
-  /**
-   * Une page de messages du groupe
-   */
+  // Une page de messages du groupe
+
   private chargeMessages(conversationId: number, userId: User['id'], before: number | null) {
     return chargePageMessages({
       conversationId,

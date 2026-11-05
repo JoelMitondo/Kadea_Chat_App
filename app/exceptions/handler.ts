@@ -1,7 +1,7 @@
 import app from '@adonisjs/core/services/app'
 import { type HttpContext, ExceptionHandler } from '@adonisjs/core/http'
 import type { StatusPageRange, StatusPageRenderer } from '@adonisjs/core/types/http'
-import { ERROR_PAGES, affichePageErreur } from '../service/error_page.ts'
+import { ERROR_PAGES, affichePageErreur } from '#services/error_page'
 
 // Messages en français qui remplacent les messages par défaut (en anglais) d'AdonisJS
 const FRENCH_MESSAGES: Record<string, string> = {
@@ -24,10 +24,18 @@ const FRENCH_MESSAGES: Record<string, string> = {
   E_TOO_MANY_REQUESTS: 'Trop de tentatives. Patientez quelques minutes avant de réessayer.',
 }
 
+// Refus d'une policy sans message précis
+const FORBIDDEN_MESSAGE = "Vous n'avez pas le droit de faire cette action."
+
 // Message affiché pour toute autre erreur serveur : on ne montre jamais le détail technique
 const SERVER_ERROR_MESSAGE = 'Une erreur est survenue sur le serveur. Réessayez dans un instant.'
 
-type HttpError = Error & { code?: string; status?: number }
+type HttpError = Error & {
+  code?: string
+  status?: number
+  // Erreur de Bouncer : le message et le statut choisis par la policy sont dans "response"
+  response?: { message?: string; status?: number }
+}
 
 export default class HttpExceptionHandler extends ExceptionHandler {
   /**
@@ -58,6 +66,12 @@ export default class HttpExceptionHandler extends ExceptionHandler {
   // Toute erreur non gérée dans l'application arrive ici. Le nom "handle" est imposé par AdonisJS.
   async handle(error: unknown, ctx: HttpContext) {
     const httpError = error as HttpError
+
+    // 0. Refus d'une policy (Bouncer) : on reprend le message français écrit dans la policy
+    if (httpError?.code === 'E_AUTHORIZATION_FAILURE') {
+      httpError.message = httpError.response?.message || FORBIDDEN_MESSAGE
+      httpError.status = httpError.response?.status || 403
+    }
 
     // 1. Message anglais d'AdonisJS → message français clair
     const frenchMessage = httpError?.code ? FRENCH_MESSAGES[httpError.code] : undefined

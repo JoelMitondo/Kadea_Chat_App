@@ -7,10 +7,10 @@ import logger from '@adonisjs/core/services/logger'
 import { inscriptionValidator } from '#validators/inscription'
 import Inscription from '#models/inscription'
 import { DateTime } from 'luxon'
-import { genereCodeUnique } from './../service/code_generation.ts'
+import { genereCodeUnique } from '#services/code_generation'
 import hash from '@adonisjs/core/services/hash'
 import { publicUrl } from '#config/app'
-import { APP_TIMEZONE } from '../service/chat_service.ts'
+import { AGE_MINIMUM, APP_TIMEZONE, estMajeur } from '#services/chat_service'
 import ConfirmationEmailMail from '#mails/confirmation_email_mail'
 
 export default class InscriptionsController {
@@ -22,10 +22,13 @@ export default class InscriptionsController {
 
     // Vérification de la majorité (avant tout le reste : inutile de générer un code pour rien)
     // Format { errors: [{ field, message }] } : le formulaire affiche l'erreur sous le bon champ
-    if (!this.estMajeur(payload.birth_date)) {
+    if (!estMajeur(payload.birth_date)) {
       return response.unprocessableEntity({
         errors: [
-          { field: 'birth_date', message: 'Vous devez avoir au moins 18 ans pour vous inscrire' },
+          {
+            field: 'birth_date',
+            message: `Vous devez avoir au moins ${AGE_MINIMUM} ans pour vous inscrire`,
+          },
         ],
       })
     }
@@ -69,16 +72,5 @@ export default class InscriptionsController {
         message: "Échec de l'envoi de l'e-mail",
       })
     }
-  }
-
-  private estMajeur(dateNaissance: DateTime): boolean {
-    // Récupère la date et l'heure actuelles du serveur backend
-    const now = DateTime.now()
-
-    // Calcule la date limite exacte : la date d'aujourd'hui moins 18 ans
-    const dateLimites18Ans = now.minus({ years: 18 })
-
-    // L'utilisateur est majeur si sa date de naissance est inférieure ou égale à la date limite
-    return dateNaissance <= dateLimites18Ans
   }
 }

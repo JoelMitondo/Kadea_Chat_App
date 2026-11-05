@@ -7,8 +7,12 @@ import db from '@adonisjs/lucid/services/db'
 import Message from '#models/message'
 import type User from '#models/user'
 import UserConversation from '#models/user_conversation'
+import ConversationType from '#models/conversation_type'
+import RoleConversation from '#models/role_conversation'
+import MessageType from '#models/message_type'
 import type { ModelQueryBuilderContract } from '@adonisjs/lucid/types/model'
-import { construitLienTelechargement, construitLienMiniature } from './cloudinary_service.ts'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
+import { construitLienTelechargement, construitLienMiniature } from '#services/cloudinary_service'
 
 // Fuseau horaire utilisé pour afficher les heures et calculer "Aujourd'hui" / "Hier"
 export const APP_TIMEZONE = 'Africa/Kinshasa'
@@ -213,39 +217,67 @@ export function construitVueMessage(
 // On cherche une ligne dans user_conversations pour CET utilisateur et CETTE conversation.
 // Pas de ligne = pas membre : firstOrFail() déclenche une erreur 404, et rien n'est affiché.
 export function chercheParticipationPrivee(userId: User['id'], conversationId: number) {
-  return UserConversation.query()
-    .where('userId', userId)
-    .where('conversationId', conversationId)
-    .whereHas('conversation', (conversationQuery) => {
-      conversationQuery.whereHas('type', (typeQuery) => {
-        typeQuery.where('type', PRIVATE_TYPE)
-      })
-    })
-}
-
-// Passe en "lu" tous les messages non lus de l'utilisateur dans une conversation
-export async function marqueConversationCommeLue(userId: User['id'], conversationId: number) {
-  await db
-    .from('message_statuses')
-    .where('user_id', userId)
-    .where('is_read', false)
-    .whereIn(
-      'message_id',
-      db.from('messages').select('id').where('conversation_id', conversationId)
-    )
-    .update({ is_read: true, status: STATUS_READ, updated_at: new Date() })
+  return chercheParticipation(userId, conversationId, PRIVATE_TYPE)
 }
 
 // Même chose que chercheParticipationPrivee, mais pour un GROUPE
 export function chercheParticipationGroupe(userId: User['id'], conversationId: number) {
+  return chercheParticipation(userId, conversationId, GROUP_TYPE)
+}
+
+// La requête commune aux deux : la participation de l'utilisateur à une conversation d'un type donné
+function chercheParticipation(userId: User['id'], conversationId: number, typeName: string) {
   return UserConversation.query()
     .where('userId', userId)
     .where('conversationId', conversationId)
     .whereHas('conversation', (conversationQuery) => {
       conversationQuery.whereHas('type', (typeQuery) => {
-        typeQuery.where('type', GROUP_TYPE)
+        typeQuery.where('type', typeName)
       })
     })
+}
+
+/**
+ * Le dernier message d'une conversation (null s'il n'y en a aucun).
+ * - withAuthor : charge aussi son auteur (aperçu « Jo : ... » dans un groupe) ;
+ * - client : pour lire à l'intérieur d'une transaction.
+ */
+export function donneDernierMessage(
+  conversationId: number,
+  options: { withAuthor?: boolean; client?: TransactionClientContract } = {}
+) {
+  const query = Message.query({ client: options.client })
+    .where('conversationId', conversationId)
+    .orderBy('id', 'desc')
+  if (options.withAuthor) {
+    query.preload('user')
+  }
+  return query.first()
+}
+
+// ---------- Données de référence ----------
+// Normalement créées par le seeder ; firstOrCreate les crée quand même si elles manquent
+// (base toute neuve), pour que l'application ne tombe jamais en erreur.
+
+export function donneTypeConversation(type: string) {
+  return ConversationType.firstOrCreate({ type }, { type })
+}
+
+export function donneRole(title: string) {
+  return RoleConversation.firstOrCreate({ title }, { title })
+}
+
+export function donneTypeMessage(type: string) {
+  return MessageType.firstOrCreate({ type }, { type })
+}
+
+// ---------- Âge ----------
+
+export const AGE_MINIMUM = 18
+
+// Vrai si la personne née à cette date a au moins 18 ans aujourd'hui
+export function estMajeur(birthDate: DateTime): boolean {
+  return birthDate <= DateTime.now().minus({ years: AGE_MINIMUM })
 }
 
 // Nombre de messages non lus par conversation (table message_statuses).
