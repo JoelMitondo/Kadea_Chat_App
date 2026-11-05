@@ -75,9 +75,9 @@ Projet de fin de formation · Kadea Academy
 |---|---|
 | **Comptes** | Inscription en deux étapes avec confirmation par e-mail, connexion, mot de passe oublié par lien à usage unique |
 | **Profil** | Photo, biographie, statut « En ligne », statistiques |
-| **Messages privés** | Envoi, modification, suppression, accusés de lecture, compteur de non-lus, suppression de conversation pour soi |
+| **Messages privés** | Envoi, modification, suppression (le texte est effacé de la base), statuts envoyé / reçu / lu, historique complet (« messages précédents » par pages de 50), compteur de non-lus, suppression de conversation pour soi |
 | **Groupes** | Création, rôles administrateur / membre, ajout et retrait de membres par l'administrateur, suppression du groupe |
-| **Temps réel** | Nouveaux messages, lectures, modifications et présence instantanés (SSE) |
+| **Temps réel** | Nouveaux messages, réceptions, lectures, modifications et présence instantanés (SSE) |
 | **Fichiers joints** | Images et documents jusqu'à 10 Mo, miniatures, ouverture et téléchargement |
 | **Recherche** | Dans tous ses propres messages, avec mot surligné |
 | **Utilisateurs** | Liste paginée, recherche, démarrage d'une discussion |
@@ -280,6 +280,9 @@ BREVO_API_KEY=votre_cle_brevo
 CLOUDINARY_CLOUD_NAME=votre_cloud
 CLOUDINARY_API_KEY=votre_cle
 CLOUDINARY_API_SECRET=votre_secret
+
+# Limiteur de requêtes (facultatif, "database" par défaut)
+LIMITER_STORE=database
 ```
 
 | Variable | Rôle | Remarque |
@@ -287,9 +290,10 @@ CLOUDINARY_API_SECRET=votre_secret
 | `APP_KEY` | Chiffrement des cookies et sessions | Unique par environnement, jamais partagée |
 | `APP_URL` | Adresse publique, base de **tous** les liens envoyés par e-mail | En production : l'adresse réelle en `https://` (ex. `https://agora-chat-app-1.onrender.com`). Les liens ne sont jamais construits à partir de l'en-tête `Host` de la requête |
 | `SESSION_DRIVER` | `cookie`, `database` ou `memory` | `memory` est réservé aux tests |
-| `MAIL_FROM_ADDRESS` | Expéditeur des e-mails | Doit être **vérifiée** dans Brevo |
+| `MAIL_FROM_ADDRESS` | Expéditeur de **tous** les e-mails (lu dans `config/mail.ts`) | Doit être **vérifiée** dans Brevo. Idéalement une adresse d'un domaine à soi (SPF/DKIM configurés) : une adresse Gmail envoyée par Brevo arrive souvent dans les spams |
 | `BREVO_API_KEY` | Clé d'API Brevo | Brevo → SMTP & API → Clés d'API |
 | `CLOUDINARY_*` | Identifiants Cloudinary | Console Cloudinary → Tableau de bord |
+| `LIMITER_STORE` | Où le limiteur garde ses compteurs : `database` (table `rate_limits`) ou `memory` | Facultatif. `memory` est utilisé par les tests |
 
 > **Ne commitez jamais `.env`.** Il est déjà dans `.gitignore`. Si un secret a été publié par erreur, **changez-le** : le supprimer de l'historique Git ne suffit pas.
 
@@ -355,19 +359,21 @@ kadea-chat/
 
 | Méthode | Route | Rôle | Accès |
 |---|---|---|---|
-| GET / POST | `/register` | Inscription | Invité |
+| GET / POST | `/register` | Inscription (5 envois d'e-mail / 15 min par IP) | Invité |
 | GET / POST | `/signup/:id/:code` | Finalisation du compte | Invité |
-| GET / POST | `/login` | Connexion | Invité |
-| GET / POST | `/forgoPassword` | Demande de réinitialisation | Invité |
+| GET / POST | `/login` | Connexion (5 essais / min, puis 5 min de blocage), puis arrivée sur `/messages` | Invité |
+| GET / POST | `/forgoPassword` | Demande de réinitialisation (5 envois / 15 min par IP) | Invité |
 | GET / POST | `/forgoPassword/:id/:code` | Nouveau mot de passe | Invité |
 | POST | `/logout` | Déconnexion | Connecté |
 | GET | `/messages` | Liste des conversations privées | Connecté |
 | GET / DELETE | `/conversations/:id` | Ouvrir / supprimer pour soi | Participant |
+| GET | `/conversations/:id/messages?before=` | Messages précédents (JSON, 50 par page) | Participant |
 | POST | `/conversations/:id/messages` | Envoyer (texte et/ou fichier) | Participant |
 | PUT / DELETE | `/messages/:id` | Modifier / supprimer | Auteur |
 | POST | `/conversations/:id/read` | Marquer comme lu | Participant |
 | GET / POST | `/groups` | Liste / création | Connecté |
 | GET / DELETE | `/groups/:id` | Ouvrir / supprimer | Membre / admin |
+| GET | `/groups/:id/messages?before=` | Messages précédents du groupe (JSON) | Membre |
 | POST | `/groups/:id/members` | Ajouter des membres | Admin |
 | DELETE | `/groups/:id/members/:userId` | Retirer un membre | Admin |
 | POST | `/groups/:id/messages` | Écrire dans un groupe | Membre |
@@ -379,13 +385,15 @@ kadea-chat/
 | GET | `/settings` | Paramètres du compte | Connecté |
 | POST | `/settings/password` | Changer son mot de passe (ancien redemandé) | Connecté |
 
+Les `:id` de conversation, de groupe et de message n'acceptent que des nombres, et les `:id` d'utilisateur que des uuid : `/conversations/abc` renvoie une 404, jamais une erreur 500.
+
 La liste exacte et à jour s'obtient avec `node ace list:routes`.
 
 ---
 
 ## Base de données
 
-La modélisation suit la méthode Merise et correspond exactement aux migrations de `database/migrations/`.
+La modélisation suit la méthode Merise et correspond aux migrations de `database/migrations/`. Seule la table technique `rate_limits` (compteurs du limiteur de requêtes, gérée par `@adonisjs/limiter`) n'y figure pas : elle ne fait pas partie du domaine métier.
 
 | Document | Image | Fichier source |
 |---|---|---|
@@ -425,15 +433,18 @@ La modélisation suit la méthode Merise et correspond exactement aux migrations
 | `message_types` | Référence : texte, images, document… |
 | `messages` | Messages, suppression douce (`is_deleted`) |
 | `message_attachments` | Fichiers joints (nom, lien, type, taille) |
-| `message_statuses` | Statut d'envoi et de lecture par destinataire |
-| `message_recipients` | Destinataires explicites |
+| `message_statuses` | Statut de chaque message pour chaque destinataire : `sent` (envoyé) → `delivered` (reçu sur son appareil) → `read` (lu) |
+| `message_recipients` | **Réservée à une évolution, non utilisée** : les statuts par destinataire (envoyé, reçu, lu) sont dans `message_statuses`. Elle est prévue pour des destinataires explicites, par exemple une réponse adressée à une partie seulement des membres d'un groupe |
 | `blocked_users` | Qui a bloqué qui |
 
 **Choix de conception**
 
 - Un seul modèle pour les conversations privées **et** les groupes.
 - Les rôles sont stockés dans la table de liaison `user_conversations`.
-- Une migration déjà appliquée n'est jamais modifiée : on en écrit une nouvelle.
+- Une migration déjà appliquée n'est jamais modifiée : on en écrit une nouvelle (exemple : `1793902700000_fix_foreign_keys_and_add_indexes.ts`).
+- Suppression d'un compte : ses messages sont supprimés (`messages.user_id` en `CASCADE`). Le créateur d'un groupe ne peut pas être supprimé tant que le groupe n'a pas été transmis (`conversations.created_by_id` en `RESTRICT`) : `deletion_service.ts` le transmet d'abord au membre le plus ancien.
+- Index sur les requêtes fréquentes : `messages(conversation_id, id)`, `message_statuses(user_id, is_read)`, `message_statuses(user_id, status)`, `user_conversations(conversation_id)`.
+- Un message supprimé garde sa ligne (pour afficher « Ce message a été supprimé » à sa place) mais **son texte est effacé** (`content = NULL`) et ses fichiers sont supprimés de Cloudinary.
 
 ---
 
@@ -452,6 +463,9 @@ La modélisation suit la méthode Merise et correspond exactement aux migrations
 | En-têtes | HSTS, anti-clickjacking, anti-sniffing |
 | Réponses neutres | Connexion et blocage ne révèlent rien d'inutile |
 | Actions sensibles | Mot de passe actuel redemandé pour changer de mot de passe et pour supprimer le compte |
+| Force brute | `@adonisjs/limiter` (`start/limiter.ts`) : 5 essais de connexion par minute (e-mail + IP), 5 vérifications du mot de passe actuel par minute (par compte), 5 envois d'e-mail par quart d'heure (par IP). Au-delà : code 429 et message clair |
+| Adresse IP réelle | `trustProxy: 'uniquelocal'` : on ne croit l'en-tête `X-Forwarded-For` que s'il vient du proxy privé de l'hébergeur, il ne peut donc pas être falsifié |
+| E-mails | Contenu dans des vues Edge (`resources/views/emails/`) et classes `app/mails/` : le nom de l'utilisateur est échappé. Expéditeur unique tiré de `MAIL_FROM_ADDRESS` |
 
 **Signaler une faille :** contactez l'auteur par e-mail (voir [Auteur](#auteur)) plutôt que d'ouvrir une issue publique.
 
@@ -479,6 +493,8 @@ node ace test functional  # tests de routes
 |---|---|
 | `tests/functional/access_control.spec.ts` | Visiteur redirigé vers `/login` ; un non-membre ne peut **ni lire ni écrire** dans une conversation privée ou un groupe (404) ; on ne supprime pas le message d'un autre (403) ; la recherche n'expose pas les messages d'autrui ; seul l'administrateur ajoute ou retire des membres ; un membre retiré perd immédiatement l'accès |
 | `tests/functional/password_change.spec.ts` | Ancien mot de passe obligatoire, confirmation identique, nouveau mot de passe stocké haché |
+| `tests/functional/messages_history.spec.ts` | Historique par pages de 50 avec « messages précédents » (et 404 pour un non-membre) ; texte effacé à la suppression ; statut « reçu » pour un destinataire en ligne puis à la connexion |
+| `tests/functional/security.spec.ts` | Identifiant non numérique → 404 ; arrivée sur `/messages` après la connexion ; 6ᵉ essai de connexion refusé (429) ; e-mail de réinitialisation construit sur `APP_URL` avec le nom échappé |
 
 ---
 
@@ -506,7 +522,7 @@ node bin/server.js
 - [ ] Adresse d'expédition vérifiée dans Brevo
 - [ ] Sauvegarde automatique de PostgreSQL **et** test de restauration
 - [ ] Processus géré par `pm2`, `systemd` ou Docker (redémarrage automatique)
-- [ ] Limitation du nombre de tentatives sur `/login`, `/forgoPassword`, `/register`
+- [ ] Variable `LIMITER_STORE` absente ou à `database`, et migration `rate_limits` appliquée
 
 Consultez la documentation officielle « Deployment » d'AdonisJS pour les chemins exacts de la version 7.
 
@@ -535,16 +551,14 @@ Consultez la documentation officielle « Deployment » d'AdonisJS pour les chemi
 
 - Présence en ligne et temps réel conçus pour **un seul processus serveur**.
 - Recherche en `ILIKE '%…%'` : suffisante pour un projet de formation, lente à grande échelle.
-- Pas de limitation du nombre de tentatives de connexion.
 - Envoi des e-mails pendant la requête (pas de file d'attente).
-- Couverture de tests limitée au contrôle d'accès et au mot de passe (pas encore l'inscription ni le temps réel).
+- Couverture de tests : contrôle d'accès, mot de passe, historique, statuts, limiteur et e-mail de réinitialisation (pas encore l'inscription complète ni l'affichage temps réel dans le navigateur).
 - Liens des fichiers publics (non devinables, mais non signés).
 
 **Évolutions prévues (V2)**
 
 - [ ] Chiffrement de bout en bout des messages
 - [ ] Redis pour la présence et le temps réel multi-serveurs
-- [ ] Limiteur de débit sur les routes d'authentification
 - [ ] Tests de l'inscription, de la réinitialisation et du temps réel
 - [ ] Colonnes `nullable` pour l'anonymisation à la suppression d'un compte
 - [ ] Recherche optimisée (`pg_trgm`) et saut jusqu'au message trouvé
@@ -558,10 +572,10 @@ Conformément aux règles du projet, l'usage d'assistants d'IA est déclaré ici
 
 | Outil | Usage | Parties concernées |
 |---|---|---|
-| Claude (Claude Code, Anthropic) | Audit du code par rapport au cahier des charges, corrections et revue | Retrait de membres d'un groupe, changement direct du mot de passe, liens e-mail construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README |
+| Claude (Claude Code, Anthropic) | Audit du code par rapport au cahier des charges, corrections et revue | Retrait de membres d'un groupe, changement direct du mot de passe, liens e-mail construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README ; puis (branche `fix/p1`) historique paginé, statut « reçu », effacement du texte supprimé, limiteur de requêtes, e-mails en vues Edge, routes à identifiant numérique, migration de clés étrangères et d'index, redirection après connexion |
 | Claude (Claude Code, Anthropic) — branche `UpdateClaude` | Documentation, modélisation et refactorisation, relues puis fusionnées dans `main` | Dictionnaire des données, MCD et MLD ; modèle C4 (Structurizr) ; commentaires explicatifs des services, contrôleurs et du temps réel ; noms de méthodes et de routes plus clairs ; contrainte `NOT NULL` sur `expired_at` ; correction de la page d'accueil et ajustements des vues |
 
-**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude` et `fix/p0`).
+**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude`, `fix/p0` et `fix/p1`).
 
 ---
 

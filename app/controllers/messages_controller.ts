@@ -1,7 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
-import type User from '#models/user'
+import User from '#models/user'
 import Conversation from '#models/conversation'
 import Message from '#models/message'
 import MessageAttachment from '#models/message_attachment'
@@ -11,6 +11,8 @@ import UserConversation from '#models/user_conversation'
 import { IMAGE_EXTENSIONS, sendMessageValidator, updateMessageValidator } from '#validators/message'
 import {
   GROUP_TYPE,
+  STATUS_DELIVERED,
+  STATUS_SENT,
   construitVueMessage,
   construitApercu,
   chercheParticipationGroupe,
@@ -81,7 +83,9 @@ export default class MessagesController {
     return response.ok(data)
   }
 
-  // Supprime un message (uniquement par son auteur) : suppression "douce"
+  // Supprime un message (uniquement par son auteur).
+  // La ligne reste (pour afficher « Ce message a été supprimé » à sa place dans la discussion),
+  // mais son TEXTE est effacé de la base : rien du contenu supprimé n'est conservé.
 
   async supprimeMessage({ auth, params, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
@@ -91,7 +95,7 @@ export default class MessagesController {
       return response.forbidden({ message: 'Vous ne pouvez supprimer que vos propres messages.' })
     }
 
-    message.merge({ isDeleted: true, deletedAt: DateTime.now() })
+    message.merge({ isDeleted: true, deletedAt: DateTime.now(), content: null })
     await message.save()
 
     // Si le message avait un fichier, on le supprime de Cloudinary puis de la base
@@ -140,6 +144,17 @@ export default class MessagesController {
         return response.forbidden({ message: "Impossible d'envoyer ce message à cet utilisateur." })
       }
     }
+
+    // Qui est en ligne en ce moment ? Pour eux, le message arrive tout de suite (statut « reçu »).
+    // Les autres le recevront à leur prochaine connexion (voir marqueMessagesCommeRecus).
+    const onlineRecipients = await User.query()
+      .whereIn(
+        'id',
+        otherMemberships.map((other) => other.userId)
+      )
+      .where('isOnline', true)
+      .select('id')
+    const onlineIds = new Set(onlineRecipients.map((recipient) => recipient.id))
 
     // ÉTAPE 3 : s'il y a un fichier, on l'envoie vers Cloudinary
     let messageTypeName = 'texte'
@@ -208,13 +223,14 @@ export default class MessagesController {
           )
         }
 
-        // Un statut "non lu" pour chaque destinataire (il alimente son compteur)
+        // Un statut "non lu" pour chaque destinataire (il alimente son compteur) :
+        // « reçu » s'il est en ligne, sinon « envoyé »
         await MessageStatus.createMany(
           otherMemberships.map((other) => ({
             messageId: newMessage.id,
             userId: other.userId,
             isRead: false,
-            status: 'sent',
+            status: onlineIds.has(other.userId) ? STATUS_DELIVERED : STATUS_SENT,
           })),
           { client: trx }
         )
@@ -232,8 +248,9 @@ export default class MessagesController {
       throw error
     }
 
-    // On charge le fichier du message : il est nécessaire pour construire la bulle
+    // On charge le fichier et les statuts du message : ils servent à construire la bulle (coches)
     await message.load('attachments')
+    await message.load('statuses')
 
     // Réponse à celui qui vient d'écrire
     const showSeparator = besoinSeparateurDeJour(previousMessage, message, membership)

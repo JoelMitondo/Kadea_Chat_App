@@ -1,0 +1,29 @@
+{{-- E-mail de confirmation d'adresse. Les {{ }} échappent le HTML : un nom contenant
+     des balises (<script>, <a>...) s'affiche comme du texte et ne s'exécute jamais. --}}
+<div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+  <h2>Bonjour {{ fullName }},</h2>
+
+  <p>Merci de vous être inscrit sur <strong>Kadea Chat</strong> ! Pour finaliser la création de votre compte, veuillez confirmer votre adresse e-mail.</p>
+
+  <p>Voici un récapitulatif de vos informations :</p>
+  <ul>
+    <li><strong>Nom complet :</strong> {{ fullName }}</li>
+    <li><strong>Adresse e-mail :</strong> {{ email }}</li>
+    <li><strong>Date d'expiration du lien :</strong> {{ expiresAt }}</li>
+  </ul>
+
+  <p>Cliquez sur le bouton ci-dessous pour confirmer votre e-mail. Vous serez ensuite redirigé vers une page vous permettant de compléter les informations de votre profil :</p>
+
+  <p style="text-align: center; margin: 25px 0;">
+    <a href="{{ activationLink }}" style="background-color: #2e7d32; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+      Confirmer mon e-mail
+    </a>
+  </p>
+
+  <p style="color: #c0392b; font-size: 0.9em;">
+    <strong>Attention :</strong> ce lien d'activation expire dans <strong>48 heures</strong>. Passé ce délai, vous devrez refaire une demande de création de compte.
+  </p>
+
+  <br>
+  <p>Cordialement,<br><strong>L'équipe Kadea Chat</strong></p>
+</div>

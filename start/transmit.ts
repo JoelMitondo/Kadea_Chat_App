@@ -12,6 +12,7 @@ import {
   PRESENCE_CHANNEL,
   annoncePresence,
   convertitEnIdentifiantCanal,
+  marqueMessagesCommeRecus,
 } from '../app/service/realtime_service.ts'
 
 // ===== 1. QUI A LE DROIT DE S'ABONNER À QUEL CANAL ? =====
@@ -78,6 +79,13 @@ transmit.on('connect', async ({ uid, context }) => {
 
   if (!wasOnline) {
     await changeStatutEnLigne(userId, true)
+  }
+
+  // Les messages reçus pendant son absence arrivent maintenant sur son appareil : statut « reçu »
+  try {
+    await marqueMessagesCommeRecus(userId)
+  } catch (error) {
+    logger.error({ err: error, userId }, 'Échec du passage des messages en « reçu »')
   }
 })
 

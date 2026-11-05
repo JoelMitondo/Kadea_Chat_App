@@ -1249,7 +1249,7 @@
             <mxRectangle height="30" width="70" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="dqMCouWfjg1XaFp9AUQ--264" parent="dqMCouWfjg1XaFp9AUQ--259" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;overflow=hidden;top=1;left=1;bottom=1;right=1;strokeColor=#7A8B9C;fontSize=11;pointerEvents=1;align=left;spacingLeft=6;fillColor=none;" value="NOT NULL FK → users(id) ON DELETE SET NULL" vertex="1">
+        <mxCell id="dqMCouWfjg1XaFp9AUQ--264" parent="dqMCouWfjg1XaFp9AUQ--259" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;overflow=hidden;top=1;left=1;bottom=1;right=1;strokeColor=#7A8B9C;fontSize=11;pointerEvents=1;align=left;spacingLeft=6;fillColor=none;" value="NOT NULL FK → users(id) ON DELETE RESTRICT" vertex="1">
           <mxGeometry height="30" width="330" x="500" as="geometry">
             <mxRectangle height="30" width="330" as="alternateBounds" />
           </mxGeometry>
@@ -1439,7 +1439,7 @@
             <mxRectangle height="30" width="70" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="dqMCouWfjg1XaFp9AUQ--304" parent="dqMCouWfjg1XaFp9AUQ--299" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;overflow=hidden;top=1;left=1;bottom=1;right=1;strokeColor=#7A8B9C;fontSize=11;pointerEvents=1;align=left;spacingLeft=6;fillColor=#F2F6FA;fillStyle=solid;" value="NOT NULL FK → users(id) ON DELETE SET NULL" vertex="1">
+        <mxCell id="dqMCouWfjg1XaFp9AUQ--304" parent="dqMCouWfjg1XaFp9AUQ--299" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;overflow=hidden;top=1;left=1;bottom=1;right=1;strokeColor=#7A8B9C;fontSize=11;pointerEvents=1;align=left;spacingLeft=6;fillColor=#F2F6FA;fillStyle=solid;" value="NOT NULL FK → users(id) ON DELETE CASCADE" vertex="1">
           <mxGeometry height="30" width="330" x="500" as="geometry">
             <mxRectangle height="30" width="330" as="alternateBounds" />
           </mxGeometry>

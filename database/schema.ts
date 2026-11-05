@@ -88,7 +88,7 @@ export class ForgoPasswordSchema extends BaseModel {
   @column()
   declare email: string
   @column.dateTime()
-  declare expiredAt: DateTime | null
+  declare expiredAt: DateTime
   @column({ isPrimary: true })
   declare id: number
   @column.dateTime({ autoCreate: true, autoUpdate: true })
@@ -118,7 +118,7 @@ export class InscriptionSchema extends BaseModel {
   @column()
   declare email: string
   @column.dateTime()
-  declare expiredAt: DateTime | null
+  declare expiredAt: DateTime
   @column()
   declare fullName: string
   @column({ isPrimary: true })
@@ -245,6 +245,17 @@ export class MessageSchema extends BaseModel {
   declare updatedAt: DateTime
   @column()
   declare userId: string
+}
+
+export class RateLimitSchema extends BaseModel {
+  static $columns = ['expire', 'key', 'points'] as const
+  $columns = RateLimitSchema.$columns
+  @column()
+  declare expire: bigint | number | null
+  @column({ isPrimary: true })
+  declare key: string
+  @column()
+  declare points: number
 }
 
 export class RoleConversationSchema extends BaseModel {

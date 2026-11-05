@@ -8,13 +8,16 @@ import UserConversation from '#models/user_conversation'
 import { addMembersValidator, createGroupValidator } from '#validators/group'
 import { ajouteMembresAuGroupe, creeGroupe, retireMembreDuGroupe } from '../service/group.ts'
 import { chatWithUserValidator } from '#validators/user_list'
+import { olderMessagesValidator } from '#validators/message'
 import { supprimeConversationEtFichiers } from '../service/deletion_service.ts'
 import {
   ADMIN_ROLE,
   GROUP_TYPE,
   construitVueMessage,
   construitApercu,
+  chargePageMessages,
   chercheParticipationGroupe,
+  memeJourQueLePremierAffiche,
   formateDate,
   donneInitiales,
   donneHeureDeLaListe,
@@ -26,9 +29,6 @@ import {
   marqueConversationCommeLueEtPrevient,
   previensConversationSupprimee,
 } from '../service/realtime_service.ts'
-
-// Nombre maximum de messages chargés à l'ouverture d'un groupe
-const MESSAGES_LIMIT = 100
 
 export default class GroupsController {
   /**
@@ -57,6 +57,29 @@ export default class GroupsController {
     const groups = await this.donneListeGroupes(user)
     const candidates = await this.donneCandidats([user.id])
     return view.render('pages/groups', { groups, chat, candidates })
+  }
+
+  /**
+   * « Messages précédents » d'un groupe (même principe que pour une conversation privée)
+   */
+  async donneMessagesPrecedents({ auth, params, request, response, view }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const conversationId = Number(params.id)
+    const { before } = await olderMessagesValidator.validate(request.qs())
+
+    // Seuls les membres du groupe peuvent lire ses messages (sinon : erreur 404)
+    await chercheParticipationGroupe(user.id, conversationId).firstOrFail()
+
+    const page = await this.chargeMessages(conversationId, user.id, before)
+
+    return response.ok({
+      html: await view.render('partials/messages-page', {
+        messages: page.messages.map((message) => construitVueMessage(message, user.id, true)),
+      }),
+      hasMore: page.hasMore,
+      oldestId: page.oldestId,
+      dropFirstSeparator: await memeJourQueLePremierAffiche(page.messages, conversationId, before),
+    })
   }
 
   /**
@@ -366,17 +389,8 @@ export default class GroupsController {
     // Ouvrir le groupe = lire ses messages
     await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
-    const queriedMessages = await Message.query()
-      .where('conversationId', conversationId)
-      .preload('attachments')
-      .preload('user') // pour le nom de l'auteur
-      .preload('statuses', (statusQuery) => {
-        statusQuery.whereNot('userId', user.id) // pour les coches "lu" de MES messages
-      })
-      .orderBy('createdAt', 'desc')
-      .orderBy('id', 'desc')
-      .limit(MESSAGES_LIMIT)
-    const messages = queriedMessages.reverse()
+    // La page la plus récente ; les plus anciennes se chargent avec « Messages précédents »
+    const page = await this.chargeMessages(conversationId, user.id, null)
 
     // Seul l'administrateur peut ajouter des membres : lui seul a besoin de la liste
     const candidates = isAdmin ? await this.donneCandidats(members.map((member) => member.id)) : []
@@ -393,7 +407,28 @@ export default class GroupsController {
       },
       members,
       candidates,
-      messages: messages.map((message) => construitVueMessage(message, user.id, true)),
+      messages: page.messages.map((message) => construitVueMessage(message, user.id, true)),
+      hasMore: page.hasMore,
+      oldestId: page.oldestId,
     }
+  }
+
+  /**
+   * Une page de messages du groupe
+   */
+  private chargeMessages(conversationId: number, userId: User['id'], before: number | null) {
+    return chargePageMessages({
+      conversationId,
+      before,
+      visibleAfter: null,
+      prepare: (query) => {
+        query
+          .preload('attachments')
+          .preload('user') // pour le nom de l'auteur
+          .preload('statuses', (statusQuery) => {
+            statusQuery.whereNot('userId', userId) // pour les coches de MES messages
+          })
+      },
+    })
   }
 }

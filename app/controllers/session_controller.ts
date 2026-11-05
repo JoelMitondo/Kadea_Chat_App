@@ -25,7 +25,8 @@ export default class SessionController {
     const user = await User.verifyCredentials(email, password)
 
     await auth.use('web').login(user)
-    response.redirect().toRoute('profile')
+    // Après la connexion, on arrive directement sur la messagerie (cœur de l'application)
+    response.redirect().toRoute('messages')
   }
 
   /**

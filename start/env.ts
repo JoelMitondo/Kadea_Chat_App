@@ -35,4 +35,11 @@ export default await Env.create(new URL('../', import.meta.url), {
   CLOUDINARY_CLOUD_NAME: Env.schema.string(),
   CLOUDINARY_API_KEY: Env.schema.string(),
   CLOUDINARY_API_SECRET: Env.schema.secret(),
+
+  /*
+  |----------------------------------------------------------
+  | Variables for configuring the limiter package
+  |----------------------------------------------------------
+  */
+  LIMITER_STORE: Env.schema.enum.optional(['database', 'memory'] as const),
 })

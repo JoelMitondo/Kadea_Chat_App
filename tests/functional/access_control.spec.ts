@@ -8,7 +8,7 @@ import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import { chercheOuCreeConversationPrivee } from '../../app/service/conversation_service.ts'
 import { creeGroupe } from '../../app/service/group.ts'
-import { creeUtilisateur } from '../helpers.ts'
+import { creeUtilisateur, TEST_PASSWORD } from '../helpers.ts'
 
 test.group('Conversations privées : contrôle d’accès', (group) => {
   group.each.setup(() => testUtils.db().withGlobalTransaction())
@@ -214,6 +214,31 @@ test.group('Groupes : contrôle d’accès et gestion des membres', (group) => {
       .withCsrfToken()
       .loginAs(membre2)
     ecriture.assertStatus(404)
+  })
+
+  test("le créateur d'un groupe peut supprimer son compte : le groupe passe au plus ancien membre", async ({
+    client,
+    assert,
+  }) => {
+    const { admin, membre1, groupe } = await prepareGroupe()
+
+    const response = await client
+      .post('/settings/delete-account')
+      .header('Accept', 'application/json')
+      .json({ password: TEST_PASSWORD })
+      .withCsrfToken()
+      .loginAs(admin)
+
+    response.assertStatus(200)
+    // La base refuse de supprimer le créateur (RESTRICT) : le code a donc bien transmis le groupe
+    await groupe.refresh()
+    assert.equal(groupe.createdById, membre1.id)
+    const newAdmin = await UserConversation.query()
+      .where('conversationId', groupe.id)
+      .where('userId', membre1.id)
+      .preload('role')
+      .firstOrFail()
+    assert.equal(newAdmin.role.title, 'admin')
   })
 
   test("l'administrateur ne peut pas se retirer lui-même", async ({ client }) => {

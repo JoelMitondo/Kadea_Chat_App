@@ -21,15 +21,18 @@ export type ScannedRoutes = {
     'profile.update': { paramsTuple?: []; params?: {} }
     'messages': { paramsTuple?: []; params?: {} }
     'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'conversations.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'conversations.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'messages.update': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'messages.destroy': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
     'users.chat': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'settings.delete': { paramsTuple?: []; params?: {} }
+    'users.block': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'users.unblock': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.store': { paramsTuple?: []; params?: {} }
     'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.members.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'userId': ParamValue} }
@@ -40,8 +43,7 @@ export type ScannedRoutes = {
     'settings': { paramsTuple?: []; params?: {} }
     'settings.password': { paramsTuple?: []; params?: {} }
     'settings.password.forgot': { paramsTuple?: []; params?: {} }
-    'users.block': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'users.unblock': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'settings.delete': { paramsTuple?: []; params?: {} }
     'search': { paramsTuple?: []; params?: {} }
     'event_stream': { paramsTuple?: []; params?: {} }
     'subscribe': { paramsTuple?: []; params?: {} }
@@ -58,9 +60,11 @@ export type ScannedRoutes = {
     'profile': { paramsTuple?: []; params?: {} }
     'messages': { paramsTuple?: []; params?: {} }
     'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'conversations.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
     'settings': { paramsTuple?: []; params?: {} }
     'search': { paramsTuple?: []; params?: {} }
@@ -77,9 +81,11 @@ export type ScannedRoutes = {
     'profile': { paramsTuple?: []; params?: {} }
     'messages': { paramsTuple?: []; params?: {} }
     'conversations.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'conversations.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
     'groups': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'groups.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
     'settings': { paramsTuple?: []; params?: {} }
     'search': { paramsTuple?: []; params?: {} }
@@ -95,15 +101,15 @@ export type ScannedRoutes = {
     'profile.update': { paramsTuple?: []; params?: {} }
     'messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users.chat': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'settings.delete': { paramsTuple?: []; params?: {} }
+    'users.block': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'users.unblock': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.store': { paramsTuple?: []; params?: {} }
     'groups.members.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.store': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.read': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'settings.password': { paramsTuple?: []; params?: {} }
     'settings.password.forgot': { paramsTuple?: []; params?: {} }
-    'users.block': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
-    'users.unblock': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'settings.delete': { paramsTuple?: []; params?: {} }
     'subscribe': { paramsTuple?: []; params?: {} }
     'unsubscribe': { paramsTuple?: []; params?: {} }
   }
