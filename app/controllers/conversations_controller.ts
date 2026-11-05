@@ -12,12 +12,11 @@ import {
   chercheParticipationPrivee,
   donneInitiales,
   donneHeureDeLaListe,
-  marqueConversationCommeLue,
   memeJourQueLePremierAffiche,
   donneNombreMessagesNonLus,
-} from '../service/chat_service.ts'
-import { marqueConversationCommeLueEtPrevient } from './../service/realtime_service.ts'
-import { aBloque } from '../service/block_service.ts'
+} from '#services/chat_service'
+import { marqueConversationCommeLueEtPrevient } from '#services/realtime_service'
+import { aBloque } from '#services/block_service'
 
 export default class ConversationsController {
   /**
@@ -96,7 +95,7 @@ export default class ConversationsController {
     membership.removedAt = DateTime.now()
     await membership.save()
 
-    await marqueConversationCommeLue(user.id, conversationId)
+    await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
     return response.ok({ message: 'La conversation a été supprimée.' })
   }

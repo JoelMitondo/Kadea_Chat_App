@@ -25,12 +25,7 @@
     <link rel="icon" href="https://i.ibb.co/1YhrGKHz/logo-Kadea.png" type="image/png">
 
   <meta name="csrf-token" content="{{ csrfToken }}">
-  {{-- Application du thème sombre ou clair avant l'affichage, pour éviter un flash --}}
-  <script>
-    let themeSauvegarde = localStorage.getItem('theme')
-    let themeDuSysteme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    document.documentElement.dataset.theme = themeSauvegarde || themeDuSysteme
-  </script>
+  @include('partials/head-script')
 
  @vite(['resources/css/compiles/app.css'])
   {{-- charge realtime.js (il passe par Vite) --}}
@@ -195,18 +190,6 @@
 
     </div>
   </div>
-
-  <script>
-    let bouton = document.getElementById('theme-toggle')
-
-    bouton.addEventListener('click', function () {
-      let html = document.documentElement
-      let nouveauTheme = html.dataset.theme === 'dark' ? 'light' : 'dark'
-
-      html.dataset.theme = nouveauTheme
-      localStorage.setItem('theme', nouveauTheme)
-    })
-  </script>
 
 @vite(['resources/js/compiles/animate.js'])
 </body>

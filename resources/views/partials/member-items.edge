@@ -1,0 +1,4 @@
+{{-- Réponse de la recherche de membres (GET /groups/candidates) --}}
+@each(person in candidates)
+  @!component('components/member-item', { person })
+@end

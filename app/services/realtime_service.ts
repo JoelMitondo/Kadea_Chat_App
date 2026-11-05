@@ -24,7 +24,7 @@ import {
   donneHeureDeLaListe,
   estPremierMessageVisible,
   besoinSeparateurDeJour,
-} from './chat_service.ts'
+} from '#services/chat_service'
 
 // Canal où l'on annonce qui passe en ligne / hors ligne
 export const PRESENCE_CHANNEL = 'presence'

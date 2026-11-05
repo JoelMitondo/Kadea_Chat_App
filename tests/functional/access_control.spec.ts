@@ -6,8 +6,8 @@ import { test } from '@japa/runner'
 import testUtils from '@adonisjs/core/services/test_utils'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
-import { chercheOuCreeConversationPrivee } from '../../app/service/conversation_service.ts'
-import { creeGroupe } from '../../app/service/group.ts'
+import { chercheOuCreeConversationPrivee } from '#services/conversation_service'
+import { creeGroupe } from '#services/group'
 import { creeUtilisateur, TEST_PASSWORD } from '../helpers.ts'
 
 test.group('Conversations privées : contrôle d’accès', (group) => {

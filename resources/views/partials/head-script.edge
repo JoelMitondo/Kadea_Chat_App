@@ -1,0 +1,23 @@
+{{-- Script exécuté AVANT l'affichage de la page (dans <head>), commun à tous les layouts :
+     1. applique le thème sombre ou clair, pour éviter un « flash » de la mauvaise couleur ;
+     2. cache les images qui ne se chargent pas (photo de profil supprimée...).
+     Le nonce est un code aléatoire renouvelé à chaque requête : la politique de sécurité (CSP,
+     config/shield.ts) n'exécute QUE les scripts en ligne qui le portent. Un script injecté par
+     un attaquant n'a pas ce code et est bloqué par le navigateur. --}}
+<script nonce="{{ cspNonce }}">
+  try {
+    let themeSauvegarde = localStorage.getItem('theme')
+    let themeDuSysteme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    document.documentElement.dataset.theme = themeSauvegarde || themeDuSysteme
+  } catch (erreur) {}
+
+  // Remplace les attributs HTML de gestion d'erreur (interdits par la CSP) : data-remove-on-error retire
+  // l'image, data-hide-on-error la cache. "true" = on écoute pendant la descente de l'événement,
+  // car l'erreur d'une image ne remonte pas jusqu'au document.
+  document.addEventListener('error', function (evenement) {
+    let image = evenement.target
+    if (image.tagName !== 'IMG') { return }
+    if (image.hasAttribute('data-remove-on-error')) { image.remove() }
+    if (image.hasAttribute('data-hide-on-error')) { image.classList.add('hidden') }
+  }, true)
+</script>

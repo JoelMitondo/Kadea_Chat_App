@@ -1,4 +1,5 @@
 export const policies = {
-  UserPolicy: () => import('#policies/user_policy'),
+  ConversationPolicy: () => import('#policies/conversation_policy'),
+  GroupPolicy: () => import('#policies/group_policy'),
 }
 

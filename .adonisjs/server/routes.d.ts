@@ -7,7 +7,7 @@ export type ScannedRoutes = {
     'health_checks.ping': { paramsTuple?: []; params?: {} }
     'home': { paramsTuple?: []; params?: {} }
     'inscriptions.store': { paramsTuple?: []; params?: {} }
-    'New_compte.register': { paramsTuple?: []; params?: {} }
+    'inscriptions.create': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'new_account.store': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
@@ -31,6 +31,7 @@ export type ScannedRoutes = {
     'users.block': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users.unblock': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups': { paramsTuple?: []; params?: {} }
+    'groups.candidates': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.store': { paramsTuple?: []; params?: {} }
@@ -52,7 +53,7 @@ export type ScannedRoutes = {
   GET: {
     'health_checks.ping': { paramsTuple?: []; params?: {} }
     'home': { paramsTuple?: []; params?: {} }
-    'New_compte.register': { paramsTuple?: []; params?: {} }
+    'inscriptions.create': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
     'forgotPassword.get': { paramsTuple?: []; params?: {} }
@@ -63,6 +64,7 @@ export type ScannedRoutes = {
     'conversations.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
     'groups': { paramsTuple?: []; params?: {} }
+    'groups.candidates': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }
@@ -73,7 +75,7 @@ export type ScannedRoutes = {
   HEAD: {
     'health_checks.ping': { paramsTuple?: []; params?: {} }
     'home': { paramsTuple?: []; params?: {} }
-    'New_compte.register': { paramsTuple?: []; params?: {} }
+    'inscriptions.create': { paramsTuple?: []; params?: {} }
     'new_account.create': { paramsTuple: [ParamValue,ParamValue]; params: {'id': ParamValue,'code': ParamValue} }
     'session.create': { paramsTuple?: []; params?: {} }
     'forgotPassword.get': { paramsTuple?: []; params?: {} }
@@ -84,6 +86,7 @@ export type ScannedRoutes = {
     'conversations.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'users': { paramsTuple?: []; params?: {} }
     'groups': { paramsTuple?: []; params?: {} }
+    'groups.candidates': { paramsTuple?: []; params?: {} }
     'groups.show': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'groups.messages.index': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'realtime.unread': { paramsTuple?: []; params?: {} }

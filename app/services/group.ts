@@ -5,12 +5,17 @@
 import db from '@adonisjs/lucid/services/db'
 import type User from '#models/user'
 import Conversation from '#models/conversation'
-import ConversationType from '#models/conversation_type'
 import Message from '#models/message'
-import RoleConversation from '#models/role_conversation'
 import UserConversation from '#models/user_conversation'
 import MessageStatus from '#models/message_status'
-import { ADMIN_ROLE, GROUP_TYPE, MEMBER_ROLE } from './chat_service.ts'
+import {
+  ADMIN_ROLE,
+  GROUP_TYPE,
+  MEMBER_ROLE,
+  donneDernierMessage,
+  donneRole,
+  donneTypeConversation,
+} from '#services/chat_service'
 
 /**
  * Crée un groupe : le créateur en est l'administrateur, les autres sont "membres".
@@ -21,15 +26,9 @@ export async function creeGroupe(
   name: string,
   memberIds: string[]
 ): Promise<Conversation> {
-  const groupType = await ConversationType.firstOrCreate({ type: GROUP_TYPE }, { type: GROUP_TYPE })
-  const adminRole = await RoleConversation.firstOrCreate(
-    { title: ADMIN_ROLE },
-    { title: ADMIN_ROLE }
-  )
-  const memberRole = await RoleConversation.firstOrCreate(
-    { title: MEMBER_ROLE },
-    { title: MEMBER_ROLE }
-  )
+  const groupType = await donneTypeConversation(GROUP_TYPE)
+  const adminRole = await donneRole(ADMIN_ROLE)
+  const memberRole = await donneRole(MEMBER_ROLE)
 
   return db.transaction(async (trx) => {
     const conversation = await Conversation.create(
@@ -73,17 +72,10 @@ export async function ajouteMembresAuGroupe(
     return []
   }
 
-  const memberRole = await RoleConversation.firstOrCreate(
-    { title: MEMBER_ROLE },
-    { title: MEMBER_ROLE }
-  )
+  const memberRole = await donneRole(MEMBER_ROLE)
 
   // Les nouveaux membres voient l'historique : leur "dernier message" est celui du groupe
-  const lastMessage = await Message.query()
-    .where('conversationId', conversationId)
-    .orderBy('createdAt', 'desc')
-    .orderBy('id', 'desc')
-    .first()
+  const lastMessage = await donneDernierMessage(conversationId)
 
   await UserConversation.createMany(
     newIds.map((userId) => ({

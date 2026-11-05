@@ -1,10 +1,10 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import BlockedUser from '#models/blocked_user'
-import { donneInitiales } from '../service/chat_service.ts'
+import { donneInitiales } from '#services/chat_service'
 import User from '#models/user'
 import { changePasswordValidator, deleteAccountValidator } from '#validators/account'
 import hash from '@adonisjs/core/services/hash'
-import { supprimeCompteUtilisateur } from '../service/deletion_service.ts'
+import { supprimeCompteUtilisateur } from '#services/deletion_service'
 
 export default class SettingsController {
   /**

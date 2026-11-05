@@ -33,20 +33,48 @@ function mettreAJourFormulaireCreation() {
   boutonCreer.disabled = !(nomValide && nombre >= MEMBRES_MINIMUM)
 }
 
-// Filtre la liste de membres selon le texte tapé
-function filtrerMembres(champFiltre) {
-  let selecteur = champFiltre.closest('[data-member-picker]')
-  let texte = champFiltre.value.trim().toLowerCase()
-  let elements = selecteur.querySelectorAll('[data-member-item]')
-  let visibles = 0
+// Recherche des personnes selon le nom tapé : c'est le SERVEUR qui cherche (au plus 20 résultats),
+// la page ne reçoit jamais la liste de tous les utilisateurs.
+// Les personnes déjà cochées restent dans la liste, même si elles ne correspondent plus au texte.
+let minuteursRecherche = new WeakMap()
 
-  elements.forEach(function (element) {
-    let correspond = element.dataset.name.indexOf(texte) !== -1
-    element.classList.toggle('hidden', !correspond)
-    if (correspond) { visibles = visibles + 1 }
+function filtrerMembres(champFiltre) {
+  clearTimeout(minuteursRecherche.get(champFiltre))
+  // On attend que la personne ait fini de taper (250 ms) avant d'interroger le serveur
+  minuteursRecherche.set(champFiltre, setTimeout(function () { rechercherMembres(champFiltre) }, 250))
+}
+
+async function rechercherMembres(champFiltre) {
+  let selecteur = champFiltre.closest('[data-member-picker]')
+  let liste = selecteur.querySelector('[data-member-list]')
+  let adresse = new URL(selecteur.dataset.searchUrl, window.location.origin)
+  adresse.searchParams.set('q', champFiltre.value.trim())
+
+  let reponse
+  try {
+    reponse = await fetch(adresse, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  } catch (erreurReseau) {
+    kcNotifier.erreur('Impossible de contacter le serveur. Vérifiez votre connexion.')
+    return
+  }
+  if (!reponse.ok) { return }
+
+  // 1. On garde les personnes cochées, on retire les autres
+  liste.querySelectorAll('[data-member-item]').forEach(function (element) {
+    if (!element.querySelector('[data-member-checkbox]').checked) { element.remove() }
   })
 
-  selecteur.querySelector('[data-member-empty]').classList.toggle('hidden', visibles > 0)
+  // 2. On ajoute les résultats qui ne sont pas déjà dans la liste
+  let modele = document.createElement('template')
+  modele.innerHTML = await reponse.text()
+  modele.content.querySelectorAll('[data-member-item]').forEach(function (element) {
+    if (liste.querySelector('[data-member-id="' + element.dataset.memberId + '"]') === null) {
+      liste.appendChild(element)
+    }
+  })
+
+  let aucun = liste.querySelectorAll('[data-member-item]').length === 0
+  selecteur.querySelector('[data-member-empty]').classList.toggle('hidden', !aucun)
 }
 
 // Ferme une fenêtre et annule ce qui y était saisi

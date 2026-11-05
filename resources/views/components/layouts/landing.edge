@@ -25,11 +25,7 @@
     <link rel="icon" href="https://i.ibb.co/1YhrGKHz/logo-Kadea.png" type="image/png">
 
   {{-- Applique le thème (clair ou sombre) avant l'affichage, pour éviter un flash --}}
-  <script>
-    let themeSauvegarde = localStorage.getItem('theme')
-    let themeDuSysteme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    document.documentElement.dataset.theme = themeSauvegarde || themeDuSysteme
-  </script>
+  @include('partials/head-script')
 
   @vite(['resources/css/compiles/app.css'])
 </head>
@@ -79,7 +75,7 @@
           <a href="/login" class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-fg hover:bg-surface-2">
             Connexion
           </a>
-          <a href="{{ route('New_compte.register') }}" class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">
+          <a href="{{ route('inscriptions.create') }}" class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">
             <span class="hidden sm:inline">Créer un compte</span>
             <span class="sm:hidden">S'inscrire</span>
           </a>
@@ -101,24 +97,13 @@
       @if(!$props.get('isLoggedIn'))
         <nav aria-label="Liens utiles" class="flex items-center gap-5 font-medium">
           <a href="/login" class="hover:text-fg">Connexion</a>
-          <a href="{{ route('New_compte.register') }}" class="hover:text-fg">Créer un compte</a>
+          <a href="{{ route('inscriptions.create') }}" class="hover:text-fg">Créer un compte</a>
         </nav>
       @end
     </div>
   </footer>
 
   {{-- Script du bouton de thème --}}
-  <script>
-    let bouton = document.getElementById('theme-toggle')
-
-    bouton.addEventListener('click', function () {
-      let html = document.documentElement
-      let nouveauTheme = html.dataset.theme === 'dark' ? 'light' : 'dark'
-
-      html.dataset.theme = nouveauTheme
-      localStorage.setItem('theme', nouveauTheme)
-    })
-  </script>
   @vite(['resources/js/compiles/animate.js'])
 </body>
 </html>

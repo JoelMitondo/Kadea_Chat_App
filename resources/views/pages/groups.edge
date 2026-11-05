@@ -95,7 +95,7 @@
           <span class="text-sm font-medium text-fg">Membres</span>
           <span id="group-selected-count" class="text-xs text-fg-subtle">0 sélectionné · minimum 2</span>
         </div>
-        @!component('components/member-picker', { candidates })
+        @!component('components/member-picker', { candidates, searchUrl: route('groups.candidates') })
       </div>
 
       <p class="text-xs text-fg-subtle">Vous serez l'administrateur de ce groupe.</p>

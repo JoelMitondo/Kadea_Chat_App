@@ -1,7 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import { chatWithUserValidator } from '#validators/user_list'
-import { bloqueUtilisateur, debloqueUtilisateur } from '../service/block_service.ts'
+import { bloqueUtilisateur, debloqueUtilisateur } from '#services/block_service'
 
 export default class BlocksController {
   /**

@@ -1,28 +1,31 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import { DateTime } from 'luxon'
+import { type DateTime } from 'luxon'
 import type User from '#models/user'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import { updateProfileValidator } from '#validators/profile'
-import { supprimeImageParLien, envoiePhotoProfil } from '../service/cloudinary_service.ts'
-
-// Valeurs de la colonne "type" de conversation_types
-const TYPE_PRIVATE = 'Privee'
-const TYPE_GROUP = 'Publique'
+import { supprimeImageParLien, envoiePhotoProfil } from '#services/cloudinary_service'
+import {
+  AGE_MINIMUM,
+  GROUP_TYPE,
+  PRIVATE_TYPE,
+  donneInitiales,
+  estMajeur,
+} from '#services/chat_service'
 
 export default class ProfileController {
   // Affichage de la page profil
   async donneProfil({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
 
-    const privateChats = await this.compteConversations(user.id, TYPE_PRIVATE)
-    const groups = await this.compteConversations(user.id, TYPE_GROUP)
+    const privateChats = await this.compteConversations(user.id, PRIVATE_TYPE)
+    const groups = await this.compteConversations(user.id, GROUP_TYPE)
     const messages = await this.compteMessages(user.id)
 
     return view.render('pages/profile', {
       profile: {
         fullName: user.fullName,
-        initials: this.donneInitiales(user.fullName),
+        initials: donneInitiales(user.fullName),
         bio: user.bio,
         avatarUrl: user.avatarUrl,
         phoneNumber: user.phoneNumber,
@@ -43,8 +46,8 @@ export default class ProfileController {
     const payload = await request.validateUsing(updateProfileValidator)
 
     // 18 ans minimum
-    if (!this.estMajeur(payload.birth_date)) {
-      return this.refuseChamp(ctx, 'birth_date', 'Vous devez avoir au moins 18 ans.')
+    if (!estMajeur(payload.birth_date)) {
+      return this.refuseChamp(ctx, 'birth_date', `Vous devez avoir au moins ${AGE_MINIMUM} ans.`)
     }
 
     const oldAvatarUrl = user.avatarUrl
@@ -136,20 +139,7 @@ export default class ProfileController {
     return Number(result?.$extras.total ?? 0)
   }
 
-  private donneInitiales(fullName: string): string {
-    return fullName
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((word) => word[0].toUpperCase())
-      .join('')
-  }
-
   private formateDate(date: DateTime | null | undefined): string {
     return date ? date.toFormat('dd/MM/yyyy') : 'Non renseignée'
-  }
-
-  private estMajeur(birthDate: DateTime): boolean {
-    return birthDate <= DateTime.now().minus({ years: 18 })
   }
 }

@@ -8,7 +8,7 @@ import {
   protegeCaracteresRecherche,
   formateHeure,
   donneLibelleDuJour,
-} from '../service/chat_service.ts'
+} from '#services/chat_service'
 
 // Nombre maximum de résultats affichés
 const RESULTS_LIMIT = 50

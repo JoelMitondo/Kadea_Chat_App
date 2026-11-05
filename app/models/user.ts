@@ -18,19 +18,6 @@ import BlockedUser from '#models/blocked_user'
 // et le hachage automatique du mot de passe avant chaque enregistrement.
 // C'est pour cela qu'on écrit user.password = '...' sans jamais appeler hash nous-mêmes.
 export default class User extends compose(UserSchema, withAuthFinder(hash)) {
-  /**
-   * Get the user's initials from their full name or email.
-   * Returns the first letter of first and last name if available,
-   * otherwise returns the first two characters of the email username.
-   */
-  get initials() {
-    const [first, last] = this.fullName ? this.fullName.split(' ') : this.email.split('@')
-    if (first && last) {
-      return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase()
-    }
-    return `${first.slice(0, 2)}`.toUpperCase()
-  }
-
   // 1. Les conversations créées par cet utilisateur
   @hasMany(() => Conversation, { foreignKey: 'createdById' })
   declare createdConversations: HasMany<typeof Conversation>

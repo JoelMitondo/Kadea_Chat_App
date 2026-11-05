@@ -9,12 +9,11 @@ import Conversation from '#models/conversation'
 import ForgoPassword from '#models/forgo_password'
 import Message from '#models/message'
 import MessageAttachment from '#models/message_attachment'
-import RoleConversation from '#models/role_conversation'
 import User from '#models/user'
 import UserConversation from '#models/user_conversation'
-import { ADMIN_ROLE, GROUP_TYPE } from './chat_service.ts'
-import { supprimeFichierParLien } from './cloudinary_service.ts'
-import { previensConversationSupprimee, previensGroupeModifie } from './realtime_service.ts'
+import { ADMIN_ROLE, GROUP_TYPE, donneDernierMessage, donneRole } from '#services/chat_service'
+import { supprimeFichierParLien } from '#services/cloudinary_service'
+import { previensConversationSupprimee, previensGroupeModifie } from '#services/realtime_service'
 
 // Supprime une liste de fichiers sur Cloudinary (un échec est noté dans les logs, sans rien bloquer)
 async function supprimeFichiers(fileUrls: string[]) {
@@ -92,10 +91,7 @@ export async function supprimeCompteUtilisateur(user: User): Promise<void> {
 
   // firstOrCreate : si aucun groupe n'a encore été créé, le rôle "admin" n'existe pas en base
   // (findByOrFail provoquait alors une erreur 404 et le compte ne pouvait pas être supprimé)
-  const adminRole = await RoleConversation.firstOrCreate(
-    { title: ADMIN_ROLE },
-    { title: ADMIN_ROLE }
-  )
+  const adminRole = await donneRole(ADMIN_ROLE)
 
   // Toutes les conversations (privées et groupes) dont il fait partie
   const memberships = await UserConversation.query()
@@ -172,11 +168,7 @@ export async function supprimeCompteUtilisateur(user: User): Promise<void> {
         .delete()
 
       // "Dernier message" du groupe : on le recalcule (il a pu être supprimé)
-      const lastMessage = await Message.query({ client: trx })
-        .where('conversationId', conversationId)
-        .orderBy('createdAt', 'desc')
-        .orderBy('id', 'desc')
-        .first()
+      const lastMessage = await donneDernierMessage(conversationId, { client: trx })
 
       await UserConversation.query({ client: trx })
         .where('conversationId', conversationId)
