@@ -8,6 +8,7 @@ import Inscription from '#models/inscription'
 import { DateTime } from 'luxon'
 import { genereCodeUnique } from './../service/code_generation.ts'
 import hash from '@adonisjs/core/services/hash'
+import { publicUrl } from '#config/app'
 import { APP_TIMEZONE } from '../service/chat_service.ts'
 
 export default class InscriptionsController {
@@ -45,7 +46,7 @@ export default class InscriptionsController {
 
     //on envoie maintenant un email de confirmation de email
     try {
-      const baseUrl = `${request.protocol()}://${request.host()}`
+      const baseUrl = publicUrl
 
       const activationLink = `${baseUrl}/signup/${identite.id}/${codeAleatoire}`
 

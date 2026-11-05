@@ -118,6 +118,17 @@
               </span>
               @if(member.isAdmin)
                 <span class="flex-none rounded-full bg-group-soft px-2.5 py-0.5 text-xs font-semibold text-group">Admin</span>
+              @elseif(chat.group.isAdmin)
+                {{-- Retirer un membre : réservé à l'administrateur (le serveur le vérifie aussi) --}}
+                <button
+                  type="button"
+                  data-remove-member
+                  data-url="{{ route('groups.members.destroy', { id: chat.id, userId: member.id }) }}"
+                  data-member-name="{{ member.fullName }}"
+                  class="flex-none cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Retirer
+                </button>
               @end
             </li>
           @end

@@ -7,14 +7,14 @@
     {{-- ===== MOT DE PASSE ===== --}}
     <section class="rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-6">
       <h2 class="text-lg font-bold text-fg">Mot de passe</h2>
-      <p class="mt-1 text-fg-muted">Souhaitez-vous modifier votre mot de passe ?</p>
+      <p class="mt-1 text-fg-muted">Votre mot de passe actuel vous sera demandé.</p>
 
       <button
         type="button"
         id="open-password-dialog"
         class="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover"
       >
-        Oui, modifier mon mot de passe
+        Modifier mon mot de passe
       </button>
     </section>
 
@@ -61,38 +61,88 @@
     </section>
   </div>
 
-  {{-- ===== FENÊTRE : ACCÈS À L'ADRESSE E-MAIL ===== --}}
+  {{-- ===== FENÊTRE : CHANGER MON MOT DE PASSE ===== --}}
   <dialog
     id="password-dialog"
     aria-labelledby="password-dialog-title"
-    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line bg-surface p-0 text-fg shadow-lg backdrop:bg-black/50"
+    class="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-fg shadow-lg backdrop:bg-black/50"
   >
-    <div class="p-6">
-      <h2 id="password-dialog-title" class="text-xl font-bold text-fg">Avez-vous toujours accès à votre adresse e-mail ?</h2>
+    {{-- data-ajax : envoi sans quitter la page (notifications.js), erreurs affichées sous les champs --}}
+    <form
+      action="{{ route('settings.password') }}"
+      method="POST"
+      data-ajax
+      data-loading-text="Enregistrement…"
+      data-redirect="/settings"
+      class="space-y-4 p-6"
+    >
+      {{ csrfField() }}
 
-      <p class="mt-3 text-fg-muted">
-        Un lien de réinitialisation sera envoyé à votre adresse e-mail.
-      </p>
-      <p class="mt-2 text-sm text-fg-muted">
-        Si vous continuez, vous serez <strong>déconnecté(e)</strong> et dirigé(e) vers la page
-        « Mot de passe oublié », où vous saisirez votre adresse e-mail.
-      </p>
+      <h2 id="password-dialog-title" class="text-xl font-bold text-fg">Changer mon mot de passe</h2>
 
-      <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        {{-- Non : on ferme simplement la fenêtre --}}
-        <button type="button" data-modal-close class="cursor-pointer rounded-lg border border-line-strong px-4 py-2.5 font-semibold text-fg hover:bg-surface-2">
-          Non, annuler
-        </button>
-
-        {{-- Oui : le formulaire déconnecte l'utilisateur et le redirige --}}
-        <form action="{{ route('settings.password') }}" method="POST">
-          {{ csrfField() }}
-          <button type="submit" class="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 font-semibold text-on-primary hover:bg-primary-hover">
-            Oui, j'y ai accès
-          </button>
-        </form>
+      <div>
+        <label for="current-password" class="mb-1.5 block text-sm font-medium text-fg">Mot de passe actuel</label>
+        {{-- Les erreurs du serveur s'affichent sous ce champ --}}
+        <div>
+          <input
+            id="current-password"
+            name="current_password"
+            type="password"
+            required
+            autocomplete="current-password"
+            class="w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5 text-fg focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+          >
+        </div>
       </div>
-    </div>
+      <div>
+        <label for="new-password" class="mb-1.5 block text-sm font-medium text-fg">Nouveau mot de passe (8 caractères minimum)</label>
+        {{-- Les erreurs du serveur s'affichent sous ce champ --}}
+        <div>
+          <input
+            id="new-password"
+            name="password"
+            type="password"
+            required
+            minlength="8"
+            autocomplete="new-password"
+            class="w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5 text-fg focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+          >
+        </div>
+      </div>
+      <div>
+        <label for="new-password-confirmation" class="mb-1.5 block text-sm font-medium text-fg">Confirmez le nouveau mot de passe</label>
+        {{-- Les erreurs du serveur s'affichent sous ce champ --}}
+        <div>
+          <input
+            id="new-password-confirmation"
+            name="password_confirmation"
+            type="password"
+            required
+            minlength="8"
+            autocomplete="new-password"
+            class="w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5 text-fg focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+          >
+        </div>
+      </div>
+
+      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button type="button" data-modal-close class="cursor-pointer rounded-lg border border-line-strong px-4 py-2.5 font-semibold text-fg hover:bg-surface-2">
+          Annuler
+        </button>
+        <button type="submit" class="cursor-pointer rounded-lg bg-primary px-4 py-2.5 font-semibold text-on-primary hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60">
+          Enregistrer
+        </button>
+      </div>
+    </form>
+
+    {{-- Mot de passe actuel oublié : on passe par le lien envoyé par e-mail --}}
+    <form action="{{ route('settings.password.forgot') }}" method="POST" class="border-t border-line px-6 py-4">
+      {{ csrfField() }}
+      <button type="submit" class="cursor-pointer text-sm font-medium text-primary underline">
+        Mot de passe actuel oublié ? Recevoir un lien par e-mail
+      </button>
+      <p class="mt-1 text-xs text-fg-subtle">Vous serez déconnecté(e) puis dirigé(e) vers « Mot de passe oublié ».</p>
+    </form>
   </dialog>
 
     {{-- ===== FENÊTRE : SUPPRIMER MON COMPTE ===== --}}

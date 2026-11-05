@@ -9,6 +9,7 @@ import ConversationType from '#models/conversation_type'
 import Message from '#models/message'
 import RoleConversation from '#models/role_conversation'
 import UserConversation from '#models/user_conversation'
+import MessageStatus from '#models/message_status'
 import { ADMIN_ROLE, GROUP_TYPE, MEMBER_ROLE } from './chat_service.ts'
 
 /**
@@ -94,4 +95,29 @@ export async function ajouteMembresAuGroupe(
   )
 
   return newIds
+}
+
+/**
+ * Retire un membre d'un groupe. Transaction : tout est fait, ou rien.
+ * - Sa participation est supprimée : il ne peut plus ouvrir le groupe ni y écrire
+ *   (chercheParticipationGroupe ne le trouve plus, donc erreur 404).
+ * - Ses statuts de lecture dans ce groupe sont supprimés : ses compteurs de non-lus
+ *   ne comptent plus les messages d'un groupe auquel il n'a plus accès.
+ * - Les messages qu'il a déjà écrits restent visibles pour les autres membres (historique).
+ */
+export async function retireMembreDuGroupe(conversationId: number, userId: string) {
+  await db.transaction(async (trx) => {
+    await MessageStatus.query({ client: trx })
+      .where('userId', userId)
+      .whereIn(
+        'messageId',
+        Message.query({ client: trx }).select('id').where('conversationId', conversationId)
+      )
+      .delete()
+
+    await UserConversation.query({ client: trx })
+      .where('conversationId', conversationId)
+      .where('userId', userId)
+      .delete()
+  })
 }

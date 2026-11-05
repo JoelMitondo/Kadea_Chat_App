@@ -4,7 +4,7 @@ import { envoyer, lireErreur } from './message.js'
 // La liste des groupes, l'ouverture d'un groupe, l'envoi / modification / suppression
 // de messages et le bouton Retour sont déjà gérés par messages.js.
 
-// Ce fichier s'ajoute à message.js sur la page Groupes : il ne gère que la création, l'ajout de membres et la suppression.
+// Ce fichier s'ajoute à message.js sur la page Groupes : il ne gère que la création, l'ajout et le retrait de membres, et la suppression.
 let formulaireCreation = document.getElementById('group-create-form')
 let modaleCreation = document.getElementById('group-create-modal')
 let champNom = document.getElementById('group-name')
@@ -139,6 +139,28 @@ async function supprimerGroupe(bouton) {
   // Le groupe n'existe plus : on retourne à la liste (le message de réussite s'y affichera)
   window.location.href = '/groups'
 }
+// ===== Retirer un membre (administrateur) =====
+
+async function retirerMembre(bouton) {
+  let confirme = confirm(
+    'Retirer « ' + bouton.dataset.memberName + ' » du groupe ?\n\n' +
+    'Cette personne ne pourra plus lire ni écrire dans le groupe.'
+  )
+  if (!confirme) { return }
+
+  bouton.disabled = true
+
+  let resultat = await envoyer(bouton.dataset.url, 'DELETE')
+
+  if (!resultat.ok) {
+    kcNotifier.erreur(lireErreur(resultat.corps))
+    bouton.disabled = false
+    return
+  }
+
+  // On recharge : la liste des membres est à jour et le message de réussite s'affiche
+  window.location.reload()
+}
 // ===== 4. Événements (délégation : fonctionne aussi pour les panneaux chargés après coup) =====
 
 // Au chargement : le bouton "Créer" est désactivé tant que le formulaire n'est pas valide
@@ -163,6 +185,12 @@ document.addEventListener('click', function (evenement) {
   let boutonSupprimerGroupe = cible.closest('[data-delete-group]')
   if (boutonSupprimerGroupe !== null) {
     supprimerGroupe(boutonSupprimerGroupe)
+    return
+  }
+  // Bouton "Retirer" d'un membre
+  let boutonRetirer = cible.closest('[data-remove-member]')
+  if (boutonRetirer !== null) {
+    retirerMembre(boutonRetirer)
     return
   }
   // Boutons "Fermer" / "Annuler" de n'importe quelle fenêtre

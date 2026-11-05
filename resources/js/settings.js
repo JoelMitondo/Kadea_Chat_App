@@ -26,12 +26,11 @@ function brancherFenetre(idBouton, idFenetre) {
 
   // À la fermeture, on vide ce qui a été saisi (par exemple le mot de passe)
   fenetre.addEventListener('close', function () {
-    let formulaire = fenetre.querySelector('form')
-    if (formulaire !== null) { formulaire.reset() }
+    fenetre.querySelectorAll('form').forEach(function (formulaire) { formulaire.reset() })
   })
 }
 
-// Changer de mot de passe : question sur l'accès à l'e-mail
+// Changer de mot de passe : ancien mot de passe + nouveau + confirmation
 brancherFenetre('open-password-dialog', 'password-dialog')
 
 // Supprimer mon compte : confirmation avec le mot de passe

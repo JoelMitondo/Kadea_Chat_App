@@ -2,12 +2,13 @@ import type { HttpContext } from '@adonisjs/core/http'
 import BlockedUser from '#models/blocked_user'
 import { donneInitiales } from '../service/chat_service.ts'
 import User from '#models/user'
-import { deleteAccountValidator } from '#validators/account'
+import { changePasswordValidator, deleteAccountValidator } from '#validators/account'
+import hash from '@adonisjs/core/services/hash'
 import { supprimeCompteUtilisateur } from '../service/deletion_service.ts'
 
 export default class SettingsController {
   /**
-   * Page Paramètres : mot de passe + liste des utilisateurs bloqués
+   * Page Paramètres : changement du mot de passe, utilisateurs bloqués, suppression du compte
    */
   async donnePageParametres({ auth, view }: HttpContext) {
     const user = auth.getUserOrFail()
@@ -29,6 +30,38 @@ export default class SettingsController {
   }
 
   /**
+   * Change le mot de passe de l'utilisateur connecté.
+   * 1. le validateur vérifie la forme (8 caractères minimum, confirmation identique, différent de l'ancien) ;
+   * 2. on vérifie que le mot de passe ACTUEL est le bon (quelqu'un qui trouverait la session
+   *    ouverte ne doit pas pouvoir le changer) ;
+   * 3. on enregistre : withAuthFinder hache automatiquement le nouveau mot de passe.
+   */
+  async modifieMotDePasse({ auth, request, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const { current_password: currentPassword, password } =
+      await request.validateUsing(changePasswordValidator)
+
+    const isValid = await hash.verify(user.password, currentPassword)
+    if (!isValid) {
+      return response.unprocessableEntity({
+        errors: [{ field: 'current_password', message: 'Mot de passe actuel incorrect.' }],
+      })
+    }
+
+    user.password = password
+    await user.save()
+
+    const message = 'Votre mot de passe a été modifié.'
+    if (request.accepts(['html', 'json']) === 'json') {
+      return response.ok({ message })
+    }
+    session.flash('success', message)
+    return response.redirect().toRoute('settings')
+  }
+
+  /**
+   * Mot de passe actuel oublié : on déconnecte l'utilisateur et on l'envoie sur
+   * « Mot de passe oublié » (lien de réinitialisation reçu par e-mail).
    * L'utilisateur a confirmé qu'il a toujours accès à son e-mail :
    * on le déconnecte et on l'envoie sur la page "Mot de passe oublié",
    * qui fait tout le reste (envoi du lien par e-mail, nouveau mot de passe).

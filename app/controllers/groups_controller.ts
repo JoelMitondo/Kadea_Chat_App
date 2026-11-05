@@ -1,12 +1,13 @@
-// GROUPES : liste, ouverture, création, ajout de membres, suppression.
-// Les actions sensibles vérifient d'abord le rôle : seul l'administrateur peut ajouter ou supprimer.
+// GROUPES : liste, ouverture, création, ajout et retrait de membres, suppression.
+// Les actions sensibles vérifient d'abord le rôle : seul l'administrateur peut ajouter, retirer ou supprimer.
 
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import Message from '#models/message'
 import UserConversation from '#models/user_conversation'
 import { addMembersValidator, createGroupValidator } from '#validators/group'
-import { ajouteMembresAuGroupe, creeGroupe } from '../service/group.ts'
+import { ajouteMembresAuGroupe, creeGroupe, retireMembreDuGroupe } from '../service/group.ts'
+import { chatWithUserValidator } from '#validators/user_list'
 import { supprimeConversationEtFichiers } from '../service/deletion_service.ts'
 import {
   ADMIN_ROLE,
@@ -156,6 +157,78 @@ export default class GroupsController {
       addedIds.length === 1
         ? '1 membre a été ajouté.'
         : `${addedIds.length} membres ont été ajoutés.`
+    session.flash('success', message)
+    return response.ok({ message })
+  }
+
+  /**
+   * Retire un membre du groupe (réservé à l'administrateur).
+   * Le membre retiré ne peut plus lire ni écrire dans le groupe : sa participation est supprimée.
+   */
+  async retireMembre({ auth, params, response, session }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const conversationId = Number(params.id)
+    const { id: memberId } = await chatWithUserValidator.validate({ id: params.userId })
+
+    // 1. Je dois être membre du groupe (sinon 404)...
+    const membership = await chercheParticipationGroupe(user.id, conversationId)
+      .preload('role')
+      .preload('conversation')
+      .firstOrFail()
+
+    // 2. ... et administrateur (sinon 403). La règle est vérifiée ici, côté serveur :
+    // masquer le bouton dans la page ne suffit pas.
+    if (membership.role.title !== ADMIN_ROLE) {
+      return response.forbidden({
+        message: "Seul l'administrateur du groupe peut retirer des membres.",
+      })
+    }
+
+    // 3. L'administrateur ne se retire pas lui-même (le groupe n'aurait plus d'administrateur)
+    if (memberId === user.id) {
+      return response.unprocessableEntity({
+        message: 'Vous ne pouvez pas vous retirer vous-même : supprimez plutôt le groupe.',
+      })
+    }
+
+    // 4. La personne doit faire partie du groupe, et ne pas être administrateur
+    const target = await UserConversation.query()
+      .where('conversationId', conversationId)
+      .where('userId', memberId)
+      .preload('user')
+      .preload('role')
+      .first()
+
+    if (!target) {
+      return response.notFound({ message: 'Cette personne ne fait pas partie du groupe.' })
+    }
+    if (target.role.title === ADMIN_ROLE) {
+      return response.forbidden({ message: 'Un administrateur ne peut pas être retiré.' })
+    }
+
+    await retireMembreDuGroupe(conversationId, memberId)
+
+    const groupName = membership.conversation.title ?? 'Groupe sans nom'
+
+    // TEMPS RÉEL 1 : le groupe disparaît immédiatement de la liste du membre retiré
+    previensConversationSupprimee({
+      userIds: [memberId],
+      conversationId,
+      kind: 'group',
+      message: `Vous avez été retiré du groupe « ${groupName} ».`,
+    })
+
+    // TEMPS RÉEL 2 : les autres membres voient la liste des membres se mettre à jour
+    const remaining = await UserConversation.query()
+      .where('conversationId', conversationId)
+      .whereNot('userId', user.id)
+      .select('user_id')
+    previensGroupeModifie(
+      conversationId,
+      remaining.map((row) => row.userId)
+    )
+
+    const message = `${target.user.fullName} a été retiré(e) du groupe.`
     session.flash('success', message)
     return response.ok({ message })
   }
