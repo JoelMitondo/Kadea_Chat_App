@@ -11,6 +11,7 @@ import { forgoPassewordValidator, newPassewordValidator } from '#validators/forg
 import { genereCodeUnique } from './../service/code_generation.ts'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
+import { publicUrl } from '#config/app'
 import mail from '@adonisjs/mail/services/main'
 import logger from '@adonisjs/core/services/logger'
 import { APP_TIMEZONE } from '../service/chat_service.ts'
@@ -35,7 +36,7 @@ export default class ForgoPasswordsController {
         }
       )
       try {
-        const baseUrl = `${request.protocol()}://${request.host()}`
+        const baseUrl = publicUrl
 
         const resetLink = `${baseUrl}/forgoPassword/${identite.id}/${codeAleatoire}`
 

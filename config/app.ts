@@ -10,6 +10,13 @@ import { defineConfig } from '@adonisjs/core/http'
 export const appUrl = env.get('APP_URL')
 
 /**
+ * Adresse publique sans "/" final : base des liens envoyés par e-mail.
+ * On ne construit JAMAIS ces liens à partir de l'en-tête Host de la requête :
+ * un attaquant pourrait le falsifier et recevoir le code secret sur son propre site.
+ */
+export const publicUrl = appUrl.replace(/\/+$/, '')
+
+/**
  * The configuration settings used by the HTTP server
  */
 export const http = defineConfig({

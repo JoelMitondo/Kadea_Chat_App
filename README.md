@@ -38,7 +38,8 @@ Projet de fin de formation · Kadea Academy
 15. [Déploiement](#déploiement)
 16. [Problèmes fréquents](#problèmes-fréquents)
 17. [Limites connues et évolutions](#limites-connues-et-évolutions)
-18. [Auteur](#auteur)
+18. [Usage de l'intelligence artificielle](#usage-de-lintelligence-artificielle)
+19. [Auteur](#auteur)
 
 ---
 
@@ -46,13 +47,12 @@ Projet de fin de formation · Kadea Academy
 
 | Ressource | Lien |
 |---|---|
-| Site en ligne | [`https://www.kadeaChat.com`](https://agora-chat-app-1.onrender.com/) |
+| Site en ligne | [`https://agora-chat-app-1.onrender.com`](https://agora-chat-app-1.onrender.com/) |
 | Présentation (Canva) | [`https://www.canva.com`](https://canva.link/6sky2nlgir7lk05) |
 | Maquettes (Figma) | [`Kadea Chat`](https://www.figma.com/design/hTThi75OAXNNjJtiz2gVSU/Kadea-Chat-Final?node-id=0-1&p=f&t=Tgk3rswckWaMcmbz-0) |
 | Modélisation (dictionnaire / MCD / MLD) | [`docs/modelisation`](docs/modelisation) ou [`version interactive (draw.io)`](https://viewer.diagrams.net/?nav=1&title=Kadea%20Chat%20-%20Mod%C3%A9lisation#Uhttps%3A%2F%2Fraw.githubusercontent.com%2FJoelMitondo%2FKadea_Chat_App%2Fmain%2Fdocs%2Fmodelisation%2Fkadea_chat_modelisation.drawio) |
 | Architecture C4 (Structurizr) | [`docs/c4/workspace.dsl`](docs/c4/workspace.dsl) ou [`voir les diagrammes en ligne`](https://playground.structurizr.com/?src=https://raw.githubusercontent.com/JoelMitondo/Kadea_Chat_App/main/docs/c4/workspace.dsl) |
-| Cahier des charges | [`docs/cahier-des-charges.pdf`](docs/cahier-des-charges.pdf) |
-| Vidéo de démonstration | [`https://VOTRE-LIEN`](https://VOTRE-LIEN) |
+| Vidéo de démonstration (secours) | _à ajouter avant la soutenance_ |
 
 
 ---
@@ -76,14 +76,14 @@ Projet de fin de formation · Kadea Academy
 | **Comptes** | Inscription en deux étapes avec confirmation par e-mail, connexion, mot de passe oublié par lien à usage unique |
 | **Profil** | Photo, biographie, statut « En ligne », statistiques |
 | **Messages privés** | Envoi, modification, suppression, accusés de lecture, compteur de non-lus, suppression de conversation pour soi |
-| **Groupes** | Création, rôles administrateur / membre, ajout de membres, suppression par l'administrateur |
+| **Groupes** | Création, rôles administrateur / membre, ajout et retrait de membres par l'administrateur, suppression du groupe |
 | **Temps réel** | Nouveaux messages, lectures, modifications et présence instantanés (SSE) |
 | **Fichiers joints** | Images et documents jusqu'à 10 Mo, miniatures, ouverture et téléchargement |
 | **Recherche** | Dans tous ses propres messages, avec mot surligné |
 | **Utilisateurs** | Liste paginée, recherche, démarrage d'une discussion |
 | **Blocage** | Un utilisateur bloqué ne peut plus écrire à celui qui l'a bloqué |
-| **Paramètres** | Changement de mot de passe, liste des bloqués, suppression de compte avec règles de succession |
-| **Interface** | Responsive, thème clair et sombre, chargeur, notifications, états vides |
+| **Paramètres** | Changement de mot de passe (ancien + nouveau + confirmation, ou lien par e-mail), liste des bloqués, suppression de compte avec règles de succession |
+| **Interface** | Responsive (ordinateur et téléphone), chargeur, notifications, états vides, pages d'erreur |
 
 ---
 
@@ -95,8 +95,8 @@ Projet de fin de formation · Kadea Academy
 | Gabarits | **Edge** | Génération des pages HTML |
 | Base de données | **PostgreSQL** + **Lucid** (ORM) | Stockage et requêtes |
 | Validation | **VineJS** | Contrôle des données reçues |
-| Styles | **Tailwind CSS 4** | Mise en forme, thème clair et sombre |
-| Interface | **JavaScript (modules)** + **Vite** + **Alpine.js** | Interactions dans le navigateur |
+| Styles | **Tailwind CSS 4** | Mise en forme (identité visuelle Kadea Chat) |
+| Interface | **JavaScript (modules)** + **Vite** | Interactions dans le navigateur |
 | Temps réel | **Transmit** (Server-Sent Events) | Messages et présence instantanés |
 | Fichiers | **Cloudinary** | Stockage des images et documents |
 | E-mails | **Brevo** | Confirmation d'inscription, mot de passe oublié |
@@ -168,8 +168,8 @@ L'architecture est décrite avec le [modèle C4](https://c4model.com) et l'outil
 ### 1. Récupérer le projet
 
 ```bash
-git clone https://github.com/VOTRE-COMPTE/kadea-chat.git
-cd kadea-chat
+git clone https://github.com/JoelMitondo/Kadea_Chat_App.git
+cd Kadea_Chat_App
 ```
 
 ### 2. Installer les dépendances
@@ -206,7 +206,16 @@ node ace migration:run
 node ace db:seed
 ```
 
-Le seeder insère les données **indispensables** au fonctionnement : types de conversation (`private`, `group`), types de message (`texte`, `images`, `document`, `video`, `emodji`) et rôles (`admin`, `membre`). Sans elles, la création d'une conversation échoue avec `E_ROW_NOT_FOUND`.
+Deux seeders se trouvent dans `database/seeders/` :
+
+| Seeder | Environnements | Contenu |
+|---|---|---|
+| `01_reference_data_seeder.ts` | tous (y compris production) | Types de conversation (`Privee`, `Publique` = groupe), rôles (`admin`, `membre`), types de message (`texte`, `images`, `document`, `video`, `emodji`) |
+| `02_demo_users_seeder.ts` | **développement uniquement** | Quatre comptes de démonstration déjà confirmés (voir ci-dessous) |
+
+Les seeders sont rejouables : relancer `node ace db:seed` ne crée pas de doublons.
+
+**Comptes de démonstration (local uniquement)** : `amina@example.com`, `benjamin@example.com`, `chloe@example.com`, `david@example.com`, mot de passe `KadeaDemo2026`. Ils ne sont **jamais** créés en production : sur le site hébergé, les comptes se créent par l'inscription avec confirmation par e-mail.
 
 ### 6. Lancer l'application
 
@@ -276,7 +285,7 @@ CLOUDINARY_API_SECRET=votre_secret
 | Variable | Rôle | Remarque |
 |---|---|---|
 | `APP_KEY` | Chiffrement des cookies et sessions | Unique par environnement, jamais partagée |
-| `APP_URL` | Adresse publique, utilisée dans les liens des e-mails | En production : l'adresse réelle en `https://` |
+| `APP_URL` | Adresse publique, base de **tous** les liens envoyés par e-mail | En production : l'adresse réelle en `https://` (ex. `https://agora-chat-app-1.onrender.com`). Les liens ne sont jamais construits à partir de l'en-tête `Host` de la requête |
 | `SESSION_DRIVER` | `cookie`, `database` ou `memory` | `memory` est réservé aux tests |
 | `MAIL_FROM_ADDRESS` | Expéditeur des e-mails | Doit être **vérifiée** dans Brevo |
 | `BREVO_API_KEY` | Clé d'API Brevo | Brevo → SMTP & API → Clés d'API |
@@ -323,11 +332,10 @@ kadea-chat/
 ├── config/                 Réglages (base, session, hash, mail, Transmit, shield…)
 ├── database/
 │   ├── migrations/         Création et évolution des tables
-│   └── seeders/            Données de référence
+│   └── seeders/            Données de référence + comptes de démo (dev)
 ├── docs/
 │   ├── modelisation/       Dictionnaire, MCD, MLD (.drawio, .svg, .png)
-│   ├── c4/                 Diagrammes C4 (contexte, conteneurs, composants)
-│   └── maquettes/          Exports des maquettes Figma
+│   └── c4/                 Diagrammes C4 (contexte, conteneurs, composants)
 ├── resources/
 │   ├── css/                input.css (thème) → output.css (généré)
 │   ├── js/                 Scripts de pages et temps réel (modules Vite)
@@ -336,7 +344,7 @@ kadea-chat/
 │       ├── partials/       Fragments renvoyés par le serveur (panneaux de chat)
 │       └── pages/          Pages complètes
 ├── start/                  routes, kernel, validator, view, transmit
-├── tests/                  unit/ · functional/ · browser/
+├── tests/                  functional/ (contrôle d'accès, mot de passe) + helpers.ts
 ├── adonisrc.ts             Providers, preloads, suites de tests
 └── vite.config.ts          Points d'entrée JavaScript
 ```
@@ -361,6 +369,7 @@ kadea-chat/
 | GET / POST | `/groups` | Liste / création | Connecté |
 | GET / DELETE | `/groups/:id` | Ouvrir / supprimer | Membre / admin |
 | POST | `/groups/:id/members` | Ajouter des membres | Admin |
+| DELETE | `/groups/:id/members/:userId` | Retirer un membre | Admin |
 | POST | `/groups/:id/messages` | Écrire dans un groupe | Membre |
 | GET | `/users` | Liste et recherche d'utilisateurs | Connecté |
 | POST | `/users/:id/chat` | Démarrer une discussion | Connecté |
@@ -368,6 +377,7 @@ kadea-chat/
 | GET | `/search?q=` | Rechercher dans ses messages | Connecté |
 | GET / POST | `/profile` | Voir / modifier le profil | Connecté |
 | GET | `/settings` | Paramètres du compte | Connecté |
+| POST | `/settings/password` | Changer son mot de passe (ancien redemandé) | Connecté |
 
 La liste exacte et à jour s'obtient avec `node ace list:routes`.
 
@@ -432,7 +442,7 @@ La modélisation suit la méthode Merise et correspond exactement aux migrations
 | Mesure | Détail |
 |---|---|
 | Mots de passe | Hachés, jamais stockés en clair |
-| Liens secrets | Hachés, à usage unique, avec expiration (48 h inscription, 1 h réinitialisation) |
+| Liens secrets | Hachés, à usage unique, avec expiration (48 h inscription, 1 h réinitialisation), construits à partir de `APP_URL` |
 | CSRF | Jeton obligatoire sur tous les formulaires (`@adonisjs/shield`) |
 | Validation | Toutes les entrées passent par VineJS côté serveur |
 | Droits | Vérifiés par le serveur : 404 pour un non-membre, 403 sans droit |
@@ -441,7 +451,7 @@ La modélisation suit la méthode Merise et correspond exactement aux migrations
 | Cookies | `httpOnly`, `sameSite=lax`, `secure` en production |
 | En-têtes | HSTS, anti-clickjacking, anti-sniffing |
 | Réponses neutres | Connexion et blocage ne révèlent rien d'inutile |
-| Actions sensibles | Mot de passe redemandé pour supprimer le compte |
+| Actions sensibles | Mot de passe actuel redemandé pour changer de mot de passe et pour supprimer le compte |
 
 **Signaler une faille :** contactez l'auteur par e-mail (voir [Auteur](#auteur)) plutôt que d'ouvrir une issue publique.
 
@@ -449,15 +459,26 @@ La modélisation suit la méthode Merise et correspond exactement aux migrations
 
 ## Tests
 
+Les tests fonctionnels (Japa) envoient de vraies requêtes HTTP à l'application et vérifient les règles d'accès.
+
 ```bash
+# Une seule fois : créer la base de test (jamais la base de développement)
+# OWNER = le DB_USER du .env (PostgreSQL 15+ : seul le propriétaire crée des tables dans public)
+psql -U postgres -c "CREATE DATABASE kadea_chat_test OWNER <DB_USER>;"
+
 npm test                  # toutes les suites
-node ace test unit        # tests unitaires
-node ace test functional  # tests de routes (base de test)
+node ace test functional  # tests de routes
 ```
 
-- Les tests utilisent la base `kadea_chat_test`, **jamais** la base de développement.
+- `.env.test` remplace `DB_DATABASE` par `kadea_chat_test` et la session par `memory`.
+- Avant les tests : migrations puis données de référence sur la base de test (`tests/bootstrap.ts`).
+- Chaque test tourne dans une transaction annulée à la fin : les tests ne laissent aucune donnée.
 - Chaque test suit le schéma **Préparer → Agir → Vérifier**.
-- Priorités : droits sur les conversations et groupes, règle de blocage, isolation de la recherche, succession d'administrateur à la suppression d'un compte.
+
+| Fichier | Ce qui est vérifié |
+|---|---|
+| `tests/functional/access_control.spec.ts` | Visiteur redirigé vers `/login` ; un non-membre ne peut **ni lire ni écrire** dans une conversation privée ou un groupe (404) ; on ne supprime pas le message d'un autre (403) ; la recherche n'expose pas les messages d'autrui ; seul l'administrateur ajoute ou retire des membres ; un membre retiré perd immédiatement l'accès |
+| `tests/functional/password_change.spec.ts` | Ancien mot de passe obligatoire, confirmation identique, nouveau mot de passe stocké haché |
 
 ---
 
@@ -516,7 +537,7 @@ Consultez la documentation officielle « Deployment » d'AdonisJS pour les chemi
 - Recherche en `ILIKE '%…%'` : suffisante pour un projet de formation, lente à grande échelle.
 - Pas de limitation du nombre de tentatives de connexion.
 - Envoi des e-mails pendant la requête (pas de file d'attente).
-- Couverture de tests partielle.
+- Couverture de tests limitée au contrôle d'accès et au mot de passe (pas encore l'inscription ni le temps réel).
 - Liens des fichiers publics (non devinables, mais non signés).
 
 **Évolutions prévues (V2)**
@@ -524,25 +545,36 @@ Consultez la documentation officielle « Deployment » d'AdonisJS pour les chemi
 - [ ] Chiffrement de bout en bout des messages
 - [ ] Redis pour la présence et le temps réel multi-serveurs
 - [ ] Limiteur de débit sur les routes d'authentification
-- [ ] Tests automatisés complets (Japa)
-- [ ] Contrainte `UNIQUE` sur `blocked_users`, colonnes `nullable` pour l'anonymisation à la suppression d'un compte
+- [ ] Tests de l'inscription, de la réinitialisation et du temps réel
+- [ ] Colonnes `nullable` pour l'anonymisation à la suppression d'un compte
 - [ ] Recherche optimisée (`pg_trgm`) et saut jusqu'au message trouvé
 - [ ] Appels audio et vidéo, réactions, messages vocaux
 
 ---
 
+## Usage de l'intelligence artificielle
+
+Conformément aux règles du projet, l'usage d'assistants d'IA est déclaré ici. Tout le code rendu a été relu et peut être expliqué ligne par ligne.
+
+| Outil | Usage | Parties concernées |
+|---|---|---|
+| Claude (Claude Code, Anthropic) | Audit du code par rapport au cahier des charges, corrections et revue | Retrait de membres d'un groupe, changement direct du mot de passe, liens e-mail construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README |
+| Claude (Claude Code, Anthropic) — branche `UpdateClaude` | Documentation, modélisation et refactorisation, relues puis fusionnées dans `main` | Dictionnaire des données, MCD et MLD ; modèle C4 (Structurizr) ; commentaires explicatifs des services, contrôleurs et du temps réel ; noms de méthodes et de routes plus clairs ; contrainte `NOT NULL` sur `expired_at` ; correction de la page d'accueil et ajustements des vues |
+
+**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude` et `fix/p0`).
+
+---
+
 ## Auteur
 
-**[Votre nom]**
-Étudiant · Kadea Academy
-E-mail : [votre@email.com](mailto:votre@email.com)
-GitHub : [@VOTRE-COMPTE](https://github.com/VOTRE-COMPTE)
-LinkedIn : [Votre profil](https://www.linkedin.com/in/VOTRE-PROFIL)
+**Joel Mitondo**
+Apprenant · Kadea Academy (parcours Développement Web)
+GitHub : [@JoelMitondo](https://github.com/JoelMitondo)
 
 ---
 
 <div align="center">
 
-© 2026 Kadea Chat · NMS Tech · Tous droits réservés
+© 2026 Kadea Chat · Projet chef-d'œuvre Kadea Academy
 
 </div>

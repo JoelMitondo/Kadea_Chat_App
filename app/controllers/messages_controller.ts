@@ -1,7 +1,3 @@
-// MESSAGES : envoi, modification, suppression.
-// Parcours d'un message : formulaire -> route -> ce contrôleur (validation, droits, base de données)
-// -> réponse à l'expéditeur + événement temps réel vers les autres participants.
-
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
@@ -35,9 +31,7 @@ import {
 } from '../service/realtime_service.ts'
 
 export default class MessagesController {
-  /**
-   * Envoie un message dans une conversation PRIVÉE
-   */
+  // Envoie un message dans une conversation PRIVÉE
   async enregistreMessagePrive(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
     const membership = await chercheParticipationPrivee(
@@ -47,9 +41,8 @@ export default class MessagesController {
     return this.envoieMessage(ctx, membership, 'private')
   }
 
-  /**
-   * Envoie un message dans un GROUPE (tous les membres peuvent écrire)
-   */
+  // Envoie un message dans un GROUPE (tous les membres peuvent écrire)
+
   async enregistreMessageGroupe(ctx: HttpContext) {
     const user = ctx.auth.getUserOrFail()
     const membership = await chercheParticipationGroupe(user.id, Number(ctx.params.id))
@@ -58,9 +51,8 @@ export default class MessagesController {
     return this.envoieMessage(ctx, membership, 'group')
   }
 
-  /**
-   * Modifie un message (uniquement par son auteur)
-   */
+  // Modifie un message (uniquement par son auteur)
+
   async modifieMessage({ auth, params, request, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const { content } = await request.validateUsing(updateMessageValidator)
@@ -89,9 +81,8 @@ export default class MessagesController {
     return response.ok(data)
   }
 
-  /**
-   * Supprime un message (uniquement par son auteur) : suppression "douce"
-   */
+  // Supprime un message (uniquement par son auteur) : suppression "douce"
+
   async supprimeMessage({ auth, params, response, view }: HttpContext) {
     const user = auth.getUserOrFail()
     const message = await Message.findOrFail(params.id)
@@ -117,14 +108,8 @@ export default class MessagesController {
     return response.ok(data)
   }
 
-  // ---------- Méthodes privées ----------
+  // Enregistre un nouveau message (conversation privée OU groupe), avec ou sans fichier
 
-  /**
-   * Enregistre un nouveau message (conversation privée OU groupe)
-   */
-  /**
-   * Enregistre un nouveau message (conversation privée OU groupe), avec ou sans fichier
-   */
   private async envoieMessage(
     ctx: HttpContext,
     membership: UserConversation,
@@ -268,9 +253,8 @@ export default class MessagesController {
     return response.created(data)
   }
 
-  /**
-   * Prévient les autres participants qu'un message a été modifié ou supprimé
-   */
+  // Prévient les autres participants qu'un message a été modifié ou supprimé
+
   private async previensAutresParticipants(message: Message, sender: User, isLast: boolean) {
     // Est-ce une conversation privée ou un groupe ?
     const conversation = await Conversation.query()
@@ -288,9 +272,8 @@ export default class MessagesController {
     await previensMessageModifie({ message, kind, isLast, recipients })
   }
 
-  /**
-   * Réponse JSON commune : la bulle déjà fabriquée en HTML + de quoi mettre la liste à jour
-   */
+  // Réponse JSON commune : la bulle déjà fabriquée en HTML + de quoi mettre la liste à jour
+
   private async construitReponseMessage(
     message: Message,
     userId: User['id'],

@@ -85,6 +85,9 @@ router
     router
       .post('/groups/:id/members', [controllers.Groups, 'ajouteMembres'])
       .as('groups.members.store')
+    router
+      .delete('/groups/:id/members/:userId', [controllers.Groups, 'retireMembre'])
+      .as('groups.members.destroy')
     router.delete('/groups/:id', [controllers.Groups, 'supprimeGroupe']).as('groups.destroy')
     router
       .post('/groups/:id/messages', [controllers.Messages, 'enregistreMessageGroupe'])
@@ -99,8 +102,11 @@ router
 
     router.get('/settings', [controllers.Settings, 'donnePageParametres']).as('settings')
     router
-      .post('/settings/password', [controllers.Settings, 'demarreChangementMotDePasse'])
+      .post('/settings/password', [controllers.Settings, 'modifieMotDePasse'])
       .as('settings.password')
+    router
+      .post('/settings/password/forgot', [controllers.Settings, 'demarreChangementMotDePasse'])
+      .as('settings.password.forgot')
 
     router.post('/users/:id/block', [controllers.Blocks, 'bloque']).as('users.block')
     router.post('/users/:id/unblock', [controllers.Blocks, 'debloque']).as('users.unblock')

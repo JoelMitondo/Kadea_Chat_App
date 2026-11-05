@@ -81,6 +81,7 @@ export const validationFields: Record<string, string> = {
   email: "L'adresse e-mail",
   email_confirmation: "La confirmation de l'adresse e-mail",
   password: 'Le mot de passe',
+  current_password: 'Le mot de passe actuel',
   password_confirmation: 'La confirmation du mot de passe',
   birth_date: 'La date de naissance',
   phone_number: 'Le numéro de téléphone',
