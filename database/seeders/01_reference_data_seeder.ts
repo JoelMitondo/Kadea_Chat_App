@@ -14,8 +14,22 @@ import {
   PRIVATE_TYPE,
 } from '../../app/service/chat_service.ts'
 
+// Tables de référence remplies par ce seeder (identifiant auto-incrémenté "id")
+const REFERENCE_TABLES = ['conversation_types', 'role_conversations', 'message_types']
+
 export default class ReferenceDataSeeder extends BaseSeeder {
   async run() {
+    // PostgreSQL donne les identifiants avec un compteur (une "séquence"). Si des lignes ont été
+    // insérées en précisant leur id (insertion manuelle, import...), le compteur n'avance pas :
+    // il redonne un id déjà pris et l'insertion échoue ("duplicate key ... _pkey").
+    // On recale donc chaque compteur juste après le plus grand id existant.
+    for (const table of REFERENCE_TABLES) {
+      await this.client.rawQuery(
+        `SELECT setval(pg_get_serial_sequence(?, 'id'), COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1, false)`,
+        [table]
+      )
+    }
+
     const conversationTypes = [
       { type: PRIVATE_TYPE, description: 'Conversation privée entre deux utilisateurs' },
       { type: GROUP_TYPE, description: 'Groupe de discussion (plusieurs membres)' },

@@ -445,6 +445,13 @@ document.addEventListener('click', async function (evenement) {
     return
   }
 
+  // Afficher les messages précédents
+  let boutonPrecedents = cible.closest('[data-load-older-button]')
+  if (boutonPrecedents !== null) {
+    chargerMessagesPrecedents(boutonPrecedents)
+    return
+  }
+
   // Modifier / supprimer un message
   let boutonModifier = cible.closest('[data-edit-message]')
   if (boutonModifier !== null) {
@@ -485,6 +492,50 @@ document.addEventListener('click', async function (evenement) {
     quitterModeEdition()
   }
 })
+
+// « Afficher les messages précédents » : la page d'avant s'insère en haut de la discussion,
+// sans faire sauter l'affichage (on garde sous les yeux le message qu'on regardait).
+async function chargerMessagesPrecedents(bouton) {
+  let zone = document.getElementById('messages-list')
+  let bloc = bouton.closest('[data-load-older]')
+  bouton.disabled = true
+
+  let reponse
+  try {
+    reponse = await fetch(bouton.dataset.url + '?before=' + bouton.dataset.before, {
+      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    })
+  } catch (erreurReseau) {
+    kcNotifier.erreur('Impossible de contacter le serveur. Vérifiez votre connexion.')
+    bouton.disabled = false
+    return
+  }
+
+  let corps = {}
+  try { corps = await reponse.json() } catch (erreurLecture) { corps = {} }
+  if (!reponse.ok) {
+    kcNotifier.erreur(lireErreur(corps))
+    bouton.disabled = false
+    return
+  }
+
+  // Le premier jour affiché continue dans la page chargée : son séparateur passe plus haut
+  if (corps.dropFirstSeparator) {
+    let separateur = zone.querySelector('[data-day-separator]')
+    if (separateur !== null) { separateur.remove() }
+  }
+
+  let hauteurAvant = zone.scrollHeight
+  bloc.insertAdjacentHTML('afterend', corps.html)
+  zone.scrollTop += zone.scrollHeight - hauteurAvant
+
+  if (corps.hasMore) {
+    bouton.dataset.before = corps.oldestId
+    bouton.disabled = false
+  } else {
+    bloc.remove() // tout l'historique est affiché
+  }
+}
 
 // 8. TEMPS RÉEL
 // realtime.js (chargé dans le layout) reçoit les événements du serveur et nous les transmet
@@ -572,16 +623,35 @@ function traiterMessageModifie(donnees) {
   }
 }
 
+// Affiche UNE seule des trois coches d'une bulle : 'sent', 'delivered' ou 'read'
+function afficherCoche(bulle, etat) {
+  let coches = {
+    sent: bulle.querySelector('[data-tick-sent]'),
+    delivered: bulle.querySelector('[data-tick-delivered]'),
+    read: bulle.querySelector('[data-tick-read]'),
+  }
+  Object.keys(coches).forEach(function (nom) {
+    if (coches[nom] !== null) { coches[nom].classList.toggle('hidden', nom !== etat) }
+  })
+}
+
 // Quelqu'un a lu nos messages : leurs coches passent en bleu
 function traiterLecture(donnees) {
   donnees.messageIds.forEach(function (idMessage) {
     let bulle = document.querySelector('[data-message-id="' + idMessage + '"]')
-    if (bulle === null) { return }
+    if (bulle !== null) { afficherCoche(bulle, 'read') }
+  })
+}
 
-    let cocheEnvoye = bulle.querySelector('[data-tick-sent]')
+// Nos messages sont arrivés chez leurs destinataires : deux coches grises
+// (sauf s'ils sont déjà lus : on ne repasse jamais du bleu au gris)
+function traiterReception(donnees) {
+  donnees.messageIds.forEach(function (idMessage) {
+    let bulle = document.querySelector('[data-message-id="' + idMessage + '"]')
+    if (bulle === null) { return }
     let cocheLu = bulle.querySelector('[data-tick-read]')
-    if (cocheEnvoye !== null) { cocheEnvoye.classList.add('hidden') }
-    if (cocheLu !== null) { cocheLu.classList.remove('hidden') }
+    let dejaLu = cocheLu !== null && !cocheLu.classList.contains('hidden')
+    if (!dejaLu) { afficherCoche(bulle, 'delivered') }
   })
 }
 
@@ -628,6 +698,7 @@ document.addEventListener('kc:evenement', function (evenement) {
   if (donnees.type === 'message:new') { traiterNouveauMessage(donnees) }
   if (donnees.type === 'message:updated') { traiterMessageModifie(donnees) }
   if (donnees.type === 'messages:read') { traiterLecture(donnees) }
+  if (donnees.type === 'messages:delivered') { traiterReception(donnees) }
   if (donnees.type === 'group:updated') { traiterGroupeModifie(donnees) }
   if (donnees.type === 'conversation:removed') { traiterConversationSupprimee(donnees) }
 

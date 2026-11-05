@@ -3,6 +3,7 @@
 
 import type { HttpContext } from '@adonisjs/core/http'
 import mail from '@adonisjs/mail/services/main'
+import logger from '@adonisjs/core/services/logger'
 import { inscriptionValidator } from '#validators/inscription'
 import Inscription from '#models/inscription'
 import { DateTime } from 'luxon'
@@ -10,6 +11,7 @@ import { genereCodeUnique } from './../service/code_generation.ts'
 import hash from '@adonisjs/core/services/hash'
 import { publicUrl } from '#config/app'
 import { APP_TIMEZONE } from '../service/chat_service.ts'
+import ConfirmationEmailMail from '#mails/confirmation_email_mail'
 
 export default class InscriptionsController {
   async donnePageInscription({ view }: HttpContext) {
@@ -44,53 +46,15 @@ export default class InscriptionsController {
       }
     )
 
-    //on envoie maintenant un email de confirmation de email
+    // On envoie l'e-mail de confirmation (contenu : resources/views/emails/confirmation_email.edge)
     try {
-      const baseUrl = publicUrl
+      const activationLink = `${publicUrl}/signup/${identite.id}/${codeAleatoire}`
+      const expiresAt = inscriptionExpire.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
 
-      const activationLink = `${baseUrl}/signup/${identite.id}/${codeAleatoire}`
+      await mail.send(
+        new ConfirmationEmailMail({ email: payload.email, fullName }, activationLink, expiresAt)
+      )
 
-      // Formatage de la date d'expiration
-      const dateExpirationFormattee =
-        typeof inscriptionExpire?.toFormat === 'function'
-          ? inscriptionExpire.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
-          : inscriptionExpire
-
-      // Envoyer l'email via Brevo
-      await mail.send((message) => {
-        message
-          .to(payload.email) // Adresse dynamique de l'utilisateur depuis le payload
-          .from('mitondomohindo@gmail.com', 'Kadea Chat')
-          .subject('Confirmation de votre adresse email - Kadea Chat').html(`
-        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-          <h2>Bonjour ${fullName},</h2>
-          
-          <p>Merci de vous être inscrit sur <strong>Kadea Chat</strong> ! Pour finaliser la création de votre compte, veuillez confirmer votre adresse email.</p>
-          
-          <p>Voici un récapitulatif de vos informations :</p>
-          <ul>
-            <li><strong>Nom complet :</strong> ${fullName}</li>
-            <li><strong>Adresse e-mail :</strong> ${payload.email}</li>
-            <li><strong>Date d'expiration du lien :</strong> ${dateExpirationFormattee}</li>
-          </ul>
-
-          <p>Cliquez sur le bouton ci-dessous pour confirmer votre email. Vous serez ensuite redirigé vers une page vous permettant de compléter les informations de votre profil :</p>
-          
-          <p style="text-align: center; margin: 25px 0;">
-            <a href="${activationLink}" style="background-color: #2e7d32; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-              Confirmer mon email
-            </a>
-          </p>
-
-          <p style="color: #c0392b; font-size: 0.9em;">
-            <strong>Attention :</strong> Ce lien d'activation expire dans <strong>48 heures</strong>. Passé ce délai, vous devrez refaire une demande de création de compte.
-          </p>
-
-          <br>
-          <p>Cordialement,<br><strong>L'équipe Kadea Chat</strong></p>
-        </div>
-      `)
-      })
       // Envoi par le script : on répond en JSON (le message est celui de data-success)
       if (request.accepts(['html', 'json']) === 'json') {
         return response.created({ message: 'Compte créé.' })
@@ -99,7 +63,7 @@ export default class InscriptionsController {
       session.flash('success', 'Votre compte a été créé. Vérifiez votre e-mail.')
       return response.redirect().toRoute('home')
     } catch (error) {
-      console.error("Erreur lors de l'envoi de l'e-mail :", error)
+      logger.error({ err: error }, "Erreur lors de l'envoi de l'e-mail de confirmation")
       return response.status(500).json({
         success: false,
         message: "Échec de l'envoi de l'e-mail",

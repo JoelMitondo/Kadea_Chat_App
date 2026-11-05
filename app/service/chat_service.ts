@@ -4,9 +4,10 @@
 
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
-import type Message from '#models/message'
+import Message from '#models/message'
 import type User from '#models/user'
 import UserConversation from '#models/user_conversation'
+import type { ModelQueryBuilderContract } from '@adonisjs/lucid/types/model'
 import { construitLienTelechargement, construitLienMiniature } from './cloudinary_service.ts'
 
 // Fuseau horaire utilisé pour afficher les heures et calculer "Aujourd'hui" / "Hier"
@@ -20,6 +21,15 @@ export const GROUP_TYPE = 'Publique'
 // Valeurs de la colonne "title" de role_conversations
 export const ADMIN_ROLE = 'admin'
 export const MEMBER_ROLE = 'membre'
+
+// Statuts d'un message pour UN destinataire (colonne "status" de message_statuses) :
+// envoyé (enregistré) → reçu (arrivé sur son appareil) → lu (conversation ouverte)
+export const STATUS_SENT = 'sent'
+export const STATUS_DELIVERED = 'delivered'
+export const STATUS_READ = 'read'
+
+// Nombre de messages chargés à la fois (à l'ouverture, puis à chaque « messages précédents »)
+export const MESSAGES_PER_PAGE = 50
 // ---------- Dates ----------
 
 // Le serveur et la base travaillent en UTC. Pour l'affichage, on convertit à l'heure de Kinshasa,
@@ -163,6 +173,9 @@ export function construitVueMessage(
   const file = message.attachments?.[0]
   const statuses = message.statuses ?? []
   const isRead = statuses.length > 0 && statuses.every((status) => status.isRead)
+  // "Reçu" quand il est arrivé chez TOUS les destinataires (un message lu a forcément été reçu)
+  const isDelivered =
+    statuses.length > 0 && statuses.every((status) => status.status !== STATUS_SENT)
   const isMine = message.userId === currentUserId
 
   return {
@@ -173,6 +186,7 @@ export function construitVueMessage(
     // Pas de colonne "modifié" : si updated_at est plus tard que created_at, le message a été modifié
     isEdited: message.updatedAt.toMillis() - message.createdAt.toMillis() > 1000,
     isRead,
+    isDelivered,
     time: formateHeure(message.createdAt),
     dayKey: donneCleDuJour(message.createdAt),
     dayLabel: donneLibelleDuJour(message.createdAt),
@@ -219,7 +233,7 @@ export async function marqueConversationCommeLue(userId: User['id'], conversatio
       'message_id',
       db.from('messages').select('id').where('conversation_id', conversationId)
     )
-    .update({ is_read: true, status: 'read', updated_at: new Date() })
+    .update({ is_read: true, status: STATUS_READ, updated_at: new Date() })
 }
 
 // Même chose que chercheParticipationPrivee, mais pour un GROUPE
@@ -261,4 +275,65 @@ export async function donneNombreMessagesNonLus(userId: User['id'], conversation
   }
 
   return counts
+}
+
+// ---------- Pagination des messages ----------
+
+/**
+ * Charge UNE page de messages d'une conversation, du plus ancien au plus récent.
+ * - before : identifiant du plus ancien message déjà affiché (pagination « par curseur »).
+ *   Les identifiants augmentent avec le temps : « plus ancien » = « identifiant plus petit ».
+ *   Contrairement à un numéro de page, le curseur ne se décale pas quand de nouveaux messages arrivent.
+ * - visibleAfter : date de suppression de la conversation par l'utilisateur (messages plus anciens cachés).
+ * - prepare : ajoute à la requête ce qui dépend de l'écran (preload des fichiers, des statuts...).
+ * On demande UN message de plus que la page : s'il existe, il reste des messages plus anciens.
+ */
+export async function chargePageMessages(options: {
+  conversationId: number
+  before: number | null
+  visibleAfter: DateTime | null
+  prepare: (query: ModelQueryBuilderContract<typeof Message>) => void
+}) {
+  const query = Message.query()
+    .where('conversationId', options.conversationId)
+    .orderBy('id', 'desc')
+    .limit(MESSAGES_PER_PAGE + 1)
+
+  if (options.before !== null) {
+    query.where('id', '<', options.before)
+  }
+  if (options.visibleAfter !== null) {
+    query.where('createdAt', '>', options.visibleAfter.toJSDate())
+  }
+  options.prepare(query)
+
+  const rows = await query
+  const hasMore = rows.length > MESSAGES_PER_PAGE
+  const messages = rows.slice(0, MESSAGES_PER_PAGE).reverse()
+
+  return { messages, hasMore, oldestId: messages[0]?.id ?? null }
+}
+
+/**
+ * Faut-il retirer le séparateur de jour déjà affiché en haut de la discussion ?
+ * Oui si le dernier message de la page chargée est du même jour que le premier message affiché :
+ * sinon « Aujourd'hui » apparaîtrait deux fois.
+ */
+export async function memeJourQueLePremierAffiche(
+  olderMessages: Message[],
+  conversationId: number,
+  firstDisplayedId: number
+) {
+  const lastOlder = olderMessages.at(-1)
+  if (!lastOlder) {
+    return false
+  }
+  const firstDisplayed = await Message.query()
+    .where('conversationId', conversationId)
+    .where('id', firstDisplayedId)
+    .first()
+  return (
+    firstDisplayed !== null &&
+    donneCleDuJour(firstDisplayed.createdAt) === donneCleDuJour(lastOlder.createdAt)
+  )
 }

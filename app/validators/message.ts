@@ -30,3 +30,9 @@ export const sendMessageValidator = vine.create({
 export const updateMessageValidator = vine.create({
   content: vine.string().trim().minLength(1).maxLength(2000),
 })
+
+// « Messages précédents » : /conversations/12/messages?before=345
+// before = identifiant du plus ancien message déjà affiché
+export const olderMessagesValidator = vine.create({
+  before: vine.number().withoutDecimals().positive(),
+})

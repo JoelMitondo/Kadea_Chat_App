@@ -15,6 +15,7 @@ import { publicUrl } from '#config/app'
 import mail from '@adonisjs/mail/services/main'
 import logger from '@adonisjs/core/services/logger'
 import { APP_TIMEZONE } from '../service/chat_service.ts'
+import ReinitialisationMotDePasseMail from '#mails/reinitialisation_mot_de_passe_mail'
 
 export default class ForgoPasswordsController {
   async donnePageMotDePasseOublie({ view }: HttpContext) {
@@ -27,65 +28,27 @@ export default class ForgoPasswordsController {
 
     if (user) {
       const codeAleatoire = await genereCodeUnique(ForgoPassword)
+      const expiration = DateTime.now().plus({ hours: 1 })
       const identite = await ForgoPassword.updateOrCreate(
         { email: user.email },
         {
           userId: user.id,
           codeAleatoire: await hash.make(codeAleatoire),
-          expiredAt: DateTime.now().plus({ hours: 1 }),
+          expiredAt: expiration,
         }
       )
+      // Contenu de l'e-mail : resources/views/emails/reinitialisation_mot_de_passe.edge
       try {
-        const baseUrl = publicUrl
+        const resetLink = `${publicUrl}/forgoPassword/${identite.id}/${codeAleatoire}`
+        const expiresAt = expiration.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
 
-        const resetLink = `${baseUrl}/forgoPassword/${identite.id}/${codeAleatoire}`
-
-        const dateExpirationFormattee =
-          typeof identite.expiredAt?.toFormat === 'function'
-            ? identite.expiredAt.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
-            : identite.expiredAt
-
-        // Envoi de l'email via Brevo
-        await mail.send((message) => {
-          message
-            .to(identite.email)
-            .from('mitondomohindo@gmail.com', 'Kadea Chat')
-            .subject('Réinitialisation de votre mot de passe - Kadea Chat').html(`
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #2c3e50; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-          <h2 style="color: #1a73e8; margin-bottom: 20px;">Réinitialisation de mot de passe</h2>
-          
-          <p>Bonjour <strong>${user.fullName}</strong>,</p>
-          
-          <p>Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte <strong>Kadea Chat</strong>.</p>
-          
-          <p>Cliquez sur le bouton ci-dessous pour choisir votre nouveau mot de passe :</p>
-          
-          <p style="text-align: center; margin: 30px 0;">
-            <a href="${resetLink}" style="background-color: #1a73e8; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">
-              Réinitialiser mon mot de passe
-            </a>
-          </p>
-
-          <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0; color: #856404; font-size: 0.95em;">
-              <strong> Sécurité importante :</strong><br>
-              Ne partagez jamais ce lien ni aucun code avec qui que ce soit. L'équipe <strong>Kadea Chat</strong> ne vous demandera jamais ces informations. Si une personne vous les demande, il s'agit d'une tentative de piratage.
-            </p>
-          </div>
-
-          <p style="color: #7f8c8d; font-size: 0.9em;">
-            Ce lien est à usage unique et expirera le <strong>${dateExpirationFormattee}</strong> (dans 1 heure).
-          </p>
-
-          <p style="color: #7f8c8d; font-size: 0.85em; margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px;">
-            Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail en toute sécurité. Votre mot de passe actuel restera inchangé.
-          </p>
-
-          <br>
-          <p style="margin: 0;">Cordialement,<br><strong>L'équipe Kadea Chat</strong></p>
-        </div>
-      `)
-        })
+        await mail.send(
+          new ReinitialisationMotDePasseMail(
+            { email: identite.email, fullName: user.fullName },
+            resetLink,
+            expiresAt
+          )
+        )
       } catch (error) {
         logger.error({ err: error }, "Erreur lors de l'envoi de l'e-mail de réinitialisation")
         if (request.accepts(['html', 'json']) === 'json') {

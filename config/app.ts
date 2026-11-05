@@ -27,6 +27,14 @@ export const http = defineConfig({
   generateRequestId: true,
 
   /**
+   * Sur Render, les requêtes passent par un proxy interne (adresse privée) qui ajoute
+   * l'adresse du visiteur dans l'en-tête X-Forwarded-For. On ne fait confiance qu'aux proxys
+   * d'adresse privée (10.x, 172.16-31.x, 192.168.x) : request.ip() renvoie alors l'adresse du
+   * visiteur, sans qu'il puisse la falsifier. Le limiteur de requêtes (start/limiter.ts) en a besoin.
+   */
+  trustProxy: 'uniquelocal',
+
+  /**
    * Allow method spoofing via _method query parameter or form field.
    * Enables using PUT, PATCH, DELETE methods in HTML forms by spoofing
    * through POST requests with _method field.

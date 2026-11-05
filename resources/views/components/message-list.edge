@@ -1,0 +1,10 @@
+{{-- Une page de messages, avec un séparateur à chaque changement de jour.
+     Prop : messages (liste construite par construitVueMessage).
+     Utilisé à l'ouverture d'une discussion ET par « Messages précédents ». --}}
+@let(messages = $props.get('messages'))
+@each((message, index) in messages)
+  @if(index === 0 || message.dayKey !== messages[index - 1].dayKey)
+    @!component('components/day-separator', { label: message.dayLabel })
+  @end
+  @!component('components/message-bubble', { message })
+@end

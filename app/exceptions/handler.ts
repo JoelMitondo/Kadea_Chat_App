@@ -20,6 +20,8 @@ const FRENCH_MESSAGES: Record<string, string> = {
   // "request entity too large" : envoi au-dessus de la limite du serveur (20 Mo)
   E_REQUEST_ENTITY_TOO_LARGE: 'Le fichier envoyé est trop lourd (20 Mo maximum par envoi).',
   E_INVALID_MULTIPART_REQUEST: "Le fichier n'a pas pu être envoyé. Réessayez.",
+  // "Too many requests" : limite de start/limiter.ts atteinte (code 429)
+  E_TOO_MANY_REQUESTS: 'Trop de tentatives. Patientez quelques minutes avant de réessayer.',
 }
 
 // Message affiché pour toute autre erreur serveur : on ne montre jamais le détail technique
@@ -68,6 +70,13 @@ export default class HttpExceptionHandler extends ExceptionHandler {
     // avec le code 200, et le script croit que l'action a réussi.
     if (this.isScriptRequest(ctx) && httpError?.code !== 'E_VALIDATION_ERROR') {
       return this.respondAsJson(httpError, ctx)
+    }
+
+    // 3. Trop d'essais sur un formulaire classique (connexion) : retour au formulaire avec
+    // le message en notification, au lieu d'une page blanche contenant seulement du texte
+    if (httpError?.code === 'E_TOO_MANY_REQUESTS') {
+      ctx.session.flash('error', httpError.message)
+      return ctx.response.redirect().back()
     }
 
     return super.handle(error, ctx)

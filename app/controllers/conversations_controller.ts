@@ -1,22 +1,23 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import type User from '#models/user'
-import Message from '#models/message'
+import type Message from '#models/message'
 import UserConversation from '#models/user_conversation'
+import { olderMessagesValidator } from '#validators/message'
 import {
+  PRIVATE_TYPE,
   construitVueMessage,
   construitApercu,
+  chargePageMessages,
   chercheParticipationPrivee,
   donneInitiales,
   donneHeureDeLaListe,
   marqueConversationCommeLue,
+  memeJourQueLePremierAffiche,
   donneNombreMessagesNonLus,
 } from '../service/chat_service.ts'
 import { marqueConversationCommeLueEtPrevient } from './../service/realtime_service.ts'
 import { aBloque } from '../service/block_service.ts'
-
-// Nombre maximum de messages chargés à l'ouverture d'une conversation
-const MESSAGES_LIMIT = 100
 
 export default class ConversationsController {
   /**
@@ -49,6 +50,39 @@ export default class ConversationsController {
   }
 
   /**
+   * « Messages précédents » : la page de messages juste avant le plus ancien déjà affiché.
+   * Réponse JSON : les bulles déjà fabriquées en HTML, à insérer en haut de la discussion.
+   */
+  async donneMessagesPrecedents({ auth, params, request, response, view }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const conversationId = Number(params.id)
+    const { before } = await olderMessagesValidator.validate(request.qs())
+
+    // Même contrôle d'accès qu'à l'ouverture : pas membre = 404
+    const membership = await chercheParticipationPrivee(user.id, conversationId).firstOrFail()
+    const otherMembership = await UserConversation.query()
+      .where('conversationId', conversationId)
+      .whereNot('userId', user.id)
+      .firstOrFail()
+
+    const page = await this.chargeMessages(
+      conversationId,
+      otherMembership.userId,
+      membership.removedAt,
+      before
+    )
+
+    return response.ok({
+      html: await view.render('partials/messages-page', {
+        messages: page.messages.map((message) => construitVueMessage(message, user.id)),
+      }),
+      hasMore: page.hasMore,
+      oldestId: page.oldestId,
+      dropFirstSeparator: await memeJourQueLePremierAffiche(page.messages, conversationId, before),
+    })
+  }
+
+  /**
    * Supprime la conversation DE LA LISTE de l'utilisateur (l'autre personne la garde).
    * On renseigne removed_at : les anciens messages ne sont plus affichés.
    */
@@ -76,7 +110,7 @@ export default class ConversationsController {
       .where('userId', user.id)
       .whereHas('conversation', (conversationQuery) => {
         conversationQuery.whereHas('type', (typeQuery) => {
-          typeQuery.where('type', 'Privee')
+          typeQuery.where('type', PRIVATE_TYPE)
         })
       })
       .preload('lastMessage', (messageQuery) => {
@@ -152,24 +186,8 @@ export default class ConversationsController {
 
     await marqueConversationCommeLueEtPrevient(user.id, conversationId)
 
-    // On charge les derniers messages (du plus récent au plus ancien), puis on remet dans l'ordre
-    const messagesQuery = Message.query()
-      .where('conversationId', conversationId)
-      .preload('attachments')
-      .preload('statuses', (statusQuery) => {
-        statusQuery.where('userId', otherUser.id) // pour les coches "lu" de mes messages
-      })
-      .orderBy('createdAt', 'desc')
-      .orderBy('id', 'desc')
-      .limit(MESSAGES_LIMIT)
-
-    // Après une suppression de la conversation, on ne montre que les messages plus récents
-    if (membership.removedAt) {
-      messagesQuery.where('createdAt', '>', membership.removedAt.toJSDate())
-    }
-
-    const messages = await messagesQuery
-    messages.reverse()
+    // La page la plus récente ; les plus anciennes se chargent avec « Messages précédents »
+    const page = await this.chargeMessages(conversationId, otherUser.id, membership.removedAt, null)
 
     return {
       id: conversationId,
@@ -182,7 +200,31 @@ export default class ConversationsController {
         avatarUrl: otherUser.avatarUrl,
         isOnline: otherUser.isOnline,
       },
-      messages: messages.map((message) => construitVueMessage(message, user.id)),
+      messages: page.messages.map((message) => construitVueMessage(message, user.id)),
+      hasMore: page.hasMore,
+      oldestId: page.oldestId,
     }
+  }
+
+  /**
+   * Une page de messages de la conversation privée.
+   * removedAt : après une suppression de la conversation, on ne montre que les messages plus récents.
+   */
+  private chargeMessages(
+    conversationId: number,
+    otherUserId: User['id'],
+    removedAt: DateTime | null,
+    before: number | null
+  ) {
+    return chargePageMessages({
+      conversationId,
+      before,
+      visibleAfter: removedAt,
+      prepare: (query) => {
+        query.preload('attachments').preload('statuses', (statusQuery) => {
+          statusQuery.where('userId', otherUserId) // pour les coches de mes messages
+        })
+      },
+    })
   }
 }

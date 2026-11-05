@@ -1,0 +1,11 @@
+{{-- Bouton « Messages précédents », en haut de la discussion.
+     Props : hasMore (reste-t-il des messages plus anciens ?), url (adresse de la page précédente),
+     before (identifiant du plus ancien message affiché). message.js insère les anciens messages
+     juste après ce bloc. --}}
+@if($props.get('hasMore'))
+  <div data-load-older class="flex justify-center pb-2">
+    <button type="button" data-load-older-button data-url="{{ $props.get('url') }}" data-before="{{ $props.get('before') }}" class="cursor-pointer rounded-full border border-line bg-surface px-4 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-2 hover:text-fg disabled:cursor-wait disabled:opacity-60">
+      Afficher les messages précédents
+    </button>
+  </div>
+@end

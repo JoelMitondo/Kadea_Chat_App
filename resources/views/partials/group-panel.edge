@@ -31,16 +31,13 @@
 
     {{-- ===== Messages ===== --}}
     <div id="messages-list" class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-canvas px-3 py-4 sm:px-6">
+      @!component('components/load-older', { hasMore: chat.hasMore, before: chat.oldestId, url: route('groups.messages.index', { id: chat.id }) })
+
       @if(chat.messages.length === 0)
         <p data-empty-notice class="py-10 text-center text-sm text-fg-subtle">Aucun message. Lancez la discussion 👋</p>
       @end
 
-      @each((message, index) in chat.messages)
-        @if(index === 0 || message.dayKey !== chat.messages[index - 1].dayKey)
-          @!component('components/day-separator', { label: message.dayLabel })
-        @end
-        @!component('components/message-bubble', { message })
-      @end
+      @!component('components/message-list', { messages: chat.messages })
     </div>
 
     {{-- group-panel.edge (groupe) --}}

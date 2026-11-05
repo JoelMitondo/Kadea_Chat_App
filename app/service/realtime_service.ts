@@ -15,6 +15,9 @@ import type Message from '#models/message'
 import type User from '#models/user'
 import type UserConversation from '#models/user_conversation'
 import {
+  STATUS_DELIVERED,
+  STATUS_READ,
+  STATUS_SENT,
   construitVueMessage,
   construitApercu,
   donneInitiales,
@@ -255,7 +258,7 @@ export async function marqueConversationCommeLueEtPrevient(userId: string, conve
     .from('message_statuses')
     .where('user_id', userId)
     .whereIn('message_id', messageIds)
-    .update({ is_read: true, status: 'read', updated_at: new Date() })
+    .update({ is_read: true, status: STATUS_READ, updated_at: new Date() })
 
   // 3. Parmi eux, lesquels sont maintenant lus par TOUS leurs destinataires ?
   // (dans un groupe, la coche devient bleue seulement quand tout le monde a lu)
@@ -281,6 +284,59 @@ export async function marqueConversationCommeLueEtPrevient(userId: string, conve
 
   for (const [authorId, ids] of idsByAuthor) {
     envoieAUtilisateur(authorId, { type: 'messages:read', conversationId, messageIds: ids })
+  }
+}
+
+// ---------- Réception des messages ----------
+
+/**
+ * Appelée quand un utilisateur se connecte (il ouvre une page de l'application) :
+ * les messages qui l'attendaient (statut « envoyé ») sont maintenant arrivés chez lui.
+ * Ils passent en « reçu », et leurs auteurs voient deux coches grises.
+ */
+export async function marqueMessagesCommeRecus(userId: string) {
+  // 1. Les messages encore « envoyés » à cet utilisateur
+  const waitingRows = await db
+    .from('message_statuses')
+    .where('user_id', userId)
+    .where('status', STATUS_SENT)
+    .select('message_id')
+
+  if (waitingRows.length === 0) {
+    return
+  }
+
+  const messageIds = waitingRows.map((row) => row.message_id as number)
+
+  // 2. On les passe en « reçu »
+  await db
+    .from('message_statuses')
+    .where('user_id', userId)
+    .whereIn('message_id', messageIds)
+    .where('status', STATUS_SENT)
+    .update({ status: STATUS_DELIVERED, updated_at: new Date() })
+
+  // 3. Ceux qui sont maintenant reçus par TOUS leurs destinataires (dans un groupe, il faut tout le monde)
+  const fullyDelivered = await db
+    .from('messages')
+    .whereIn('id', messageIds)
+    .whereNotExists((query) => {
+      query
+        .from('message_statuses')
+        .whereRaw('message_statuses.message_id = messages.id')
+        .where('message_statuses.status', STATUS_SENT)
+    })
+    .select('id', 'user_id')
+
+  // 4. On prévient chaque auteur
+  const idsByAuthor = new Map<string, number[]>()
+  for (const row of fullyDelivered) {
+    const authorId = row.user_id as string
+    idsByAuthor.set(authorId, [...(idsByAuthor.get(authorId) ?? []), row.id as number])
+  }
+
+  for (const [authorId, ids] of idsByAuthor) {
+    envoieAUtilisateur(authorId, { type: 'messages:delivered', messageIds: ids })
   }
 }
 
