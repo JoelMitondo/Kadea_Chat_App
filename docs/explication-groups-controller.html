@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>groups_controller expliqué</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1f2328; --muted:#59636e; --line:#d8dee4; --code-bg:#f1f3f5; --accent:#2563eb; --note-bg:#eef4ff; --warn-bg:#fff6e5; --warn-line:#e0a400; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15181c; --fg:#e6e8eb; --muted:#9aa4ae; --line:#30363d; --code-bg:#1f242a; --accent:#6ea8ff; --note-bg:#17233a; --warn-bg:#2b2412; --warn-line:#b88a12; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 80px; }
+  h1 { font-size:1.9rem; line-height:1.25; margin:0 0 8px; }
+  h2 { font-size:1.4rem; margin:48px 0 12px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:1.1rem; margin:28px 0 8px; }
+  p, li { max-width:72ch; }
+  a { color:var(--accent); }
+  .subtitle, .file { color:var(--muted); }
+  .file { font-size:0.9rem; }
+  code { font:0.9em/1.5 ui-monospace,"Cascadia Code",Consolas,monospace; background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; margin:12px 0; }
+  pre code { background:none; padding:0; font-size:0.85rem; }
+  .table-wrap { overflow-x:auto; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; font-size:0.93rem; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); }
+  .note, .warn { border-radius:8px; padding:12px 16px; margin:16px 0; }
+  .note { background:var(--note-bg); border-left:4px solid var(--accent); }
+  .warn { background:var(--warn-bg); border-left:4px solid var(--warn-line); }
+  .note p, .warn p { margin:6px 0; }
+  .toc { border:1px solid var(--line); border-radius:8px; padding:12px 20px; }
+  .toc ol { margin:6px 0; padding-left:20px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1><code>groups_controller.ts</code> expliqué ligne par ligne</h1>
+<p class="subtitle">Kadea Chat · les groupes : liste, ouverture, création, ajout de membres, suppression · fichier : <code>app/controllers/groups_controller.ts</code></p>
+
+<p>Ce contrôleur gère tout ce qui concerne <strong>les groupes</strong>, sauf l'envoi de messages (c'est <code>messages_controller.ts</code> qui s'en charge, avec <code>enregistreMessageGroupe</code>).</p>
+
+<div class="note">
+  <p><strong>Un groupe, c'est quoi en base ?</strong> Une ligne de <code>conversations</code> dont le type est <code>'Publique'</code>, avec un titre (le nom du groupe). Chaque membre a une ligne dans <code>user_conversations</code>, et cette ligne porte son <strong>rôle</strong> : <code>'admin'</code> ou <code>'membre'</code>.</p>
+  <p><strong>La règle de sécurité du fichier :</strong> avant toute action sensible (ajouter des membres, supprimer le groupe), on relit le rôle de l'utilisateur <em>dans la base</em>. On ne fait jamais confiance au fait que le bouton n'était affiché qu'à l'admin.</p>
+  <p><strong>Même principe que les conversations privées :</strong> ouvrir un groupe depuis le JavaScript renvoie seulement le panneau ; ouvrir l'adresse directement renvoie la page entière.</p>
+</div>
+
+<nav class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li><a href="#routes">Les routes</a></li>
+    <li><a href="#imports">Les imports et la constante</a></li>
+    <li><a href="#page">donnePageGroupes</a></li>
+    <li><a href="#ouvrir">donneGroupe</a></li>
+    <li><a href="#creer">enregistreGroupe (+ creeGroupe)</a></li>
+    <li><a href="#ajouter">ajouteMembres (+ ajouteMembresAuGroupe)</a></li>
+    <li><a href="#supprimer">supprimeGroupe (+ supprimeConversationEtFichiers)</a></li>
+    <li><a href="#liste">donneListeGroupes</a></li>
+    <li><a href="#candidats">donneCandidats</a></li>
+    <li><a href="#discussion">donneDiscussion</a></li>
+    <li><a href="#js">Côté navigateur : groupe.js</a></li>
+    <li><a href="#remarques">Ce qui a été remarqué</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="routes">Les routes</h2>
+<p>Dans <span class="file">start/routes.ts</span>, toutes réservées aux utilisateurs connectés :</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Requête</th><th>Méthode appelée</th><th>Rôle</th></tr>
+  <tr><td><code>GET /groups</code></td><td><code>donnePageGroupes</code></td><td>Page Groupes, aucun groupe ouvert</td></tr>
+  <tr><td><code>GET /groups/:id</code></td><td><code>donneGroupe</code></td><td>Ouvrir un groupe</td></tr>
+  <tr><td><code>POST /groups</code></td><td><code>enregistreGroupe</code></td><td>Créer un groupe</td></tr>
+  <tr><td><code>POST /groups/:id/members</code></td><td><code>ajouteMembres</code></td><td>Ajouter des membres (admin)</td></tr>
+  <tr><td><code>DELETE /groups/:id</code></td><td><code>supprimeGroupe</code></td><td>Supprimer le groupe (admin)</td></tr>
+</table>
+</div>
+<p>Ici, <code>:id</code> est toujours l'identifiant de la <strong>conversation</strong> (le groupe).</p>
+
+<!-- ============================================================ -->
+<h2 id="imports">1. Les imports et la constante (lignes 1 à 30)</h2>
+
+<pre><code>// GROUPES : liste, ouverture, création, ajout de membres, suppression.
+// Les actions sensibles vérifient d'abord le rôle : seul l'administrateur peut ajouter ou supprimer.</code></pre>
+<p>Le commentaire d'en-tête résume le fichier et sa règle principale.</p>
+
+<pre><code>import type { HttpContext } from '@adonisjs/core/http'
+import User from '#models/user'
+import Message from '#models/message'
+import UserConversation from '#models/user_conversation'</code></pre>
+<ul>
+  <li><strong><code>HttpContext</code> :</strong> le type du contexte de requête. Le mot <code>type</code> veut dire qu'il ne sert qu'à TypeScript et disparaît à l'exécution.</li>
+  <li><strong><code>User</code> :</strong> importé normalement (pas <code>import type</code>), car on l'utilise pour des requêtes : <code>User.query()</code>.</li>
+  <li><strong><code>Message</code> :</strong> pour charger les messages d'un groupe.</li>
+  <li><strong><code>UserConversation</code> :</strong> la table des participations (qui est dans quel groupe, avec quel rôle).</li>
+</ul>
+
+<pre><code>import { addMembersValidator, createGroupValidator } from '#validators/group'</code></pre>
+<p>Ils viennent de <span class="file">app/validators/group.ts</span> :</p>
+<pre><code>export const createGroupValidator = vine.create({
+  name: vine.string().trim().minLength(2).maxLength(60),
+  member_ids: vine.array(vine.string().uuid()).minLength(2).maxLength(100).distinct(),
+})
+
+export const addMembersValidator = vine.create({
+  member_ids: vine.array(vine.string().uuid()).minLength(1).maxLength(100).distinct(),
+})</code></pre>
+<ul>
+  <li><strong><code>name</code> :</strong> une chaîne, espaces du début et de la fin retirés (<code>trim</code>), entre 2 et 60 caractères.</li>
+  <li><strong><code>member_ids</code> :</strong> un <strong>tableau</strong> d'identifiants. Chaque élément doit être un UUID (les identifiants des utilisateurs sont des UUID, par exemple <code>3f2a…-…</code>).</li>
+  <li><strong><code>minLength(2)</code> :</strong> à la création, au moins 2 membres choisis. Avec le créateur, cela fait au moins 3 personnes.</li>
+  <li><strong><code>maxLength(100)</code> :</strong> pas plus de 100 membres d'un coup, pour éviter une requête énorme.</li>
+  <li><strong><code>distinct()</code> :</strong> refuse un tableau où le même identifiant apparaît deux fois.</li>
+  <li>Le fichier ajoute aussi des <strong>messages d'erreur en français</strong> avec <code>SimpleMessagesProvider</code> (par exemple « Donnez un nom au groupe. »).</li>
+</ul>
+
+<pre><code>import { ajouteMembresAuGroupe, creeGroupe } from '../service/group.ts'
+import { supprimeConversationEtFichiers } from '../service/deletion_service.ts'</code></pre>
+<p>Le vrai travail en base (créer, ajouter, supprimer) est rangé dans des <strong>services</strong>. Le contrôleur, lui, vérifie les droits et répond. Ces trois fonctions sont expliquées plus bas, là où elles servent.</p>
+
+<pre><code>import {
+  ADMIN_ROLE, GROUP_TYPE, construitVueMessage, construitApercu, chercheParticipationGroupe,
+  formateDate, donneInitiales, donneHeureDeLaListe, donneNombreMessagesNonLus,
+} from '../service/chat_service.ts'</code></pre>
+<p>Les constantes, dans <span class="file">app/service/chat_service.ts</span> :</p>
+<pre><code>export const GROUP_TYPE = 'Publique'   // colonne "type" de conversation_types
+export const ADMIN_ROLE = 'admin'      // colonne "title" de role_conversations
+export const MEMBER_ROLE = 'membre'</code></pre>
+<p>Les écrire une seule fois évite les fautes de frappe : si on écrivait <code>'Admin'</code> au lieu de <code>'admin'</code> à un endroit, la vérification échouerait sans prévenir.</p>
+
+<pre><code>import {
+  previensConversationAjoutee, previensGroupeModifie,
+  marqueConversationCommeLueEtPrevient, previensConversationSupprimee,
+} from '../service/realtime_service.ts'</code></pre>
+<p>Les fonctions de <strong>temps réel</strong> (déjà vues dans le fichier sur le temps réel) : elles envoient des événements aux navigateurs des autres membres.</p>
+
+<pre><code>const MESSAGES_LIMIT = 100</code></pre>
+<p>À l'ouverture d'un groupe, on ne charge que les <strong>100 derniers messages</strong>, pour que la page reste rapide même dans un groupe très actif.</p>
+
+<!-- ============================================================ -->
+<h2 id="page">2. <code>donnePageGroupes</code> : la page sans groupe ouvert (lignes 36 à 42)</h2>
+
+<pre><code>async donnePageGroupes({ auth, view }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const groups = await this.donneListeGroupes(user)
+  const candidates = await this.donneCandidats([user.id]) // pour la popup de création
+
+  return view.render('pages/groups', { groups, chat: null, candidates })
+}</code></pre>
+<ul>
+  <li><strong><code>{ auth, view }</code> :</strong> on ne prend dans le contexte que ce qui sert (déstructuration).</li>
+  <li><strong><code>auth.getUserOrFail()</code> :</strong> l'utilisateur connecté. Le middleware <code>auth</code> de la route garantit qu'il existe ; sinon, cette ligne lèverait une erreur.</li>
+  <li><strong><code>donneListeGroupes(user)</code> :</strong> la colonne de gauche, avec les groupes de l'utilisateur (voir <a href="#liste">plus bas</a>).</li>
+  <li><strong><code>donneCandidats([user.id])</code> :</strong> la liste des personnes à cocher dans la fenêtre « Créer un groupe ». On passe <code>[user.id]</code> comme liste d'<strong>exclusion</strong> : on ne se propose pas soi-même.</li>
+  <li><strong><code>chat: null</code> :</strong> aucun groupe ouvert. La vue affiche alors le message d'accueil à droite.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="ouvrir">3. <code>donneGroupe</code> : ouvrir un groupe (lignes 48 à 59)</h2>
+
+<pre><code>async donneGroupe({ auth, params, request, view }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const chat = await this.donneDiscussion(user, Number(params.id))</code></pre>
+<ul>
+  <li><strong><code>params.id</code> :</strong> la partie <code>:id</code> de l'adresse <code>/groups/12</code>. C'est toujours une <strong>chaîne</strong> (<code>'12'</code>), d'où <code>Number(...)</code>.</li>
+  <li><strong><code>donneDiscussion</code> :</strong> prépare tout ce qu'il faut pour afficher le groupe : infos, membres, messages (voir <a href="#discussion">plus bas</a>). Elle vérifie aussi que l'utilisateur est bien membre ; sinon, erreur 404.</li>
+</ul>
+
+<pre><code>  if (request.header('x-requested-with') === 'XMLHttpRequest') {
+    return view.render('partials/group-panel', { chat })
+  }</code></pre>
+<p>Si la demande vient du JavaScript (qui ajoute l'en-tête <code>X-Requested-With: XMLHttpRequest</code>), on renvoie <strong>seulement le panneau</strong> de droite. Le script le place dans la page sans la recharger.</p>
+
+<pre><code>  const groups = await this.donneListeGroupes(user)
+  const candidates = await this.donneCandidats([user.id])
+  return view.render('pages/groups', { groups, chat, candidates })
+}</code></pre>
+<p>Sinon (adresse tapée, lien ouvert dans un nouvel onglet, page rechargée), on renvoie la <strong>page complète</strong> : la liste, la fenêtre de création et le groupe ouvert.</p>
+
+<div class="note">
+  <p><strong>Pourquoi l'ordre est important :</strong> <code>donneDiscussion</code> est appelée <em>avant</em> le test de l'en-tête. Le panneau seul n'a pas besoin de la liste ni des candidats : on évite donc deux requêtes inutiles pour la version JavaScript, qui est la plus fréquente.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="creer">4. <code>enregistreGroupe</code> : créer un groupe (lignes 64 à 93)</h2>
+
+<pre><code>async enregistreGroupe({ auth, request, response, session }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const { name, member_ids: memberIds } = await request.validateUsing(createGroupValidator)</code></pre>
+<ul>
+  <li><strong><code>validateUsing</code> :</strong> vérifie les données envoyées avec le validateur vu plus haut. Si elles sont invalides, AdonisJS répond tout seul par une <strong>erreur 422</strong> avec la liste des erreurs, et la suite n'est jamais exécutée.</li>
+  <li><strong><code>member_ids: memberIds</code> :</strong> déstructuration avec <strong>renommage</strong>. Le champ s'appelle <code>member_ids</code> dans la requête ; dans le code, on l'appelle <code>memberIds</code> (style JavaScript).</li>
+</ul>
+
+<pre><code>  const otherIds = memberIds.filter((id) => id !== user.id)</code></pre>
+<p>Le créateur sera ajouté automatiquement comme administrateur. S'il s'est coché lui-même (ou si quelqu'un a modifié la requête à la main), on le retire pour ne pas l'ajouter deux fois.</p>
+
+<pre><code>  if (otherIds.length &lt; 2) {
+    return response.unprocessableEntity({
+      errors: [{ field: 'member_ids', message: 'Sélectionnez au moins deux autres membres.' }],
+    })
+  }</code></pre>
+<p>Pourquoi revérifier alors que le validateur demande déjà 2 membres ? Parce que le retrait du créateur a pu faire passer la liste de 2 à 1. <code>unprocessableEntity</code> envoie le code <strong>422</strong> (données refusées), au même format que les erreurs du validateur : le JavaScript les lit donc de la même façon.</p>
+
+<pre><code>  const existingUsers = await User.query().whereIn('id', otherIds).select('id')
+  if (existingUsers.length !== otherIds.length) {
+    return response.unprocessableEntity({
+      errors: [{ field: 'member_ids', message: 'Un des membres sélectionnés est introuvable.' }],
+    })
+  }</code></pre>
+<ul>
+  <li><strong><code>whereIn('id', otherIds)</code> :</strong> en SQL, <code>WHERE id IN ('a', 'b', 'c')</code>. On récupère les utilisateurs dont l'identifiant est dans la liste.</li>
+  <li><strong><code>select('id')</code> :</strong> on ne lit que l'identifiant, puisqu'on veut seulement compter.</li>
+  <li><strong>La comparaison des longueurs :</strong> si on a envoyé 3 identifiants mais que la base n'en trouve que 2, l'un d'eux n'existe pas (compte supprimé entre-temps, ou identifiant inventé). Comme <code>distinct()</code> interdit les doublons, la comparaison est fiable.</li>
+</ul>
+
+<pre><code>  const group = await creeGroupe(user, name, otherIds)</code></pre>
+<p>La création elle-même, dans <span class="file">app/service/group.ts</span> :</p>
+<pre><code>export async function creeGroupe(creator: User, name: string, memberIds: string[]): Promise&lt;Conversation&gt; {
+  const groupType = await ConversationType.firstOrCreate({ type: GROUP_TYPE }, { type: GROUP_TYPE })
+  const adminRole = await RoleConversation.firstOrCreate({ title: ADMIN_ROLE }, { title: ADMIN_ROLE })
+  const memberRole = await RoleConversation.firstOrCreate({ title: MEMBER_ROLE }, { title: MEMBER_ROLE })</code></pre>
+<ul>
+  <li><strong><code>firstOrCreate(recherche, valeurs)</code> :</strong> cherche une ligne qui correspond à <code>recherche</code>. Si elle existe, il la renvoie. Sinon, il la crée avec <code>valeurs</code>. Ainsi, même sur une base toute neuve (sans données de départ), le type « Publique » et les rôles « admin » et « membre » existent.</li>
+  <li>On récupère ces trois lignes pour connaître leur <strong>identifiant</strong> (<code>groupType.id</code>, <code>adminRole.id</code>...), qui sera écrit dans les autres tables.</li>
+</ul>
+<pre><code>  return db.transaction(async (trx) => {
+    const conversation = await Conversation.create(
+      { conversationTypeId: groupType.id, createdById: creator.id, title: name },
+      { client: trx }
+    )</code></pre>
+<ul>
+  <li><strong><code>db.transaction</code> :</strong> tout ce qui est fait avec <code>trx</code> est enregistré <strong>ensemble ou pas du tout</strong>. Si l'ajout des membres échoue, la conversation créée juste avant est annulée : pas de groupe vide, sans membres.</li>
+  <li><strong><code>{ client: trx }</code> :</strong> indique que cette requête fait partie de la transaction. Sans lui, elle serait enregistrée tout de suite, en dehors.</li>
+  <li>La conversation reçoit le type groupe, son créateur et son titre (le nom du groupe).</li>
+</ul>
+<pre><code>    await UserConversation.createMany(
+      [
+        { conversationId: conversation.id, userId: creator.id, roleId: adminRole.id },
+        ...memberIds.map((userId) => ({ conversationId: conversation.id, userId, roleId: memberRole.id })),
+      ],
+      { client: trx }
+    )
+    return conversation
+  })
+}</code></pre>
+<ul>
+  <li><strong><code>createMany</code> :</strong> crée plusieurs lignes en une fois.</li>
+  <li>La première ligne : le <strong>créateur, avec le rôle admin</strong>.</li>
+  <li><strong><code>...memberIds.map(...)</code> :</strong> transforme chaque identifiant en une ligne « membre », puis les <code>...</code> étalent ces lignes dans le tableau, à la suite de celle du créateur.</li>
+  <li>La fonction renvoie la conversation créée : le contrôleur a besoin de son identifiant.</li>
+</ul>
+
+<pre><code>  await previensConversationAjoutee({ conversation: group, userIds: otherIds, lastMessage: null })</code></pre>
+<p><strong>Temps réel :</strong> pour chaque membre (sauf le créateur), le serveur fabrique la ligne HTML du groupe pour la liste de gauche, puis l'envoie avec un événement <code>conversation:added</code>. <code>lastMessage: null</code> car un groupe neuf n'a aucun message : l'aperçu affichera « Aucun message ». Les membres qui ont la page Groupes ouverte voient le groupe apparaître sans recharger.</p>
+
+<pre><code>  session.flash('success', `Le groupe « ${name} » a été créé.`)
+  return response.created({ id: group.id })
+}</code></pre>
+<ul>
+  <li><strong><code>session.flash</code> :</strong> un message gardé en session pour <strong>la prochaine page affichée</strong> seulement.</li>
+  <li><strong><code>response.created</code> :</strong> code <strong>201</strong> (« créé »), avec l'identifiant du groupe en JSON.</li>
+  <li>Le JavaScript reçoit <code>{ id: 42 }</code>, puis fait <code>window.location.href = '/groups/42'</code>. La page du groupe s'affiche, et c'est elle qui montre le message flash. Ici, le flash a donc du sens, contrairement au profil où le script affichait lui-même le message.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="ajouter">5. <code>ajouteMembres</code> : ajouter des membres (lignes 98 à 161)</h2>
+
+<pre><code>async ajouteMembres({ auth, params, request, response, session }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const conversationId = Number(params.id)
+  const { member_ids: memberIds } = await request.validateUsing(addMembersValidator)</code></pre>
+<p>L'utilisateur connecté, l'identifiant du groupe (dans l'adresse) et la liste validée des personnes à ajouter (au moins 1, au plus 100, sans doublon).</p>
+
+<h3>Étape 1 : est-il membre, et administrateur ?</h3>
+<pre><code>  const membership = await chercheParticipationGroupe(user.id, conversationId)
+    .preload('role')
+    .preload('conversation') // pour le nom du groupe
+    .firstOrFail()</code></pre>
+<p><code>chercheParticipationGroupe</code> vient de <span class="file">chat_service.ts</span> :</p>
+<pre><code>export function chercheParticipationGroupe(userId: User['id'], conversationId: number) {
+  return UserConversation.query()
+    .where('userId', userId)
+    .where('conversationId', conversationId)
+    .whereHas('conversation', (conversationQuery) => {
+      conversationQuery.whereHas('type', (typeQuery) => {
+        typeQuery.where('type', GROUP_TYPE)
+      })
+    })
+}</code></pre>
+<ul>
+  <li>Elle cherche <strong>la participation</strong> de cet utilisateur à cette conversation…</li>
+  <li>… <strong>à condition</strong> que la conversation soit un groupe. <code>whereHas</code> veut dire « dont la relation vérifie cette condition ». Ici, deux niveaux : la conversation, puis son type. Une conversation privée est donc refusée, même si on met son identifiant dans l'adresse <code>/groups/:id</code>.</li>
+  <li><strong>Elle n'exécute pas la requête</strong> (pas de <code>await</code>, pas de <code>first</code>). Elle renvoie une requête en construction, que chaque appelant complète. C'est pour cela que le contrôleur peut enchaîner <code>.preload(...)</code> puis <code>.firstOrFail()</code>.</li>
+</ul>
+<p>De retour dans le contrôleur :</p>
+<ul>
+  <li><strong><code>.preload('role')</code> :</strong> charge le rôle de l'utilisateur dans ce groupe (admin ou membre).</li>
+  <li><strong><code>.preload('conversation')</code> :</strong> charge le groupe lui-même. Il servira pour la notification temps réel (nom et identifiant).</li>
+  <li><strong><code>.firstOrFail()</code> :</strong> exécute la requête et prend la première ligne. S'il n'y en a aucune (pas membre, pas un groupe, groupe inexistant), AdonisJS répond <strong>404</strong>. On ne dit pas à un inconnu que le groupe existe.</li>
+</ul>
+
+<pre><code>  if (membership.role.title !== ADMIN_ROLE) {
+    return response.forbidden({
+      message: "Seul l'administrateur du groupe peut ajouter des membres.",
+    })
+  }</code></pre>
+<p>Il est membre, mais pas admin : code <strong>403</strong> (« interdit »). La différence avec 404 : ici, l'utilisateur fait partie du groupe, il sait déjà qu'il existe. On lui explique simplement qu'il n'a pas le droit.</p>
+
+<h3>Étape 2 : les personnes à ajouter existent-elles ?</h3>
+<pre><code>  const existingUsers = await User.query().whereIn('id', memberIds).select('id')
+  if (existingUsers.length !== memberIds.length) {
+    return response.unprocessableEntity({
+      errors: [{ field: 'member_ids', message: 'Un des utilisateurs sélectionnés est introuvable.' }],
+    })
+  }</code></pre>
+<p>Le même contrôle que pour la création : autant d'utilisateurs trouvés que d'identifiants envoyés.</p>
+
+<h3>Étape 3 : l'ajout</h3>
+<pre><code>  const addedIds = await ajouteMembresAuGroupe(conversationId, memberIds)</code></pre>
+<p>Dans <span class="file">app/service/group.ts</span> :</p>
+<pre><code>export async function ajouteMembresAuGroupe(conversationId: number, userIds: string[]): Promise&lt;string[]&gt; {
+  const existingRows = await UserConversation.query()
+    .where('conversationId', conversationId)
+    .whereIn('userId', userIds)
+    .select('user_id')
+
+  const existingIds = existingRows.map((row) => row.userId)
+  const newIds = userIds.filter((userId) => !existingIds.includes(userId))
+
+  if (newIds.length === 0) {
+    return []
+  }</code></pre>
+<ul>
+  <li>D'abord, parmi les personnes demandées, lesquelles sont <strong>déjà</strong> dans le groupe ?</li>
+  <li><strong><code>select('user_id')</code></strong> utilise le nom de la colonne en base (avec <code>_</code>), mais on lit ensuite <code>row.userId</code> : Lucid fait la conversion entre les deux noms.</li>
+  <li><strong><code>newIds</code> :</strong> on garde seulement ceux qui ne sont pas déjà membres. Ajouter quelqu'un deux fois créerait une deuxième ligne de participation.</li>
+  <li>Si personne n'est nouveau, on s'arrête et on renvoie un tableau vide.</li>
+</ul>
+<pre><code>  const memberRole = await RoleConversation.firstOrCreate({ title: MEMBER_ROLE }, { title: MEMBER_ROLE })
+
+  // Les nouveaux membres voient l'historique : leur "dernier message" est celui du groupe
+  const lastMessage = await Message.query()
+    .where('conversationId', conversationId)
+    .orderBy('createdAt', 'desc')
+    .orderBy('id', 'desc')
+    .first()</code></pre>
+<ul>
+  <li>Le rôle « membre » (créé s'il n'existe pas).</li>
+  <li><strong>Le dernier message du groupe :</strong> tri du plus récent au plus ancien, puis on prend le premier. Le second tri, sur <code>id</code>, départage deux messages envoyés à la même milliseconde.</li>
+  <li>Il sert à remplir <code>lastMessageId</code> du nouveau membre. C'est cette colonne qu'utilise la liste de gauche pour l'aperçu et le tri. Sans elle, le groupe apparaîtrait chez le nouveau membre avec « Aucun message », alors qu'il en contient.</li>
+</ul>
+<pre><code>  await UserConversation.createMany(
+    newIds.map((userId) => ({
+      conversationId, userId, roleId: memberRole.id, lastMessageId: lastMessage?.id ?? null,
+    }))
+  )
+  return newIds
+}</code></pre>
+<ul>
+  <li>Une ligne de participation par nouveau membre, avec le rôle « membre ».</li>
+  <li><strong><code>conversationId, userId</code></strong> sans <code>:</code> : raccourci JavaScript pour <code>conversationId: conversationId</code>.</li>
+  <li><strong><code>lastMessage?.id ?? null</code> :</strong> l'identifiant du dernier message, ou <code>null</code> si le groupe n'en a aucun. <code>?.</code> évite une erreur quand <code>lastMessage</code> est vide ; <code>??</code> donne la valeur de secours.</li>
+  <li>La fonction renvoie <strong>la liste des personnes réellement ajoutées</strong>. Le contrôleur en a besoin pour savoir qui prévenir.</li>
+</ul>
+
+<pre><code>  if (addedIds.length === 0) {
+    return response.unprocessableEntity({
+      errors: [{ field: 'member_ids', message: 'Ces utilisateurs font déjà partie du groupe.' }],
+    })
+  }</code></pre>
+<p>Toutes les personnes cochées étaient déjà membres : rien n'a été fait, on le signale par un 422.</p>
+
+<h3>Étape 4 : prévenir tout le monde en temps réel</h3>
+<pre><code>  const lastMessage = await Message.query()
+    .where('conversationId', conversationId)
+    .preload('user')
+    .orderBy('createdAt', 'desc')
+    .orderBy('id', 'desc')
+    .first()
+
+  await previensConversationAjoutee({
+    conversation: membership.conversation,
+    userIds: addedIds,
+    lastMessage,
+  })</code></pre>
+<ul>
+  <li><strong>Pour les nouveaux membres :</strong> on recharge le dernier message, cette fois <strong>avec son auteur</strong> (<code>preload('user')</code>). L'aperçu d'un groupe s'écrit « Jo : le projet est rendu », il faut donc le nom de l'auteur.</li>
+  <li><code>previensConversationAjoutee</code> fabrique la ligne de la liste pour chacun (avec <code>construitApercu</code> et <code>donneHeureDeLaListe</code>) et leur envoie l'événement <code>conversation:added</code>. Le groupe apparaît dans leur liste.</li>
+  <li><code>membership.conversation</code> a été chargé à l'étape 1 : pas besoin de relire le groupe.</li>
+</ul>
+
+<pre><code>  const allMembers = await UserConversation.query()
+    .where('conversationId', conversationId)
+    .select('user_id')
+  const existingMemberIds = allMembers
+    .map((row) => row.userId)
+    .filter((id) => id !== user.id &amp;&amp; !addedIds.includes(id))
+  previensGroupeModifie(conversationId, existingMemberIds)</code></pre>
+<ul>
+  <li><strong>Pour les anciens membres :</strong> on lit tous les membres du groupe (nouveaux compris, puisqu'ils viennent d'être ajoutés).</li>
+  <li>Puis on retire <strong>l'admin</strong> (il va recharger sa page lui-même) et <strong>les nouveaux</strong> (ils ont déjà reçu <code>conversation:added</code>).</li>
+  <li><code>previensGroupeModifie</code> envoie à chacun un simple <code>group:updated</code> :
+<pre><code>export function previensGroupeModifie(conversationId: number, userIds: string[]) {
+  for (const userId of userIds) {
+    envoieAUtilisateur(userId, { type: 'group:updated', kind: 'group', conversationId })
+  }
+}</code></pre>
+  Si le groupe est ouvert chez eux, le navigateur recharge le panneau : la liste des membres et le compteur se mettent à jour.</li>
+  <li>Pas de <code>await</code> devant : la fonction n'est pas asynchrone, elle envoie et rend la main tout de suite.</li>
+</ul>
+
+<h3>Étape 5 : la réponse</h3>
+<pre><code>  const message =
+    addedIds.length === 1
+      ? '1 membre a été ajouté.'
+      : `${addedIds.length} membres ont été ajoutés.`
+  session.flash('success', message)
+  return response.ok({ message })
+}</code></pre>
+<ul>
+  <li><strong>Le ternaire <code>? :</code></strong> choisit le singulier ou le pluriel.</li>
+  <li><strong>Flash + <code>response.ok</code> (200) :</strong> le JavaScript fait <code>window.location.reload()</code> après la réponse. La page rechargée affiche la nouvelle liste de membres et le message flash.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="supprimer">6. <code>supprimeGroupe</code> : supprimer un groupe (lignes 166 à 198)</h2>
+
+<pre><code>async supprimeGroupe({ auth, params, response, session }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const conversationId = Number(params.id)
+
+  const membership = await chercheParticipationGroupe(user.id, conversationId)
+    .preload('role')
+    .preload('conversation')
+    .firstOrFail()
+
+  if (membership.role.title !== ADMIN_ROLE) {
+    return response.forbidden({ message: "Seul l'administrateur du groupe peut le supprimer." })
+  }</code></pre>
+<p>Exactement la même vérification qu'à l'ajout : membre du groupe (sinon 404), puis administrateur (sinon 403).</p>
+
+<pre><code>  const groupName = membership.conversation.title ?? 'Groupe sans nom'</code></pre>
+<p>On garde le nom <strong>avant</strong> de supprimer : après, il n'existera plus en base, et il faut l'écrire dans les messages.</p>
+
+<pre><code>  const memberIds = await supprimeConversationEtFichiers(conversationId)</code></pre>
+<p>Dans <span class="file">app/service/deletion_service.ts</span> :</p>
+<pre><code>export async function supprimeConversationEtFichiers(conversationId: number): Promise&lt;string[]&gt; {
+  // 1. Les participants (pour les prévenir ensuite)
+  const members = await UserConversation.query().where('conversationId', conversationId).select('user_id')
+  const memberIds = members.map((member) => member.userId)
+
+  // 2. Les liens des fichiers joints (à supprimer de Cloudinary après)
+  const attachments = await MessageAttachment.query()
+    .whereIn('messageId', Message.query().select('id').where('conversationId', conversationId))
+    .select('file_path')
+  const fileUrls = attachments.map((attachment) => attachment.filePath)
+
+  // 3. La conversation est supprimée de la base (messages et participants avec elle)
+  await Conversation.query().where('id', conversationId).delete()
+
+  // 4. Les fichiers sont supprimés de Cloudinary
+  await supprimeFichiers(fileUrls)
+
+  return memberIds
+}</code></pre>
+<ol>
+  <li><strong>Les participants d'abord :</strong> une fois le groupe supprimé, impossible de savoir qui en faisait partie. On les note pour les prévenir.</li>
+  <li><strong>Les liens des fichiers :</strong> une <strong>sous-requête</strong>. <code>Message.query().select('id')...</code> n'est pas exécutée seule : elle est placée dans le <code>whereIn</code>. En SQL : <code>WHERE message_id IN (SELECT id FROM messages WHERE conversation_id = 12)</code>. Tout se fait en une seule requête.</li>
+  <li><strong>La suppression en cascade :</strong> on ne supprime que la ligne de <code>conversations</code>. Dans les migrations, les clés étrangères sont déclarées avec <code>.onDelete('CASCADE')</code> : PostgreSQL supprime alors automatiquement les messages de la conversation, puis leurs pièces jointes et leurs statuts, ainsi que les participations.</li>
+  <li><strong>Cloudinary en dernier :</strong> <code>supprimeFichiers</code> appelle <code>supprimeFichierParLien</code> pour chaque lien. Un échec est noté dans les logs sans tout bloquer.</li>
+</ol>
+<div class="note">
+  <p><strong>Pourquoi la base d'abord, Cloudinary ensuite ?</strong> Le commentaire du fichier l'explique : une suppression en base peut être refusée, mais un fichier effacé de Cloudinary ne revient jamais. Dans l'ordre inverse, si la base refusait, le groupe existerait encore… avec des images cassées. Dans cet ordre, le pire cas est un fichier resté sur Cloudinary sans être utilisé : de l'espace perdu, mais rien de cassé pour l'utilisateur.</p>
+</div>
+
+<pre><code>  previensConversationSupprimee({
+    userIds: memberIds.filter((memberId) => memberId !== user.id),
+    conversationId,
+    kind: 'group',
+    message: `Le groupe « ${groupName} » a été supprimé par son administrateur.`,
+  })</code></pre>
+<p><strong>Temps réel :</strong> chaque autre membre reçoit <code>conversation:removed</code> avec un message. Côté navigateur, le groupe disparaît de la liste, une notification s'affiche, et si le groupe était ouvert, le panneau est fermé. L'admin est retiré de la liste : c'est lui qui a supprimé.</p>
+
+<pre><code>  session.flash('success', `Le groupe « ${groupName} » a été supprimé.`)
+  return response.ok({ message: 'Groupe supprimé.' })
+}</code></pre>
+<p>Le JavaScript redirige vers <code>/groups</code> (le groupe n'existe plus), et c'est cette page qui affiche le message flash.</p>
+
+<!-- ============================================================ -->
+<h2 id="liste">7. <code>donneListeGroupes</code> : la liste de gauche (lignes 204 à 242)</h2>
+
+<pre><code>private async donneListeGroupes(user: User) {
+  const memberships = await UserConversation.query()
+    .where('userId', user.id)
+    .whereHas('conversation', (conversationQuery) => {
+      conversationQuery.whereHas('type', (typeQuery) => {
+        typeQuery.where('type', GROUP_TYPE)
+      })
+    })</code></pre>
+<p><code>private</code> : utilisable seulement à l'intérieur de cette classe, pas depuis une route. On prend toutes les participations de l'utilisateur dont la conversation est un groupe (le même double <code>whereHas</code> que plus haut).</p>
+
+<pre><code>    .preload('conversation')
+    .preload('lastMessage', (messageQuery) => {
+      messageQuery.preload('user')        // pour afficher "Jo : le projet est rendu"
+      messageQuery.preload('attachments') // pour afficher "Image" s'il n'y a que un fichier
+    })</code></pre>
+<ul>
+  <li><strong><code>preload('conversation')</code> :</strong> pour le nom du groupe et sa date de création.</li>
+  <li><strong><code>preload('lastMessage', ...)</code> :</strong> le dernier message, désigné par la colonne <code>lastMessageId</code>. Le second argument permet de charger <em>à l'intérieur</em> du message son auteur et ses pièces jointes.</li>
+  <li><strong>Pourquoi <code>preload</code> ?</strong> Lucid fait <strong>une requête par relation</strong> pour toutes les lignes, au lieu d'une requête par groupe. Avec 30 groupes, on a 5 requêtes au lieu de plus de 90.</li>
+</ul>
+
+<pre><code>  const unreadCounts = await donneNombreMessagesNonLus(
+    user.id,
+    memberships.map((membership) => membership.conversationId)
+  )</code></pre>
+<p>Les pastilles de non-lus. La fonction vient de <span class="file">chat_service.ts</span> :</p>
+<pre><code>const rows = await db
+  .from('message_statuses')
+  .join('messages', 'messages.id', 'message_statuses.message_id')
+  .where('message_statuses.user_id', userId)
+  .where('message_statuses.is_read', false)
+  .where('messages.is_deleted', false)
+  .whereIn('messages.conversation_id', conversationIds)
+  .select('messages.conversation_id')
+  .count('* as total')
+  .groupBy('messages.conversation_id')
+
+for (const row of rows) {
+  counts.set(Number(row.conversation_id), Number(row.total))
+}</code></pre>
+<ul>
+  <li>Elle compte les statuts « non lu » de l'utilisateur, en ignorant les messages supprimés.</li>
+  <li><strong><code>groupBy</code></strong> donne un total <strong>par conversation</strong>, en une seule requête pour tous les groupes.</li>
+  <li>Elle renvoie une <code>Map</code> : <code>12 → 3</code>, <code>15 → 1</code>... Un groupe sans non-lus n'y figure pas.</li>
+  <li><code>Number(...)</code> : PostgreSQL renvoie les nombres de <code>count</code> sous forme de chaînes.</li>
+</ul>
+
+<pre><code>  const items = memberships.map((membership) => {
+    const lastMessage = membership.lastMessage
+    const name = membership.conversation.title ?? 'Groupe sans nom'
+
+    return {
+      sortTime: (lastMessage?.createdAt ?? membership.conversation.createdAt).toMillis(),
+      view: {
+        id: membership.conversationId,
+        name,
+        initials: donneInitiales(name),
+        preview: lastMessage ? construitApercu(lastMessage, user.id, true) : 'Aucun message',
+        time: lastMessage ? donneHeureDeLaListe(lastMessage.createdAt) : '',
+        unreadCount: unreadCounts.get(membership.conversationId) ?? 0,
+      },
+    }
+  })</code></pre>
+<p>Chaque participation est transformée en deux choses : <code>sortTime</code> pour trier, et <code>view</code> pour l'affichage.</p>
+<ul>
+  <li><strong><code>sortTime</code> :</strong> la date du dernier message ou, s'il n'y en a pas, la date de création du groupe. <code>toMillis()</code> la transforme en nombre (millisecondes depuis 1970), facile à comparer.</li>
+  <li><strong><code>initials</code> :</strong> <code>donneInitiales('Projet Kadea')</code> donne <code>'PK'</code> : les premières lettres des deux premiers mots, en majuscules. C'est l'avatar du groupe.</li>
+  <li><strong><code>preview</code> :</strong> <code>construitApercu(message, user.id, true)</code> renvoie :
+    <ul>
+      <li><code>'Message supprimé'</code> si le message a été supprimé ;</li>
+      <li><code>'Vous : ...'</code> si c'est ton message ;</li>
+      <li><code>'Jo : ...'</code> pour un autre membre. Le <code>true</code> demande d'afficher l'auteur, ce qui est utile en groupe mais pas en privé ;</li>
+      <li>s'il n'y a pas de texte, un libellé comme « Image » ou « Document ».</li>
+    </ul>
+  </li>
+  <li><strong><code>time</code> :</strong> <code>donneHeureDeLaListe</code> affiche l'heure si c'est aujourd'hui, « Hier », le jour de la semaine ou la date (à l'heure de Kinshasa).</li>
+  <li><strong><code>unreadCount</code> :</strong> lu dans la <code>Map</code>, ou <code>0</code> si absent.</li>
+</ul>
+
+<pre><code>  items.sort((a, b) => b.sortTime - a.sortTime)
+  return items.map((item) => item.view)
+}</code></pre>
+<ul>
+  <li><strong><code>b.sortTime - a.sortTime</code> :</strong> un résultat positif place <code>b</code> avant <code>a</code>. Donc le plus récent passe en premier.</li>
+  <li>Puis on ne garde que <code>view</code> : la vue n'a pas besoin de <code>sortTime</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="candidats">8. <code>donneCandidats</code> : les personnes qu'on peut ajouter (lignes 247 à 257)</h2>
+
+<pre><code>private async donneCandidats(excludedIds: User['id'][]) {
+  const users = await User.query().whereNotIn('id', excludedIds).orderBy('fullName', 'asc')
+
+  return users.map((person) => ({
+    id: person.id,
+    fullName: person.fullName,
+    initials: donneInitiales(person.fullName),
+    avatarUrl: person.avatarUrl,
+    isOnline: person.isOnline,
+  }))
+}</code></pre>
+<ul>
+  <li><strong><code>User['id'][]</code> :</strong> « un tableau du même type que l'identifiant d'un utilisateur ». Si ce type change un jour, cette fonction suit automatiquement.</li>
+  <li><strong><code>whereNotIn</code> :</strong> l'inverse de <code>whereIn</code>. Tous les utilisateurs <strong>sauf</strong> ceux de la liste.
+    <ul>
+      <li>Pour la création, on exclut seulement soi-même.</li>
+      <li>Pour l'ajout, on exclut tous les membres actuels.</li>
+    </ul>
+  </li>
+  <li><strong><code>orderBy('fullName', 'asc')</code> :</strong> par ordre alphabétique.</li>
+  <li>Le <code>map</code> ne garde que ce que la vue affiche. On n'envoie jamais tout l'objet <code>User</code> (avec l'e-mail, le mot de passe haché...) à un modèle.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="discussion">9. <code>donneDiscussion</code> : préparer un groupe ouvert (lignes 262 à 325)</h2>
+
+<h3>Le droit d'accès</h3>
+<pre><code>private async donneDiscussion(user: User, conversationId: number) {
+  const membership = await chercheParticipationGroupe(user.id, conversationId)
+    .preload('role')
+    .preload('conversation', (conversationQuery) => {
+      conversationQuery.preload('creator')
+    })
+    .firstOrFail()</code></pre>
+<ul>
+  <li>Encore <code>chercheParticipationGroupe</code> : seuls les membres peuvent ouvrir le groupe. Sinon, <code>firstOrFail</code> renvoie une 404.</li>
+  <li><strong><code>preload('conversation', ...)</code> avec <code>preload('creator')</code> à l'intérieur :</strong> le groupe et, dans le groupe, son créateur (pour « Créé par Ana »).</li>
+</ul>
+
+<pre><code>  const conversation = membership.conversation
+  const groupName = conversation.title ?? 'Groupe sans nom'
+  const isAdmin = membership.role.title === ADMIN_ROLE</code></pre>
+<p>Des raccourcis. <code>isAdmin</code> décidera si la vue affiche les boutons « Ajouter des membres » et « Supprimer le groupe ».</p>
+
+<h3>Les membres</h3>
+<pre><code>  const memberRows = await UserConversation.query()
+    .where('conversationId', conversationId)
+    .preload('user')
+    .preload('role')</code></pre>
+<p>Toutes les participations du groupe, chacune avec son utilisateur et son rôle.</p>
+
+<pre><code>  const members = memberRows
+    .map((row) => ({
+      id: row.user.id,
+      fullName: row.user.fullName,
+      initials: donneInitiales(row.user.fullName),
+      avatarUrl: row.user.avatarUrl,
+      isOnline: row.user.isOnline,
+      isAdmin: row.role.title === ADMIN_ROLE,
+      isMe: row.userId === user.id,
+    }))
+    .sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin) || a.fullName.localeCompare(b.fullName))</code></pre>
+<ul>
+  <li>Chaque ligne devient un petit objet pour la vue. <code>isMe</code> permet d'afficher « (vous) » à côté de son propre nom ; <code>isOnline</code> sert à la puce verte.</li>
+  <li><strong>Le tri, en deux critères :</strong>
+    <ul>
+      <li><code>Number(true)</code> vaut 1 et <code>Number(false)</code> vaut 0. <code>Number(b.isAdmin) - Number(a.isAdmin)</code> place donc les admins en premier.</li>
+      <li>Si les deux ont le même rôle, le calcul donne <code>0</code>. Or <code>0</code> est « faux » en JavaScript, donc <code>||</code> passe au deuxième critère.</li>
+      <li><code>localeCompare</code> compare les noms par ordre alphabétique, en tenant compte des accents (É avec E).</li>
+    </ul>
+  </li>
+</ul>
+
+<h3>Marquer comme lu</h3>
+<pre><code>  await marqueConversationCommeLueEtPrevient(user.id, conversationId)</code></pre>
+<p>Ouvrir le groupe veut dire lire ses messages. Cette fonction de <span class="file">realtime_service.ts</span> passe les statuts non lus de l'utilisateur à « lu ». Ensuite, elle prévient les auteurs des messages dont <strong>tout le monde</strong> a maintenant lu le message : leurs coches passent au bleu. Elle est appelée <strong>avant</strong> de charger les messages, pour que la page affichée soit déjà à jour.</p>
+
+<h3>Les messages</h3>
+<pre><code>  const queriedMessages = await Message.query()
+    .where('conversationId', conversationId)
+    .preload('attachments')
+    .preload('user') // pour le nom de l'auteur
+    .preload('statuses', (statusQuery) => {
+      statusQuery.whereNot('userId', user.id) // pour les coches "lu" de MES messages
+    })
+    .orderBy('createdAt', 'desc')
+    .orderBy('id', 'desc')
+    .limit(MESSAGES_LIMIT)
+  const messages = queriedMessages.reverse()</code></pre>
+<ul>
+  <li><strong><code>attachments</code> :</strong> les fichiers joints (image ou document).</li>
+  <li><strong><code>user</code> :</strong> l'auteur. En groupe, son nom s'affiche au-dessus de la bulle.</li>
+  <li><strong><code>statuses</code>, sauf les miens :</strong> pour mes messages, on regarde si <strong>les autres</strong> les ont lus. Si tous les statuts sont « lu », les coches sont bleues. Mon propre statut n'est pas utile ici.</li>
+  <li><strong>Pourquoi trier du plus récent au plus ancien, puis inverser ?</strong>
+    <ul>
+      <li><code>limit(100)</code> prend les 100 <em>premiers</em> résultats. Triés du plus récent au plus ancien, ce sont les <strong>100 derniers messages</strong>.</li>
+      <li><code>reverse()</code> les remet ensuite dans l'ordre de lecture : ancien en haut, récent en bas.</li>
+      <li>Un tri croissant avec <code>limit(100)</code> donnerait au contraire les 100 <em>plus vieux</em> messages.</li>
+    </ul>
+  </li>
+</ul>
+
+<h3>Les candidats (admin seulement)</h3>
+<pre><code>  const candidates = isAdmin ? await this.donneCandidats(members.map((member) => member.id)) : []</code></pre>
+<p>Seul l'admin voit la fenêtre « Ajouter des membres ». Pour les autres, on ne fait même pas la requête : tableau vide. Les membres actuels sont exclus de la liste.</p>
+
+<h3>L'objet renvoyé à la vue</h3>
+<pre><code>  return {
+    id: conversationId,
+    group: {
+      name: groupName,
+      initials: donneInitiales(groupName),
+      createdAt: formateDate(conversation.createdAt),
+      creatorName: conversation.creator?.fullName ?? 'Utilisateur supprimé',
+      membersCount: members.length,
+      isAdmin,
+    },
+    members,
+    candidates,
+    messages: messages.map((message) => construitVueMessage(message, user.id, true)),
+  }
+}</code></pre>
+<ul>
+  <li><strong><code>formateDate</code> :</strong> la date au format <code>04/11/2026</code>, convertie à l'heure de Kinshasa.</li>
+  <li><strong><code>creator?.fullName ?? 'Utilisateur supprimé'</code> :</strong> dans la migration, <code>created_by_id</code> est en <code>SET NULL</code>. Si le créateur n'existe plus, <code>creator</code> est vide. (En pratique, la suppression de compte transmet le titre de créateur au membre le plus ancien, mais la protection reste utile.)</li>
+  <li><strong><code>isAdmin</code></strong> seul, sans <code>:</code>, est le raccourci de <code>isAdmin: isAdmin</code>.</li>
+  <li><strong><code>construitVueMessage(message, user.id, true)</code> :</strong> transforme chaque message en données simples pour la bulle (texte, heure, est-ce le mien, fichier, coches lues). Le <code>true</code> demande d'afficher le nom de l'auteur, comme pour l'aperçu.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="js">10. Côté navigateur : <code>resources/js/groupe.js</code></h2>
+<p>Le contrôleur répond en JSON. C'est ce fichier qui envoie les demandes et réagit aux réponses :</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Action</th><th>Vérification avant envoi</th><th>Requête</th><th>Si ça réussit</th></tr>
+  <tr><td>Créer</td><td>nom ≥ 2 caractères, ≥ 2 membres cochés</td><td><code>POST /groups</code></td><td><code>window.location.href = '/groups/' + id</code></td></tr>
+  <tr><td>Ajouter</td><td>≥ 1 personne cochée</td><td><code>POST /groups/:id/members</code></td><td><code>window.location.reload()</code></td></tr>
+  <tr><td>Supprimer</td><td><code>confirm(...)</code> « irréversible »</td><td><code>DELETE /groups/:id</code></td><td><code>window.location.href = '/groups'</code></td></tr>
+</table>
+</div>
+<ul>
+  <li>En cas d'échec (422, 403...), <code>lireErreur(resultat.corps)</code> lit le message d'erreur et <code>kcNotifier.erreur(...)</code> l'affiche, puis le bouton est réactivé.</li>
+  <li>Les vérifications du navigateur servent au <strong>confort</strong> : elles évitent un aller-retour inutile. La <strong>sécurité</strong>, elle, est assurée par le serveur, qui revérifie tout. N'importe qui peut envoyer une requête sans passer par la page.</li>
+  <li>Les trois actions changent de page juste après. C'est pourquoi le contrôleur utilise <code>session.flash</code> : le message apparaît sur la page suivante.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>Le parcours complet : Ana crée « Projet Kadea » avec Jo et Mia</h2>
+<ol>
+  <li>Ana remplit la fenêtre et clique « Créer ». <code>groupe.js</code> vérifie le nom et le nombre de membres, puis envoie <code>POST /groups</code> avec <code>{ name, member_ids: [Jo, Mia] }</code>.</li>
+  <li><code>enregistreGroupe</code> valide, retire Ana de la liste si besoin, et vérifie que Jo et Mia existent.</li>
+  <li><code>creeGroupe</code> crée, dans une seule transaction, la conversation « Publique » et trois participations : Ana (admin), Jo et Mia (membres).</li>
+  <li><code>previensConversationAjoutee</code> envoie à Jo et Mia la ligne HTML du groupe. Le groupe apparaît dans leur liste, avec « Aucun message ».</li>
+  <li>Ana reçoit <code>201 { id: 42 }</code>, son navigateur ouvre <code>/groups/42</code>, et le toast « Le groupe a été créé » s'affiche.</li>
+  <li>Plus tard, Ana ajoute Léo : <code>ajouteMembres</code> vérifie qu'elle est admin et ajoute Léo avec le bon <code>lastMessageId</code>. Léo reçoit <code>conversation:added</code> ; Jo et Mia reçoivent <code>group:updated</code> et leur panneau se recharge.</li>
+  <li>Ana supprime le groupe : la base supprime tout en cascade, puis Cloudinary efface les fichiers. Jo, Mia et Léo reçoivent <code>conversation:removed</code> et le groupe disparaît de leur écran.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="remarques">Ce qui a été remarqué</h2>
+<p>Ce ne sont pas des erreurs bloquantes. Ce sont des points à connaître, éventuellement à améliorer plus tard.</p>
+
+<div class="warn">
+  <p><strong>1. <code>Number(params.id)</code> sans vérification.</strong> Avec <code>/groups/abc</code>, <code>Number('abc')</code> donne <code>NaN</code>. La requête SQL échoue alors, et l'utilisateur obtient probablement une erreur 500 au lieu d'une 404. C'est le même cas que dans les autres contrôleurs. Une solution : limiter la route aux nombres avec <code>.where('id', router.matchers.number())</code>.</p>
+</div>
+
+<div class="warn">
+  <p><strong>2. <code>donneCandidats</code> charge tous les utilisateurs.</strong> C'est le cas à chaque ouverture de la page Groupes, et à chaque rechargement complet d'un groupe (la fenêtre de création est dans la page). Avec quelques dizaines de comptes, ce n'est pas un problème. Avec des milliers, la page deviendrait lourde. Une recherche à la demande, comme dans <code>users.js</code>, passerait mieux à l'échelle.</p>
+</div>
+
+<div class="warn">
+  <p><strong>3. Deux ajouts simultanés.</strong> <code>ajouteMembresAuGroupe</code> vérifie d'abord qui est déjà membre, puis insère. Si deux demandes identiques arrivent presque en même temps (double clic avant que le bouton soit désactivé, par exemple), les deux peuvent voir « pas encore membre » et essayer d'insérer la même personne. Heureusement, la migration déclare <code>table.unique(['user_id', 'conversation_id'])</code> : la base refuse le doublon. La seconde demande échoue donc avec une erreur 500 au lieu d'un message clair, mais les données restent propres. C'est un bon exemple de l'intérêt d'une <strong>contrainte en base</strong> en plus de la vérification dans le code.</p>
+</div>
+
+<div class="warn">
+  <p><strong>4. Personne ne peut quitter un groupe.</strong> Le contrôleur ne propose ni « quitter le groupe », ni « retirer un membre », ni « changer d'administrateur ». Un membre ajouté contre son gré ne peut pas sortir. Seule la suppression du compte retire quelqu'un d'un groupe (et transmet le rôle d'admin au membre le plus ancien).</p>
+</div>
+
+<div class="note">
+  <p><strong>Ce qui est bien fait</strong>, à retenir pour tes prochains projets :</p>
+  <p>• Le rôle est toujours <strong>relu en base</strong> avant une action sensible, et la différence entre 404 (pas membre) et 403 (membre mais pas admin) est respectée.</p>
+  <p>• La création est dans une <strong>transaction</strong> : jamais de groupe à moitié créé.</p>
+  <p>• Pour la suppression, <strong>la base d'abord, Cloudinary ensuite</strong>, et la cascade de PostgreSQL fait le ménage.</p>
+  <p>• Les nouveaux membres reçoivent le bon <code>lastMessageId</code>, et chaque type de personne (nouveaux membres, anciens membres, admin) reçoit le <strong>bon événement</strong> temps réel.</p>
+</div>
+
+</main>
+</body>
+</html>

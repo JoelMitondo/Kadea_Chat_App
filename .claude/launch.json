@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kadea-chat",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["ace", "serve", "--hmr"],
+      "port": 3333
+    }
+  ]
+}

@@ -50,7 +50,7 @@ Projet de fin de formation · Kadea Academy
 | Site en ligne | [`https://agora-chat-app-1.onrender.com`](https://agora-chat-app-1.onrender.com/) |
 | Présentation (Canva) | [`Diaporama de soutenance`](https://www.canva.com/design/DAHZPdEXD74/efmBfAdAlk039St4dMZBMw/view) |
 | Maquettes (Figma) | [`Kadea Chat`](https://www.figma.com/design/hTThi75OAXNNjJtiz2gVSU/Kadea-Chat-Final?node-id=0-1&p=f&t=Tgk3rswckWaMcmbz-0) |
-| Modélisation (dictionnaire / MCD / MLD) | [`docs/modelisation`](docs/modelisation) ou [`version interactive (draw.io)`](https://viewer.diagrams.net/?nav=1&title=Kadea%20Chat%20-%20Mod%C3%A9lisation#Uhttps%3A%2F%2Fraw.githubusercontent.com%2FJoelMitondo%2FKadea_Chat_App%2Fmain%2Fdocs%2Fmodelisation%2Fkadea_chat_modelisation.drawio) |
+| Modélisation (dictionnaire / MCD / MLD) | [`docs/modelisation`](docs/modelisation) |
 | Architecture C4 (Structurizr) | [`docs/c4/workspace.dsl`](docs/c4/workspace.dsl) ou [`voir les diagrammes en ligne`](https://playground.structurizr.com/?src=https://raw.githubusercontent.com/JoelMitondo/Kadea_Chat_App/main/docs/c4/workspace.dsl) |
 | Vidéo de démonstration (secours) | [`Voir sur YouTube`](https://youtu.be/tYmT7e_5RL4) — toutes les procédures en 4 min 20 |
 
@@ -188,8 +188,7 @@ psql -U postgres
 
 ```sql
 CREATE DATABASE kadea_chat;
-CREATE DATABASE kadea_chat_test;   -- pour les tests, jamais la même base
-\q
+CREATE DATABASE kadea_chat_test; 
 ```
 
 ### 4. Configurer l'environnement
@@ -215,7 +214,6 @@ Deux seeders se trouvent dans `database/seeders/` :
 | `01_reference_data_seeder.ts` | tous (y compris production) | Types de conversation (`Privee`, `Publique` = groupe), rôles (`admin`, `membre`), types de message (`texte`, `images`, `document`, `video`, `emodji`) |
 | `02_demo_users_seeder.ts` | **développement uniquement** | Quatre comptes de démonstration déjà confirmés (voir ci-dessous) |
 
-Les seeders sont rejouables : relancer `node ace db:seed` ne crée pas de doublons.
 
 **Comptes de démonstration (local uniquement)** : `amina@example.com`, `benjamin@example.com`, `chloe@example.com`, `david@example.com`, mot de passe `KadeaDemo2026`. Ils ne sont **jamais** créés en production : sur le site hébergé, les comptes se créent par l'inscription avec confirmation par e-mail.
 
@@ -297,7 +295,6 @@ LIMITER_STORE=database
 | `CLOUDINARY_*` | Identifiants Cloudinary | Console Cloudinary → Tableau de bord |
 | `LIMITER_STORE` | Où le limiteur garde ses compteurs : `database` (table `rate_limits`) ou `memory` | Facultatif. `memory` est utilisé par les tests |
 
-> **Ne commitez jamais `.env`.** Il est déjà dans `.gitignore`. Si un secret a été publié par erreur, **changez-le** : le supprimer de l'historique Git ne suffit pas.
 
 Toute nouvelle variable doit aussi être déclarée dans `start/env.ts`, sinon le démarrage ne la valide pas.
 
