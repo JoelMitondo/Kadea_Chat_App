@@ -26,9 +26,11 @@ export default class ProfileController {
       profile: {
         fullName: user.fullName,
         initials: donneInitiales(user.fullName),
-        bio: user.bio,
+        // ?? '' : Edge affiche null sous la forme du texte "null" dans les champs du formulaire.
+        // Le téléphone vide devenait alors "null", refusé par la validation : le profil ne s'enregistrait plus.
+        bio: user.bio ?? '',
         avatarUrl: user.avatarUrl,
-        phoneNumber: user.phoneNumber,
+        phoneNumber: user.phoneNumber ?? '',
         birthDateLabel: this.formateDate(user.birthDate),
         // Le champ <input type="date"> n'accepte que le format AAAA-MM-JJ
         birthDateValue: user.birthDate ? user.birthDate.toISODate() : '',

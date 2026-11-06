@@ -13,7 +13,7 @@ Projet de fin de formation · Kadea Academy
 ![Node](https://img.shields.io/badge/Node.js-%E2%89%A5%2024-339933?logo=nodedotjs&logoColor=white)
 ![Licence](https://img.shields.io/badge/licence-propri%C3%A9taire-lightgrey)
 
-[Démo en ligne](#liens-du-projet) · [Présentation](#liens-du-projet) · [Modélisation](#liens-du-projet) · [Architecture C4](#liens-du-projet) · [Installation](#installation)
+[Démo en ligne](#liens-du-projet) · [Vidéo](https://youtu.be/tYmT7e_5RL4) · [Présentation](#liens-du-projet) · [Modélisation](#liens-du-projet) · [Architecture C4](#liens-du-projet) · [Installation](#installation)
 
 </div>
 
@@ -48,11 +48,11 @@ Projet de fin de formation · Kadea Academy
 | Ressource | Lien |
 |---|---|
 | Site en ligne | [`https://agora-chat-app-1.onrender.com`](https://agora-chat-app-1.onrender.com/) |
-| Présentation (Canva) | [`https://www.canva.com`](https://canva.link/6sky2nlgir7lk05) |
+| Présentation (Canva) | [`Diaporama de soutenance`](https://www.canva.com/design/DAHZPdEXD74/efmBfAdAlk039St4dMZBMw/view) |
 | Maquettes (Figma) | [`Kadea Chat`](https://www.figma.com/design/hTThi75OAXNNjJtiz2gVSU/Kadea-Chat-Final?node-id=0-1&p=f&t=Tgk3rswckWaMcmbz-0) |
 | Modélisation (dictionnaire / MCD / MLD) | [`docs/modelisation`](docs/modelisation) ou [`version interactive (draw.io)`](https://viewer.diagrams.net/?nav=1&title=Kadea%20Chat%20-%20Mod%C3%A9lisation#Uhttps%3A%2F%2Fraw.githubusercontent.com%2FJoelMitondo%2FKadea_Chat_App%2Fmain%2Fdocs%2Fmodelisation%2Fkadea_chat_modelisation.drawio) |
 | Architecture C4 (Structurizr) | [`docs/c4/workspace.dsl`](docs/c4/workspace.dsl) ou [`voir les diagrammes en ligne`](https://playground.structurizr.com/?src=https://raw.githubusercontent.com/JoelMitondo/Kadea_Chat_App/main/docs/c4/workspace.dsl) |
-| Vidéo de démonstration (secours) | _à ajouter avant la soutenance_ |
+| Vidéo de démonstration (secours) | [`Voir sur YouTube`](https://youtu.be/tYmT7e_5RL4) — toutes les procédures en 4 min 20 |
 
 
 ---
@@ -575,14 +575,18 @@ Consultez la documentation officielle « Deployment » d'AdonisJS pour les chemi
 
 ## Usage de l'intelligence artificielle
 
-Conformément aux règles du projet, l'usage d'assistants d'IA est déclaré ici. Tout le code rendu a été relu et peut être expliqué ligne par ligne.
+Conformément aux règles du projet, l'usage d'un assistant d'intelligence artificielle est déclaré ici. **Outil utilisé : Claude Code** (assistant de programmation d'Anthropic, utilisé en ligne de commande et dans l'application de bureau Claude). Tout le code rendu a été relu, testé et peut être expliqué ligne par ligne par l'auteur.
 
-| Outil | Usage | Parties concernées |
+| Période / branche Git | Ce que Claude Code a fait | Parties concernées |
 |---|---|---|
-| Claude (Claude Code, Anthropic) | Audit du code par rapport au cahier des charges, corrections et revue | Retrait de membres d'un groupe, changement direct du mot de passe, liens e-mail construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README ; puis (branche `fix/p1`) historique paginé, statut « reçu », effacement du texte supprimé, limiteur de requêtes, e-mails en vues Edge, routes à identifiant numérique, migration de clés étrangères et d'index, redirection après connexion ; puis (branche `fix/p2`) suppression des duplications, policies Bouncer, dossier `app/services`, suppression du code mort, CSP, recherche de membres côté serveur |
-| Claude (Claude Code, Anthropic) — branche `UpdateClaude` | Documentation, modélisation et refactorisation, relues puis fusionnées dans `main` | Dictionnaire des données, MCD et MLD ; modèle C4 (Structurizr) ; commentaires explicatifs des services, contrôleurs et du temps réel ; noms de méthodes et de routes plus clairs ; contrainte `NOT NULL` sur `expired_at` ; correction de la page d'accueil et ajustements des vues |
+| `UpdateClaude` | Documentation, modélisation et refactorisation | Dictionnaire des données, MCD et MLD ; modèle C4 (Structurizr) ; commentaires explicatifs des services, des contrôleurs et du temps réel ; noms de méthodes et de routes plus clairs ; contrainte `NOT NULL` sur `expired_at` ; correction de la page d'accueil et ajustements des vues |
+| Audit | Analyse du code par rapport au cahier des charges et au règlement du chef-d'œuvre, puis liste priorisée des corrections (P0 / P1 / P2) | Ensemble du projet |
+| `fix/p0` | Corrections indispensables | Retrait de membres d'un groupe, changement direct du mot de passe, liens des e-mails construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README |
+| `fix/p1` | Corrections importantes | Historique paginé, statut « reçu », effacement du texte des messages supprimés, limiteur de requêtes, e-mails en vues Edge, routes à identifiant numérique, migration des clés étrangères et des index, redirection après connexion, seeder robuste |
+| `fix/p2` | Qualité du code | Suppression des duplications, policies Bouncer (`ConversationPolicy`, `GroupPolicy`), dossier `app/services`, suppression du code mort, politique de sécurité du contenu (CSP), recherche de membres côté serveur |
+| Vidéo de démonstration | Script de captures automatiques de l'application (Playwright) et montage de la vidéo | Vidéo de secours : les images sont de vraies captures de l'application ; la voix est une synthèse vocale de Windows |
 
-**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude`, `fix/p0`, `fix/p1` et `fix/p2`).
+**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local (tests automatisés et essais dans le navigateur) puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude`, `fix/p0`, `fix/p1` et `fix/p2`, commits signés `Co-Authored-By: Claude`).
 
 ---
 
