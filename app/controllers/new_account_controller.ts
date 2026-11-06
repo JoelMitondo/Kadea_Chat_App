@@ -9,6 +9,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { ERROR_PAGES, affichePageErreur } from '#services/error_page'
+import { formateDate } from '#services/chat_service'
 
 export default class NewAccountController {
   //function pour envoyer les information d'une invitation lors de l'enregistrement de l'utilisateur
@@ -27,7 +28,8 @@ export default class NewAccountController {
       id: params.id,
       user: {
         full_name: inscription.fullName,
-        birth_date: inscription.birthDate,
+        // Affichage lisible (12/04/1998) : sinon la date s'affichait au format brut 1998-04-12T00:00:00...
+        birth_date: inscription.birthDate ? formateDate(inscription.birthDate) : '',
         email: inscription.email,
       },
     })
