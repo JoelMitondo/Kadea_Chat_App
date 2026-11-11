@@ -34,7 +34,7 @@
       @!component('components/load-older', { hasMore: chat.hasMore, before: chat.oldestId, url: route('groups.messages.index', { id: chat.id }) })
 
       @if(chat.messages.length === 0)
-        <p data-empty-notice class="py-10 text-center text-sm text-fg-subtle">Aucun message. Lancez la discussion 👋</p>
+        <p data-empty-notice class="py-10 text-center text-sm text-fg-subtle">Aucun message. Lancez la discussion</p>
       @end
 
       @!component('components/message-list', { messages: chat.messages })
