@@ -1,6 +1,3 @@
-// INSCRIPTION, première étape : on garde les informations dans la table inscriptions (temporaire)
-// et on envoie le lien de confirmation. La suite est dans new_account_controller.ts.
-
 import type { HttpContext } from '@adonisjs/core/http'
 import mail from '@adonisjs/mail/services/main'
 import logger from '@adonisjs/core/services/logger'

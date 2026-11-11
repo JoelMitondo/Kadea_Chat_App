@@ -1,7 +1,3 @@
-// CRÉATION DU COMPTE, deuxième étape de l'inscription.
-// Le lien reçu par e-mail prouve que l'adresse existe. Le vrai compte (table users) n'est créé qu'ici :
-// c'est pourquoi on ne peut pas se connecter tant que l'e-mail n'est pas confirmé.
-
 import User from '#models/user'
 import Inscription from '#models/inscription'
 import { confirmationCompteValidator } from '#validators/user'

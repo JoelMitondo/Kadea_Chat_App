@@ -4,9 +4,7 @@ import { chatWithUserValidator } from '#validators/user_list'
 import { bloqueUtilisateur, debloqueUtilisateur } from '#services/block_service'
 
 export default class BlocksController {
-  /**
-   * Bloquer un utilisateur
-   */
+  //Bloquer un utilisateur
   async bloque({ auth, params, request, response, session }: HttpContext) {
     const me = auth.getUserOrFail()
     const { id } = await chatWithUserValidator.validate({ id: params.id })
@@ -26,9 +24,7 @@ export default class BlocksController {
     return response.redirect().back()
   }
 
-  /**
-   * Débloquer un utilisateur
-   */
+  // Débloquer un utilisateur
   async debloque({ auth, params, request, response, session }: HttpContext) {
     const me = auth.getUserOrFail()
     const { id } = await chatWithUserValidator.validate({ id: params.id })
