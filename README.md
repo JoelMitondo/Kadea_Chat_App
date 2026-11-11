@@ -577,14 +577,14 @@ Conformément aux règles du projet, l'usage d'un assistant d'intelligence artif
 
 | Période / branche Git | Ce que Claude Code a fait | Parties concernées |
 |---|---|---|
-| `UpdateClaude` | Documentation, modélisation et refactorisation | Dictionnaire des données, MCD et MLD ; modèle C4 (Structurizr) ; commentaires explicatifs des services, des contrôleurs et du temps réel ; noms de méthodes et de routes plus clairs ; contrainte `NOT NULL` sur `expired_at` ; correction de la page d'accueil et ajustements des vues |
+| `UpdateClaude` | Refactorisation | Correction MCD et MLD ; modèle C4 (Structurizr) ; noms de méthodes et de routes plus clairs ; contrainte `NOT NULL` sur `expired_at` ; correction de la page d'accueil et ajustements des vues |
 | Audit | Analyse du code par rapport au cahier des charges et au règlement du chef-d'œuvre, puis liste priorisée des corrections (P0 / P1 / P2) | Ensemble du projet |
-| `fix/p0` | Corrections indispensables | Retrait de membres d'un groupe, changement direct du mot de passe, liens des e-mails construits depuis `APP_URL`, seeders, tests fonctionnels, mise à jour de ce README |
-| `fix/p1` | Corrections importantes | Historique paginé, statut « reçu », effacement du texte des messages supprimés, limiteur de requêtes, e-mails en vues Edge, routes à identifiant numérique, migration des clés étrangères et des index, redirection après connexion, seeder robuste |
-| `fix/p2` | Qualité du code | Suppression des duplications, policies Bouncer (`ConversationPolicy`, `GroupPolicy`), dossier `app/services`, suppression du code mort, politique de sécurité du contenu (CSP), recherche de membres côté serveur |
+| `fix/p0` | Corrections indispensables | Retrait de membres d'un groupe, changement direct du mot de passe, liens des e-mails construits depuis `APP_URL`, seeders, tests fonctionnels, |
+| `fix/p1` | Corrections importantes | Historique paginé, effacement du texte des messages supprimés, limiteur de requêtes, routes à identifiant numérique, redirection après connexion, |
+| `fix/p2` | Qualité du code | Suppression des duplications, policies Bouncer (`ConversationPolicy`, `GroupPolicy`), suppression du code mort, politique de sécurité du contenu (CSP), recherche de membres côté serveur |
 | Vidéo de démonstration | Script de captures automatiques de l'application (Playwright) et montage de la vidéo | Vidéo de secours : les images sont de vraies captures de l'application ; la voix est une synthèse vocale de Windows |
 
-**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local (tests automatisés et essais dans le navigateur) puis validée par l'auteur avant d'être commitée. Les choix fonctionnels (règles d'accès, parcours d'inscription, succession de l'administrateur) restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude`, `fix/p0`, `fix/p1` et `fix/p2`, commits signés `Co-Authored-By: Claude`).
+**Méthode de travail.** L'IA a servi d'assistant : chaque proposition a été lue, testée en local (tests automatisés et essais dans le navigateur) puis validée par l'auteur avant d'être commitée. Les choix fonctionnels restent ceux de l'auteur. Le travail fait avec l'IA est identifiable dans l'historique Git (branches `UpdateClaude`, `fix/p0`, `fix/p1` et `fix/p2`, commits signés `Co-Authored-By: Claude`).
 
 ---
 
