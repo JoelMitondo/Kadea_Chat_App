@@ -1,7 +1,3 @@
-// CONTRÔLE D'ACCÈS : un non-membre ne peut ni lire ni écrire dans une conversation ou un groupe.
-// Chaque test suit le schéma Préparer → Agir → Vérifier.
-// withGlobalTransaction : tout ce qu'un test écrit en base est annulé à la fin du test.
-
 import { test } from '@japa/runner'
 import testUtils from '@adonisjs/core/services/test_utils'
 import Message from '#models/message'

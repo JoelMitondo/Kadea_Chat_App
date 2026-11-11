@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les vues Edge expliquées</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1f2328; --muted:#59636e; --line:#d8dee4; --code-bg:#f1f3f5; --accent:#2563eb; --note-bg:#eef4ff; --warn-bg:#fff6e5; --warn-line:#e0a400; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15181c; --fg:#e6e8eb; --muted:#9aa4ae; --line:#30363d; --code-bg:#1f242a; --accent:#6ea8ff; --note-bg:#17233a; --warn-bg:#2b2412; --warn-line:#b88a12; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 80px; }
+  h1 { font-size:1.9rem; line-height:1.25; margin:0 0 8px; }
+  h2 { font-size:1.4rem; margin:48px 0 12px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:1.1rem; margin:28px 0 8px; }
+  p, li { max-width:72ch; }
+  a { color:var(--accent); }
+  .subtitle, .file { color:var(--muted); }
+  .file { font-size:0.9rem; }
+  code { font:0.9em/1.5 ui-monospace,"Cascadia Code",Consolas,monospace; background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; margin:12px 0; }
+  pre code { background:none; padding:0; font-size:0.85rem; }
+  .table-wrap { overflow-x:auto; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; font-size:0.93rem; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); }
+  .note, .warn { border-radius:8px; padding:12px 16px; margin:16px 0; }
+  .note { background:var(--note-bg); border-left:4px solid var(--accent); }
+  .warn { background:var(--warn-bg); border-left:4px solid var(--warn-line); }
+  .note p, .warn p { margin:6px 0; }
+  .toc { border:1px solid var(--line); border-radius:8px; padding:12px 20px; }
+  .toc ol { margin:6px 0; padding-left:20px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Les vues Edge de Kadea Chat expliquées</h1>
+<p class="subtitle">Dossier <code>resources/views/</code> · layouts · components · partials · pages · emails</p>
+
+<p>Les <strong>vues</strong> fabriquent le HTML envoyé au navigateur. Kadea Chat utilise <strong>Edge</strong>, le moteur de vues d'AdonisJS : du HTML normal, avec des balises spéciales pour afficher des données, faire des conditions et réutiliser des morceaux. Les classes CSS (Tailwind) sont volontairement laissées de côté dans les extraits : elles ne servent qu'au style. Ce qui compte ici, c'est la <strong>structure</strong>.</p>
+
+<div class="note">
+  <p><strong>Le principe de tout le dossier : écrire chaque morceau une seule fois.</strong> Une bulle de message est écrite dans <strong>un</strong> fichier (<code>message-bubble.edge</code>). Le même fichier sert au chargement de la page, à l'envoi, au temps réel et aux « messages précédents ». C'est pour ça qu'une bulle a toujours exactement le même aspect, d'où qu'elle vienne.</p>
+</div>
+
+<nav class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li><a href="#syntaxe">La syntaxe d'Edge en 10 points</a></li>
+    <li><a href="#organisation">L'organisation du dossier</a></li>
+    <li><a href="#app">Le layout app.edge (pages connectées)</a></li>
+    <li><a href="#autres-layouts">Les layouts auth.edge et landing.edge</a></li>
+    <li><a href="#composants">Les composants de la messagerie</a></li>
+    <li><a href="#composants-ui">Les autres composants (cartes, formulaires, chargeur)</a></li>
+    <li><a href="#panneaux">Les partials : chat-panel et group-panel</a></li>
+    <li><a href="#petits-partials">Les petits partials (réponses au JavaScript)</a></li>
+    <li><a href="#pages">Les pages</a></li>
+    <li><a href="#carte">Qui rend quelle vue</a></li>
+    <li><a href="#remarques">Ce qui a été remarqué</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="syntaxe">1. La syntaxe d'Edge en 10 points</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Syntaxe</th><th>Rôle</th><th>Exemple dans le projet</th></tr>
+  <tr><td><code>{{ valeur }}</code></td><td>Affiche une valeur <strong>échappée</strong> : <code>&lt;</code> devient <code>&amp;lt;</code>, donc un texte ne peut jamais devenir du HTML actif</td><td><code>{{ message.content }}</code></td></tr>
+  <tr><td><code>{{{ valeur }}}</code></td><td>Affiche <strong>sans</strong> échappement. À réserver au HTML qu'on a fabriqué soi-même</td><td><code>{{{ await $slots.main() }}}</code></td></tr>
+  <tr><td><code>{{-- ... --}}</code></td><td>Un commentaire, jamais envoyé au navigateur</td><td>Partout</td></tr>
+  <tr><td><code>@if / @elseif / @else / @end</code></td><td>Une condition</td><td><code>@if(chat.blockedByMe)</code></td></tr>
+  <tr><td><code>@each(x in liste)</code></td><td>Une boucle. <code>@each((x, index) in liste)</code> donne aussi la position</td><td><code>@each(item in conversations)</code></td></tr>
+  <tr><td><code>@let(nom = valeur)</code></td><td>Une variable locale à la vue</td><td><code>@let(message = $props.get('message'))</code></td></tr>
+  <tr><td><code>@include('partials/x')</code></td><td>Insère un autre fichier, qui voit les <strong>mêmes</strong> variables</td><td><code>@include('partials/chat-panel')</code></td></tr>
+  <tr><td><code>@component('components/x', { ... })</code> … <code>@end</code></td><td>Insère un composant avec <strong>ses propres</strong> données (props), et un contenu entre les deux balises (le slot)</td><td><code>@component('components/stat-card', {...})</code> + une icône</td></tr>
+  <tr><td><code>@!component(...)</code></td><td>Le même, <strong>sans contenu</strong> : le <code>!</code> veut dire « pas de <code>@end</code> »</td><td><code>@!component('components/message-bubble', { message })</code></td></tr>
+  <tr><td><code>@layouts.app({ ... })</code> … <code>@end</code></td><td>Un raccourci pour le composant <code>components/layouts/app.edge</code>. Le point remplace le <code>/</code></td><td>En tête de chaque page</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong><code>$props.get('nom', défaut)</code></strong> : dans un composant, lit une donnée reçue, avec une valeur par défaut facultative. <code>$props.has('nom')</code> teste si elle a été passée.</li>
+  <li><strong><code>$slots.main()</code></strong> : le contenu placé entre <code>@component(...)</code> et <code>@end</code>. C'est une fonction asynchrone, d'où le <code>await</code>. On l'affiche avec <code>{{{ }}}</code>, car c'est du HTML écrit par nous.</li>
+  <li><strong>Les variables disponibles partout</strong>, ajoutées par AdonisJS : <code>auth</code> (l'utilisateur connecté), <code>csrfToken</code>, <code>csrfField()</code>, <code>cspNonce</code>, <code>route('nom', params)</code>, <code>flashMessages</code>, <code>old('champ')</code>…</li>
+  <li><strong><code>include</code> ou <code>component</code> ?</strong> Un <code>@include</code> partage toutes les variables de la vue qui l'inclut, ce qui est pratique pour découper une grande page. Un <code>@component</code> ne reçoit <strong>que</strong> ses props : il est réutilisable n'importe où, comme une fonction.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="organisation">2. L'organisation du dossier</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Dossier</th><th>Contenu</th><th>Exemples</th></tr>
+  <tr><td><code>components/layouts/</code></td><td>Le « cadre » commun d'un ensemble de pages : <code>&lt;head&gt;</code>, en-tête, navigation, scripts</td><td><code>app</code> (connecté), <code>auth</code> (connexion, inscription), <code>landing</code> (accueil)</td></tr>
+  <tr><td><code>components/</code></td><td>Des petits morceaux réutilisables, avec des props</td><td><code>message-bubble</code>, <code>user-avatar</code>, <code>composer</code>, <code>stat-card</code>…</td></tr>
+  <tr><td><code>partials/</code></td><td>Des morceaux de page, souvent <strong>renvoyés seuls au JavaScript</strong></td><td><code>chat-panel</code>, <code>users-list</code>, <code>message-item</code>…</td></tr>
+  <tr><td><code>pages/</code></td><td>Une page complète par écran, qui commence par <code>@layouts.xxx</code></td><td><code>message</code>, <code>groups</code>, <code>profile</code>, <code>auth/login</code>…</td></tr>
+  <tr><td><code>emails/</code></td><td>Le contenu HTML des e-mails</td><td><code>confirmation_email</code>, <code>reinitialisation_mot_de_passe</code></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="app">3. Le layout <code>app.edge</code> (pages connectées)</h2>
+
+<h3>Le <code>&lt;head&gt;</code></h3>
+<pre><code>&lt;title&gt;{{ $props.get('title', 'Kadea Chat') }}&lt;/title&gt;
+&lt;meta name="description" content="Kadea Chat : Application web de chat"&gt;
+&lt;meta property="og:title" content="Kadea Chat | Application web de conversation"&gt;
+&lt;meta property="og:image" content="https://i.ibb.co/zVsVm0NQ/Screenshot-17.png"&gt;
+&lt;meta property="twitter:card" content="summary_large_image"&gt;
+&lt;meta name="theme-color" content="#2563eb"&gt;
+&lt;link rel="icon" href="https://i.ibb.co/1YhrGKHz/logo-Kadea.png" type="image/png"&gt;
+&lt;meta name="csrf-token" content="{{ csrfToken }}"&gt;
+@include('partials/head-script')
+@vite(['resources/css/compiles/app.css'])
+@vite(['resources/js/realtime.js'])</code></pre>
+<ul>
+  <li><strong>Le titre</strong> vient de la page : <code>@layouts.app({ title: 'Messages · Kadea Chat' })</code>, ou « Kadea Chat » par défaut.</li>
+  <li><strong>Les balises <code>og:</code> et <code>twitter:</code></strong> (Open Graph) décident de l'aperçu affiché quand on partage le lien sur WhatsApp, Facebook ou LinkedIn : titre, description, image. <code>theme-color</code> colore la barre du navigateur sur téléphone.</li>
+  <li><strong><code>&lt;meta name="csrf-token"&gt;</code></strong> : le jeton CSRF, lu par <code>realtime.js</code> pour ses requêtes (voir le fichier sur le socle).</li>
+  <li><strong><code>@include('partials/head-script')</code></strong> : le petit script avec le nonce de la CSP, qui applique le thème clair ou sombre <strong>avant</strong> l'affichage (pas de flash blanc) et gère les images cassées.</li>
+  <li><strong><code>@vite([...])</code></strong> ajoute la balise <code>&lt;link&gt;</code> ou <code>&lt;script type="module"&gt;</code> du fichier. En développement, elle pointe vers le serveur Vite. En production, vers le fichier compilé avec son nom à empreinte (<code>app-3f2a.css</code>), pour le cache.</li>
+  <li><strong><code>realtime.js</code> est chargé dans le <code>&lt;head&gt;</code></strong>, sur toutes les pages connectées : la connexion temps réel s'ouvre partout, pour les pastilles et les notifications.</li>
+</ul>
+
+<h3>Le <code>&lt;body&gt;</code></h3>
+<pre><code>&lt;body data-user-id="{{ auth.user.id }}"&gt;
+  @!component('components/loader')
+  @!component('components/toasts')
+
+  &lt;header&gt;
+    &lt;a href="/messages"&gt;logo + « Kadea Chat »&lt;/a&gt;
+    &lt;form action="/search" method="GET"&gt;&lt;input type="search" name="q" placeholder="Rechercher un message…"&gt;&lt;/form&gt;
+    &lt;a href="/search"&gt;loupe (téléphone)&lt;/a&gt;
+    &lt;button id="theme-toggle"&gt;…&lt;/button&gt;
+    &lt;a href="/settings"&gt;…&lt;/a&gt;
+    &lt;form action="/logout" method="POST"&gt;{{ csrfField() }}&lt;button type="submit"&gt;…&lt;/button&gt;&lt;/form&gt;
+  &lt;/header&gt;
+
+  &lt;nav aria-label="Navigation principale"&gt;
+    @component('components/nav-item', { href: '/messages', label: 'Messages', active: $props.get('active') === 'messages', delay: 100, badge: 'private' })
+      &lt;svg&gt;…&lt;/svg&gt;
+    @end
+    … Groupes (badge: 'group'), Utilisateurs, Mon profil …
+  &lt;/nav&gt;
+
+  &lt;main&gt;
+    {{{ await $slots.main() }}}
+  &lt;/main&gt;
+
+  @vite(['resources/js/compiles/animate.js'])
+&lt;/body&gt;</code></pre>
+<ul>
+  <li><strong><code>data-user-id</code></strong> : l'identifiant de l'utilisateur connecté, lu par <code>realtime.js</code> pour s'abonner à <strong>son</strong> canal personnel. Le layout <code>app</code> n'est utilisé que sur des routes protégées par <code>auth</code>, donc <code>auth.user</code> existe toujours.</li>
+  <li><strong>Le chargeur et la zone des notifications</strong> sont posés une fois, en haut de chaque page.</li>
+  <li><strong>L'en-tête :</strong>
+    <ul>
+      <li>la barre de recherche est un vrai formulaire <code>GET /search</code>, qui fonctionne sans JavaScript ;</li>
+      <li>sur téléphone, une simple loupe vers <code>/search</code> la remplace ;</li>
+      <li>la déconnexion est un formulaire <code>POST</code> avec <code>csrfField()</code>. Le commentaire précise que c'est plus sûr qu'un lien : un lien piégé ne peut pas déconnecter.</li>
+    </ul>
+  </li>
+  <li><strong>La navigation :</strong> chaque bouton est un composant <code>nav-item</code>. L'icône SVG est passée <strong>dans le slot</strong>. <code>active</code> compare le <code>active</code> reçu de la page (<code>@layouts.app({ active: 'messages' })</code>) pour mettre le bon bouton en évidence. Le commentaire explique la mise en page : barre en bas sur téléphone, à gauche sur ordinateur, qui s'agrandit au survol <strong>par-dessus</strong> le contenu sans le pousser.</li>
+  <li><strong><code>{{{ await $slots.main() }}}</code></strong> : c'est ici que s'insère le contenu propre à chaque page.</li>
+  <li><strong><code>animate.js</code> à la fin</strong> : les notifications, le chargeur et le bouton de thème (voir le fichier sur le JavaScript principal).</li>
+</ul>
+
+<h3>Le composant <code>nav-item</code></h3>
+<pre><code>&lt;a href="{{ $props.get('href') }}"
+   aria-current="{{ $props.get('active') ? 'page' : 'false' }}"
+   style="animation-delay: {{ $props.get('delay', 0) }}ms"&gt;
+  &lt;span&gt;
+    {{{ await $slots.main() }}}
+    @if($props.get('badge'))
+      &lt;span data-nav-badge="{{ $props.get('badge') }}"&gt;0&lt;/span&gt;
+    @end
+  &lt;/span&gt;
+  &lt;span&gt;{{ $props.get('label') }}&lt;/span&gt;
+&lt;/a&gt;</code></pre>
+<ul>
+  <li><strong><code>aria-current="page"</code></strong> dit aux lecteurs d'écran « c'est la page actuelle ». Le CSS s'en sert aussi pour colorer le bouton.</li>
+  <li><strong><code>animation-delay</code></strong> : les boutons apparaissent l'un après l'autre (100, 200, 300, 400 ms), pour un petit effet de cascade.</li>
+  <li><strong>La pastille <code>data-nav-badge</code></strong> (<code>private</code> ou <code>group</code>) est créée à 0 et cachée. <code>realtime.js</code> la remplit avec le nombre de messages non lus, reçu de <code>/unread-counts</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="autres-layouts">4. Les layouts <code>auth.edge</code> et <code>landing.edge</code></h2>
+<ul>
+  <li><strong><code>auth.edge</code></strong> (connexion, inscription, mot de passe oublié) : le même <code>&lt;head&gt;</code>, mais <strong>sans</strong> <code>realtime.js</code>, puisque personne n'est connecté. L'en-tête est réduit au logo (lien vers l'accueil) et au bouton de thème. Le contenu est centré, avec un pied de page « © 2026 Kadea Chat · Projet chef-d'œuvre Kadea Academy ». En fin de page, il charge <code>compiles/auth.js</code> (la vérification en direct de l'inscription) et <code>animate.js</code>.</li>
+  <li><strong><code>landing.edge</code></strong> (page d'accueil) : un en-tête avec des liens d'ancre vers les sections (<code>#fonctionnalites</code>, <code>#comment-ca-marche</code>), le bouton de thème, et des boutons qui changent selon <code>isLoggedIn</code> : « Mes messages » ou « Se connecter / S'inscrire ».</li>
+</ul>
+<pre><code>{{-- pages/home.edge --}}
+@let(isLoggedIn = auth.isAuthenticated)
+
+@layouts.landing({ title: 'Kadea Chat · Discutez simplement, en privé ou en groupe', isLoggedIn: isLoggedIn })
+  ...
+  @if(isLoggedIn)
+    &lt;a href="/messages"&gt;…&lt;/a&gt;
+  @else
+    &lt;a href="{{ route('inscriptions.create') }}"&gt;…&lt;/a&gt; &lt;a href="/login"&gt;…&lt;/a&gt;
+  @end</code></pre>
+<ul>
+  <li><strong><code>auth.isAuthenticated</code></strong> est déjà connu, sans aucune requête du navigateur. Le middleware <code>silent_auth</code> a vérifié la session avant d'afficher la page (voir le fichier sur le socle). La route <code>/</code> n'a même pas de contrôleur : <code>router.on('/').render('pages/home')</code>.</li>
+  <li>La page passe <code>isLoggedIn</code> au layout comme une prop, pour adapter les boutons de l'en-tête.</li>
+  <li>Le reste de l'accueil est de la présentation : un aperçu de discussion dessiné en HTML, les cartes de fonctionnalités (<code>feature-card</code>), une explication en étapes, et un appel à l'action final.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="composants">5. Les composants de la messagerie</h2>
+
+<h3><code>user-avatar.edge</code> : l'avatar, avec la présence en direct</h3>
+<pre><code>@let(sizeClasses = $props.get('size') === 'sm' ? 'h-10 w-10' : 'h-12 w-12')
+@let(toneClasses = $props.get('tone') === 'group' ? 'bg-group-soft text-group' : 'bg-primary-soft text-on-primary-soft')
+@let(isOnline = Boolean($props.get('online')))
+@let(showOffline = Boolean($props.get('showOffline')))
+
+&lt;span data-presence-user="{{ $props.get('userId', '') }}"
+      data-show-offline="{{ showOffline ? 'true' : 'false' }}"&gt;
+  &lt;span&gt;{{ $props.get('initials') }}&lt;/span&gt;
+  @if($props.get('src'))
+    &lt;img src="{{ $props.get('src') }}" alt="" data-remove-on-error&gt;
+  @end
+  &lt;span data-presence-online title="En ligne"&gt;…&lt;/span&gt;
+  &lt;span data-presence-offline title="Hors ligne"&gt;&lt;/span&gt;
+&lt;/span&gt;</code></pre>
+<ul>
+  <li><strong>Des props pour toutes les situations :</strong>
+    <ul>
+      <li>la taille (<code>size: 'sm'</code>) ;</li>
+      <li>la couleur pour un groupe (<code>tone: 'group'</code>) ;</li>
+      <li>la puce verte (<code>online</code>), et la puce grise « hors ligne » seulement si on la demande (<code>showOffline</code>) ;</li>
+      <li><code>userId</code>, pour le temps réel.</li>
+    </ul>
+  </li>
+  <li><strong>Les initiales sont toujours là, la photo par-dessus.</strong> Si la photo ne se charge plus (supprimée de Cloudinary), <code>data-remove-on-error</code> la retire, et les initiales réapparaissent.</li>
+  <li><strong><code>data-presence-user</code></strong> : <code>realtime.js</code> retrouve <strong>tous</strong> les avatars d'une personne grâce à cet attribut, et allume ou éteint sa puce quand l'événement <code>presence</code> arrive. Les deux puces sont toujours dans le HTML, et une seule est visible.</li>
+  <li><strong><code>Boolean(...)</code></strong> transforme <code>undefined</code> (prop non passée) en <code>false</code>.</li>
+</ul>
+
+<h3><code>conversation-item.edge</code> : une ligne de la liste</h3>
+<pre><code>@let(item = $props.get('item'))
+@let(chatUrl = $props.get('chatUrl'))
+
+&lt;div data-conversation-item data-conversation-id="{{ item.id }}" data-active="{{ $props.get('active') ? 'true' : 'false' }}"&gt;
+  &lt;a href="{{ chatUrl }}/{{ item.id }}" data-conversation-link data-conversation-id="{{ item.id }}" data-no-loader&gt;
+    @if($props.get('isGroup'))
+      @!component('components/user-avatar', { initials: item.initials, tone: 'group' })
+    @else
+      @!component('components/user-avatar', { initials: item.initials, src: item.avatarUrl, online: item.isOnline, userId: item.userId })
+    @end
+    &lt;span&gt;{{ item.name }}&lt;/span&gt;  &lt;span data-time&gt;{{ item.time }}&lt;/span&gt;
+    &lt;span data-preview&gt;{{ item.preview }}&lt;/span&gt;  &lt;span data-unread-badge&gt;{{ item.unreadCount }}&lt;/span&gt;
+  &lt;/a&gt;
+  @if($props.get('canDelete'))
+    &lt;button type="button" data-delete-conversation&gt;corbeille&lt;/button&gt;
+  @end
+&lt;/div&gt;</code></pre>
+<ul>
+  <li><strong>Une seule ligne pour les conversations privées et les groupes</strong> : <code>isGroup</code> choisit l'avatar (photo et présence, ou initiales colorées), et <code>canDelete</code> affiche la corbeille, seulement en privé.</li>
+  <li><strong>Un vrai lien</strong> (<code>href="/conversations/12"</code>) : sans JavaScript, ou avec un clic du milieu, il ouvre la page normalement. <code>data-conversation-link</code> permet à <code>message.js</code> de l'intercepter pour ouvrir la discussion sans recharger. <code>data-no-loader</code> évite le chargeur plein écran.</li>
+  <li><strong>Les attributs <code>data-time</code>, <code>data-preview</code> et <code>data-unread-badge</code></strong> sont les points d'accroche que <code>message.js</code> met à jour quand un message arrive.</li>
+  <li><strong>Il est utilisé trois fois :</strong> dans la liste de <code>message.edge</code> et <code>groups.edge</code>, et par <code>partials/list-item.edge</code>, la ligne envoyée par le temps réel quand une nouvelle conversation apparaît.</li>
+</ul>
+
+<h3><code>message-bubble.edge</code> : une bulle</h3>
+<pre><code>@let(message = $props.get('message'))
+@let(bubbleClasses = message.isMine
+  ? 'rounded-br-md bg-bubble-out text-on-bubble-out'
+  : 'rounded-bl-md border border-bubble-line bg-bubble-in text-on-bubble-in')
+
+&lt;div data-message-id="{{ message.id }}"&gt;
+  @if(message.isMine &amp;&amp; !message.isDeleted)
+    @if(!message.attachment)
+      &lt;button type="button" data-edit-message&gt;crayon&lt;/button&gt;
+    @end
+    &lt;button type="button" data-delete-message&gt;corbeille&lt;/button&gt;
+  @end
+
+  @if(message.senderName)
+    &lt;p&gt;{{ message.senderName }}&lt;/p&gt;
+  @end
+
+  @if(message.isDeleted)
+    &lt;p&gt;Ce message a été supprimé&lt;/p&gt;
+  @else
+    @if(message.attachment)
+      @if(message.attachment.isImage)
+        &lt;a href="{{ message.attachment.url }}" target="_blank" rel="noopener"&gt;
+          &lt;img src="{{ message.attachment.thumbUrl }}" alt="{{ message.attachment.name }}" loading="lazy"&gt;
+        &lt;/a&gt;
+      @else
+        &lt;p&gt;{{ message.attachment.name }}&lt;/p&gt;
+      @end
+      &lt;span&gt;{{ message.attachment.size }}&lt;/span&gt; · &lt;a href="{{ message.attachment.url }}" target="_blank" rel="noopener"&gt;Ouvrir&lt;/a&gt;
+      · &lt;a href="{{ message.attachment.downloadUrl }}"&gt;Télécharger&lt;/a&gt;
+    @end
+    @if(message.content)
+      &lt;p data-message-text&gt;{{ message.content }}&lt;/p&gt;
+    @end
+  @end
+
+  @if(message.isEdited &amp;&amp; !message.isDeleted) &lt;span&gt;modifié&lt;/span&gt; @end
+  &lt;span&gt;{{ message.time }}&lt;/span&gt;
+  @if(message.isMine &amp;&amp; !message.isDeleted)
+    &lt;span data-tick-read aria-label="Lu"&gt;…&lt;/span&gt;
+    &lt;span data-tick-delivered aria-label="Reçu"&gt;…&lt;/span&gt;
+    &lt;span data-tick-sent aria-label="Envoyé"&gt;…&lt;/span&gt;
+  @end
+&lt;/div&gt;</code></pre>
+<p>Toutes les données viennent de <code>construitVueMessage</code> (voir le fichier sur les services) : la vue n'a <strong>aucun calcul</strong> à faire, seulement des conditions.</p>
+<ul>
+  <li><strong><code>bubbleClasses</code></strong> : mes messages à droite en bleu, ceux des autres à gauche avec une bordure. Le coin « en pointe » est du côté de l'auteur.</li>
+  <li><strong>Les boutons Modifier / Supprimer</strong> n'apparaissent que sur <strong>mes</strong> messages non supprimés. Un message avec un fichier ne peut être que supprimé. C'est de l'affichage : le serveur revérifie avec la policy.</li>
+  <li><strong>Le nom de l'auteur</strong> n'apparaît que dans un groupe, et pas sur mes propres messages (<code>senderName</code> vaut alors <code>null</code>).</li>
+  <li><strong>Une image s'affiche en miniature</strong> (<code>thumbUrl</code>, 480 px, format optimisé). Un clic ouvre l'original dans un nouvel onglet.
+    <ul>
+      <li><code>rel="noopener"</code> empêche la page ouverte de prendre le contrôle de l'onglet d'origine (<code>window.opener</code>).</li>
+      <li><code>loading="lazy"</code> ne charge l'image qu'au moment où elle approche de l'écran, ce qui allège les longues discussions.</li>
+    </ul>
+  </li>
+  <li><strong>« Télécharger »</strong> pointe vers <code>downloadUrl</code> (<code>fl_attachment</code>), qui force l'enregistrement du fichier.</li>
+  <li><strong><code>data-message-text</code></strong> : <code>message.js</code> y lit le texte à mettre dans le champ quand on clique sur « Modifier ».</li>
+  <li><strong>Les trois coches sont toujours présentes</strong> sur mes messages, et une seule est visible. La classe <code>hidden</code> dépend de <code>isRead</code> et <code>isDelivered</code> : par exemple, la coche « Reçu » est visible si <code>!message.isRead &amp;&amp; message.isDelivered</code>. Le temps réel bascule ensuite de l'une à l'autre (<code>afficherCoche</code>).</li>
+  <li><strong><code>{{ message.content }}</code> est échappé :</strong> un message <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> s'affiche comme du texte. C'est la protection principale contre les attaques XSS, et la CSP en est la seconde.</li>
+</ul>
+
+<h3><code>message-list.edge</code> et <code>day-separator.edge</code></h3>
+<pre><code>@let(messages = $props.get('messages'))
+@each((message, index) in messages)
+  @if(index === 0 || message.dayKey !== messages[index - 1].dayKey)
+    @!component('components/day-separator', { label: message.dayLabel })
+  @end
+  @!component('components/message-bubble', { message })
+@end
+
+{{-- day-separator.edge --}}
+&lt;div data-day-separator&gt;&lt;span&gt;{{ $props.get('label') }}&lt;/span&gt;&lt;/div&gt;</code></pre>
+<ul>
+  <li><strong>Un séparateur de jour</strong> (« Aujourd'hui », « Hier », « Lundi »…) avant le premier message, puis à chaque fois que <code>dayKey</code> (<code>"2026-11-06"</code>) change par rapport au message précédent.</li>
+  <li><strong><code>@each((message, index) in messages)</code></strong> donne aussi la position, ce qui permet de regarder le message d'avant (<code>messages[index - 1]</code>).</li>
+  <li><strong>Utilisé à l'ouverture d'une discussion et par « Messages précédents »</strong> : c'est le même composant, donc le même découpage par jour.</li>
+  <li><strong><code>data-day-separator</code></strong> permet à <code>message.js</code> de retirer un séparateur en double (<code>dropFirstSeparator</code>).</li>
+</ul>
+
+<h3><code>load-older.edge</code> : le bouton « messages précédents »</h3>
+<pre><code>@if($props.get('hasMore'))
+  &lt;div data-load-older&gt;
+    &lt;button type="button" data-load-older-button data-url="{{ $props.get('url') }}" data-before="{{ $props.get('before') }}"&gt;
+      Afficher les messages précédents
+    &lt;/button&gt;
+  &lt;/div&gt;
+@end</code></pre>
+<p>Il n'existe que s'il reste des messages plus anciens. L'adresse et le curseur (<code>before</code>, l'identifiant du plus ancien message affiché) sont rangés dans le bouton. <code>message.js</code> les lit, fait la requête, puis met à jour <code>data-before</code> ou retire le bloc.</p>
+
+<h3><code>composer.edge</code> : la zone de saisie</h3>
+<pre><code>&lt;form id="composer" action="{{ $props.get('action') }}" method="POST" data-no-loader&gt;
+  &lt;div id="edit-banner"&gt;Modification du message &lt;button type="button" data-cancel-edit&gt;✕&lt;/button&gt;&lt;/div&gt;
+  &lt;div id="attachment-chip"&gt;&lt;span id="attachment-name"&gt;&lt;/span&gt; &lt;button type="button" data-remove-attachment&gt;✕&lt;/button&gt;&lt;/div&gt;
+
+  &lt;input id="attachment-input" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"&gt;
+  &lt;button type="button" data-pick-attachment&gt;trombone&lt;/button&gt;
+  &lt;input name="content" type="text" autocomplete="off" maxlength="2000" placeholder="{{ $props.get('placeholder', 'Écrire un message…') }}"&gt;
+  &lt;button type="submit" aria-label="Envoyer"&gt;avion en papier&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+<ul>
+  <li><strong>Une seule zone de saisie</strong> pour le privé et les groupes : seule l'adresse d'envoi (<code>action</code>) et le texte d'invitation changent.</li>
+  <li><strong>Le bandeau de modification et l'étiquette du fichier</strong> sont dans le HTML, cachés. <code>message.js</code> les montre quand il faut.</li>
+  <li><strong>Le vrai champ de fichier est caché</strong>, car un <code>&lt;input type="file"&gt;</code> est difficile à styler. Le joli trombone appelle <code>.click()</code> dessus. <code>accept</code> limite les types proposés dans la fenêtre de choix du système.</li>
+  <li><strong><code>maxlength="2000"</code></strong> reprend la limite du validateur, et <code>autocomplete="off"</code> évite que le navigateur propose d'anciens messages.</li>
+  <li><strong>Pas de <code>csrfField()</code> :</strong> ce formulaire n'est jamais envoyé normalement. <code>message.js</code> envoie lui-même le jeton dans l'en-tête <code>X-CSRF-TOKEN</code>.</li>
+</ul>
+
+<h3><code>member-picker.edge</code> et <code>member-item.edge</code></h3>
+<pre><code>@let(candidates = $props.get('candidates'))
+&lt;div data-member-picker data-search-url="{{ $props.get('searchUrl') }}"&gt;
+  @if(candidates.length === 0)
+    &lt;p&gt;Aucun utilisateur disponible.&lt;/p&gt;
+  @else
+    &lt;input type="search" data-member-filter placeholder="Rechercher un utilisateur…"&gt;
+    &lt;ul data-member-list&gt;
+      @each(person in candidates)
+        @!component('components/member-item', { person })
+      @end
+    &lt;/ul&gt;
+    &lt;p data-member-empty&gt;Aucun utilisateur trouvé.&lt;/p&gt;
+  @end
+&lt;/div&gt;
+
+{{-- member-item.edge --}}
+&lt;li data-member-item data-member-id="{{ person.id }}"&gt;
+  &lt;label&gt;&lt;input type="checkbox" data-member-checkbox value="{{ person.id }}"&gt; avatar  {{ person.fullName }}&lt;/label&gt;
+&lt;/li&gt;</code></pre>
+<ul>
+  <li><strong>Le sélecteur de membres</strong>, utilisé pour créer un groupe et pour en ajouter. L'adresse de recherche est rangée dans <code>data-search-url</code> : <code>/groups/candidates</code>, avec <code>?group=12</code> pour l'ajout.</li>
+  <li><strong>Une case à cocher dans un <code>&lt;label&gt;</code></strong> : cliquer n'importe où sur la ligne (nom, avatar) coche la case.</li>
+  <li><strong><code>member-item</code></strong> est la même ligne que celle renvoyée par la recherche (<code>partials/member-items</code>). <code>groupe.js</code> évite les doublons grâce à <code>data-member-id</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="composants-ui">6. Les autres composants</h2>
+
+<h3>Les cartes à icône : <code>stat-card</code>, <code>info-row</code>, <code>feature-card</code></h3>
+<pre><code>{{-- stat-card.edge --}}
+@let(tones = { primary: 'bg-primary-soft …', group: 'bg-group-soft …', accent: 'bg-accent-soft …' })
+&lt;div&gt;
+  &lt;span class="{{ tones[$props.get('tone')] }} …"&gt;{{{ await $slots.main() }}}&lt;/span&gt;
+  &lt;p&gt;{{ $props.get('value') }}&lt;/p&gt;
+  &lt;p&gt;{{ $props.get('label') }}&lt;/p&gt;
+&lt;/div&gt;
+
+{{-- utilisation dans pages/profile.edge --}}
+@component('components/stat-card', { label: 'Groupes', value: stats.groups, tone: 'group' })
+  &lt;svg&gt;…&lt;/svg&gt;
+@end</code></pre>
+<ul>
+  <li><strong>Le même modèle pour les trois :</strong> les textes passent par les props, et l'<strong>icône</strong> passe par le slot (le SVG entre <code>@component</code> et <code>@end</code>).</li>
+  <li><strong><code>tones</code></strong> : un petit dictionnaire qui associe un nom de couleur à des classes. La page écrit <code>tone: 'group'</code> sans connaître les classes Tailwind.</li>
+  <li><strong><code>info-row</code></strong> utilise <code>&lt;dt&gt;</code> / <code>&lt;dd&gt;</code>, les balises HTML d'une liste « intitulé : valeur ». Les lecteurs d'écran annoncent ainsi chaque paire correctement.</li>
+</ul>
+
+<h3><code>toasts.edge</code> et <code>loader.edge</code></h3>
+<ul>
+  <li><strong><code>toasts.edge</code></strong> contient :
+    <ul>
+      <li>la zone <code>#kc-toasts</code> (<code>aria-live="polite"</code>) où s'empilent les notifications ;</li>
+      <li>le <code>&lt;template id="kc-toast-modele"&gt;</code> que <code>notifications.js</code> copie ;</li>
+      <li>les messages flash du serveur, écrits en <code>&lt;div data-flash="succes" data-message="…" hidden&gt;</code> quand <code>flashMessages.has('success')</code> (ou <code>'error'</code>).</li>
+    </ul>
+  </li>
+  <li><strong><code>loader.edge</code></strong> : un anneau SVG avec un filtre « liquide » (<code>feGaussianBlur</code> pour flouter, puis <code>feColorMatrix</code> pour durcir les contours, ce qui fait fusionner les gouttes avec l'anneau), le logo au centre et « Veuillez patienter ! ». Il est visible par défaut, et un <code>&lt;noscript&gt;</code> le cache si JavaScript est désactivé.</li>
+</ul>
+
+<h3>Les composants de formulaire : <code>form</code>, <code>field/*</code>, <code>input/control</code>, <code>link</code></h3>
+<p>Ils viennent du kit de démarrage d'AdonisJS et servent surtout à la page de connexion et à l'inscription.</p>
+<pre><code>{{-- utilisation (pages/auth/login.edge) --}}
+@form({ route: 'session.store', method: 'POST' })
+  @field.root({ name: 'email' })
+    @!field.label({ text: 'Adresse e-mail' })
+    @!input.control({ type: 'email', autocomplete: 'username' })
+    @!field.error()
+  @end
+@end</code></pre>
+<ul>
+  <li><strong><code>form/index.edge</code></strong> transforme <code>route: 'session.store'</code> en <code>action</code> et <code>method</code> (<code>formAttributes</code>), puis ajoute <strong>tout seul</strong> <code>{{ csrfField() }}</code> si la méthode n'est pas <code>GET</code>.</li>
+  <li><strong><code>field/root.edge</code></strong> prépare un « contexte » partagé avec ses enfants grâce à <code>@inject({...})</code> :
+    <ul>
+      <li>le nom et l'<code>id</code> du champ ;</li>
+      <li>l'ancienne valeur (<code>old('email')</code>, pour garder ce qui a été tapé après une erreur) ;</li>
+      <li>les erreurs du champ, lues dans le flash <code>inputErrorsBag</code>.</li>
+    </ul>
+  </li>
+  <li><strong><code>field/label</code>, <code>input/control</code> et <code>field/error</code></strong> lisent ce contexte avec <code>$context</code>. Le label reçoit <code>for</code>, le champ reçoit <code>name</code>, <code>id</code>, <code>value</code> et <code>aria-invalid</code>, et l'erreur s'affiche sous le champ. On écrit <code>name: 'email'</code> <strong>une seule fois</strong>, et les trois morceaux sont reliés.</li>
+  <li><strong><code>input/control</code> ne remet jamais l'ancienne valeur</strong> pour un mot de passe ou un fichier (<code>useOldValue</code>). Un mot de passe ne doit pas revenir pré-rempli dans la page.</li>
+  <li><strong><code>$props.except([...]).merge({...}).toAttrs()</code></strong> : on prend toutes les props, on retire celles qui ne sont pas des attributs HTML, on ajoute les siennes, puis on transforme le tout en attributs. Toute prop non prévue (<code>placeholder</code>, <code>autocomplete</code>…) passe donc directement sur la balise.</li>
+  <li><strong><code>link.edge</code></strong> fabrique un <code>&lt;a&gt;</code> à partir d'un nom de route (<code>urlFor</code>) ou d'un <code>href</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="panneaux">7. Les partials : <code>chat-panel</code> et <code>group-panel</code></h2>
+<p>Le panneau de droite : en-tête, messages, zone de saisie. Il est inclus dans la page au chargement, <strong>et</strong> renvoyé seul quand <code>message.js</code> ouvre une discussion sans recharger.</p>
+
+<h3><code>chat-panel.edge</code> (conversation privée)</h3>
+<pre><code>@if(chat)
+  &lt;div id="chat-panel" data-conversation-id="{{ chat.id }}"&gt;
+    &lt;header&gt;
+      &lt;button type="button" data-chat-back&gt;← (téléphone)&lt;/button&gt;
+      @!component('components/user-avatar', { initials: chat.other.initials, src: chat.other.avatarUrl, online: chat.other.isOnline, userId: chat.other.id, size: 'sm' })
+      &lt;p&gt;{{ chat.other.name }}&lt;/p&gt;
+      &lt;p data-presence-label="{{ chat.other.id }}"&gt;&lt;span data-presence-pulse&gt;&lt;/span&gt;&lt;span data-presence-text&gt;{{ chat.other.isOnline ? 'En ligne' : 'Hors ligne' }}&lt;/span&gt;&lt;/p&gt;
+      @if(chat.blockedByMe)
+        &lt;button type="button" data-unblock-user data-user-id="{{ chat.other.id }}"&gt;Débloquer&lt;/button&gt;
+      @else
+        &lt;button type="button" data-block-user data-user-id="{{ chat.other.id }}"&gt;bloquer&lt;/button&gt;
+      @end
+    &lt;/header&gt;
+
+    @if(chat.blockedByMe)
+      &lt;div&gt;Vous avez bloqué {{ chat.other.name }}. Cette personne ne peut plus vous envoyer de messages.&lt;/div&gt;
+    @end
+
+    &lt;div id="messages-list"&gt;
+      @!component('components/load-older', { hasMore: chat.hasMore, before: chat.oldestId, url: route('conversations.messages.index', { id: chat.id }) })
+      @if(chat.messages.length === 0)
+        &lt;p data-empty-notice&gt;Aucun message. Dites bonjour !!!&lt;/p&gt;
+      @end
+      @!component('components/message-list', { messages: chat.messages })
+    &lt;/div&gt;
+
+    @!component('components/composer', { action: route('messages.store', { id: chat.id }), placeholder: 'Écrire un message…' })
+  &lt;/div&gt;
+@else
+  @include('partials/chat-empty')
+@end</code></pre>
+<ul>
+  <li><strong><code>@if(chat)</code></strong> : sans conversation ouverte (<code>chat: null</code>), on affiche l'écran d'accueil <code>chat-empty</code> (« Bienvenue sur Kadea Chat »).</li>
+  <li><strong><code>data-conversation-id</code></strong> sur <code>#chat-panel</code> : <code>message.js</code> y lit l'identifiant de la discussion ouverte, par exemple pour mettre à jour la bonne ligne de la liste.</li>
+  <li><strong>L'en-tête</strong> montre l'avatar et le statut en direct de l'autre personne (<code>data-presence-label</code>, mis à jour par <code>realtime.js</code>), et le bouton Bloquer ou Débloquer selon <code>blockedByMe</code>.</li>
+  <li><strong><code>route('nom', { id })</code></strong> fabrique les adresses à partir des noms de routes. Si une adresse change un jour dans <code>start/routes.ts</code>, les vues suivent automatiquement.</li>
+  <li><strong><code>data-empty-notice</code></strong> : « Aucun message », retiré par <code>message.js</code> à l'arrivée du premier message.</li>
+</ul>
+
+<h3><code>group-panel.edge</code> (groupe)</h3>
+<p>La même structure, avec ce qui est propre aux groupes :</p>
+<ul>
+  <li><strong>L'en-tête</strong> montre l'avatar du groupe, son nom, « N membres », et un bouton qui ouvre la fenêtre <strong>Informations du groupe</strong> (<code>&lt;dialog id="group-info-modal"&gt;</code>).</li>
+  <li><strong>Dans la fenêtre :</strong>
+    <ul>
+      <li>la date de création et le créateur (<code>info-row</code>) ;</li>
+      <li>la liste des membres, avec « (vous) » et un badge « Admin ». L'admin voit un bouton <strong>Retirer</strong> (<code>data-remove-member</code>) à côté de chaque membre qui n'est pas admin, et l'adresse est rangée dans <code>data-url</code> avec <code>route('groups.members.destroy', { id, userId })</code> ;</li>
+      <li>pour l'admin seulement : un bloc repliable <code>&lt;details&gt;&lt;summary&gt;Ajouter des membres&lt;/summary&gt;</code> avec le <code>member-picker</code>, et une « Zone dangereuse » avec le bouton <strong>Supprimer le groupe</strong>.</li>
+    </ul>
+  </li>
+  <li><strong><code>route('groups.candidates', {}, { qs: { group: chat.id } })</code></strong> : le troisième argument ajoute une « query string ». On obtient <code>/groups/candidates?group=12</code>.</li>
+  <li><strong><code>&lt;details&gt;</code> / <code>&lt;summary&gt;</code></strong> : un bloc qui s'ouvre et se ferme <strong>sans JavaScript</strong>, géré par le navigateur.</li>
+  <li><strong>Ces boutons d'admin sont de l'affichage :</strong> les vraies règles sont dans la policy <code>GroupPolicy</code>, côté serveur (voir le fichier sur les groupes).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="petits-partials">8. Les petits partials (réponses au JavaScript)</h2>
+<p>Des fichiers de une à trois lignes, qui servent de <strong>réponse</strong> à une requête du JavaScript ou du temps réel. Chacun réutilise un composant existant.</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Partial</th><th>Contenu</th><th>Rendu par</th></tr>
+  <tr><td><code>message-item.edge</code></td><td>Un séparateur (si <code>showSeparator</code>) + <code>message-bubble</code></td><td><code>messages_controller</code> (envoi, modification, suppression), <code>realtime_service</code> (temps réel)</td></tr>
+  <tr><td><code>messages-page.edge</code></td><td><code>message-list</code></td><td><code>donneMessagesPrecedents</code> (privé et groupe)</td></tr>
+  <tr><td><code>list-item.edge</code></td><td><code>conversation-item</code></td><td><code>realtime_service</code> (une nouvelle conversation apparaît)</td></tr>
+  <tr><td><code>member-items.edge</code></td><td>Un <code>member-item</code> par candidat</td><td><code>donneCandidatsRecherche</code></td></tr>
+  <tr><td><code>users-list.edge</code></td><td>La liste d'utilisateurs + pagination</td><td><code>donnePageUtilisateurs</code> (page entière ou recherche en direct)</td></tr>
+  <tr><td><code>chat-panel</code> / <code>group-panel</code></td><td>Le panneau de discussion</td><td><code>donneConversation</code> / <code>donneGroupe</code></td></tr>
+  <tr><td><code>chat-empty</code> / <code>group-empty</code></td><td>L'écran d'accueil sans discussion ouverte</td><td>Inclus par les panneaux et par le <code>&lt;template id="chat-placeholder"&gt;</code></td></tr>
+  <tr><td><code>head-script.edge</code></td><td>Le script du thème et des images cassées, avec le nonce</td><td>Inclus dans le <code>&lt;head&gt;</code> des layouts</td></tr>
+</table>
+</div>
+<pre><code>{{-- partials/message-item.edge, en entier --}}
+@if(showSeparator)
+  @!component('components/day-separator', { label: message.dayLabel })
+@end
+@!component('components/message-bubble', { message })
+
+{{-- partials/list-item.edge, en entier --}}
+@!component('components/conversation-item', { item, chatUrl, active: false, isGroup, canDelete })</code></pre>
+<p><strong><code>{ item, chatUrl, ... }</code></strong> est le raccourci de <code>{ item: item, chatUrl: chatUrl, ... }</code>. Ces variables viennent des données passées par le serveur à <code>edge.render('partials/list-item', { item, chatUrl, isGroup, canDelete })</code>.</p>
+
+<!-- ============================================================ -->
+<h2 id="pages">9. Les pages</h2>
+
+<h3><code>message.edge</code> et <code>groups.edge</code> : la même structure</h3>
+<pre><code>@layouts.app({ title: 'Messages · Kadea Chat', active: 'messages' })
+  &lt;input type="hidden" id="csrf-token" value="{{ csrfToken }}"&gt;
+
+  &lt;div id="messages-page"
+       data-kind="private"
+       data-view="{{ chat ? 'chat' : 'list' }}"
+       data-active-id="{{ chat ? chat.id : '' }}"
+       data-list-url="/messages"
+       data-chat-url="/conversations"&gt;
+
+    &lt;section&gt;
+      &lt;h1&gt;Messages&lt;/h1&gt; &lt;a href="/users"&gt;nouvelle conversation&lt;/a&gt;
+      &lt;div id="empty-list"&gt;Il n'y a aucune conversation pour le moment…&lt;/div&gt;
+      &lt;div id="conversations-list"&gt;
+        @each(item in conversations)
+          @!component('components/conversation-item', { item, chatUrl: '/conversations', active: chat ? chat.id === item.id : false, isGroup: false, canDelete: true })
+        @end
+      &lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;section id="chat-pane"&gt;
+      @include('partials/chat-panel')
+    &lt;/section&gt;
+  &lt;/div&gt;
+
+  &lt;template id="chat-placeholder"&gt;
+    @include('partials/chat-empty')
+  &lt;/template&gt;
+
+  @vite(['resources/js/message.js'])
+@end</code></pre>
+<ul>
+  <li><strong><code>groups.edge</code> a exactement les mêmes identifiants</strong> (<code>#messages-page</code>, <code>#conversations-list</code>, <code>#chat-pane</code>, <code>#chat-placeholder</code>). Seules les valeurs <code>data-…</code> changent : <code>data-kind="group"</code>, <code>data-list-url="/groups"</code>, <code>data-chat-url="/groups"</code>. Le commentaire de la page le dit : <code>message.js</code> fonctionne tel quel sur les deux pages.</li>
+  <li><strong><code>data-kind</code></strong> : <code>message.js</code> ignore les événements temps réel de l'autre type (pas de message de groupe affiché sur la page Messages).</li>
+  <li><strong><code>data-view</code></strong> (<code>list</code> ou <code>chat</code>) : sur téléphone, le CSS montre soit la liste, soit la discussion. Si la page est ouverte directement sur <code>/conversations/12</code>, elle démarre en mode <code>chat</code>.</li>
+  <li><strong><code>data-active-id</code></strong> : la discussion ouverte, que <code>message.js</code> lit et met à jour.</li>
+  <li><strong><code>#empty-list</code></strong> est toujours présent : <code>message.js</code> l'affiche ou le cache selon qu'il reste des conversations.</li>
+  <li><strong>Le <code>&lt;template id="chat-placeholder"&gt;</code></strong> garde une copie de l'écran d'accueil, que <code>fermerChat()</code> remet dans le panneau.</li>
+  <li><strong><code>groups.edge</code> ajoute</strong> la fenêtre « Créer un groupe » (<code>&lt;dialog id="group-create-modal"&gt;</code>) avec le nom, le <code>member-picker</code>, le compteur « 0 sélectionné · minimum 2 » et un bouton désactivé tant que le formulaire n'est pas valide. Elle charge <code>groupe.js</code>, qui importe lui-même <code>message.js</code>.</li>
+</ul>
+
+<h3>Les autres pages</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>Page</th><th>Layout</th><th>Expliquée dans</th></tr>
+  <tr><td><code>home.edge</code></td><td><code>landing</code></td><td>Ce fichier, <a href="#autres-layouts">point 4</a></td></tr>
+  <tr><td><code>auth/login</code>, <code>register</code>, <code>signup</code>, <code>forgoPassword</code>, <code>updatePassword</code></td><td><code>auth</code></td><td>Le fichier sur l'authentification</td></tr>
+  <tr><td><code>profile.edge</code>, <code>settings.edge</code></td><td><code>app</code></td><td>Le fichier sur le profil et les paramètres</td></tr>
+  <tr><td><code>users.edge</code>, <code>search.edge</code></td><td><code>app</code></td><td>Le fichier sur les utilisateurs et la recherche</td></tr>
+  <tr><td><code>errors/error.edge</code></td><td>Aucun : une page autonome</td><td>Le fichier sur le socle (<code>error_page.ts</code>)</td></tr>
+</table>
+</div>
+<p><strong><code>errors/error.edge</code> n'utilise pas de layout</strong> : elle doit fonctionner même pour une adresse inconnue, quand la session et l'authentification n'ont pas été chargées. Le layout <code>app</code> utilise <code>auth.user</code>, qui n'existerait pas. Elle affiche le code (<code>{{ page.code }}</code>), une icône choisie par <code>@if(page.icon === 'link')</code>…, le titre, le message, le conseil, les boutons (<code>@each(action in page.actions)</code>) et la référence pour les erreurs 500.</p>
+
+<!-- ============================================================ -->
+<h2 id="carte">10. Qui rend quelle vue</h2>
+<pre><code>view.render('pages/xxx')             → une page complète (contrôleur, requête normale)
+view.render('partials/xxx')          → un morceau (contrôleur, requête du JavaScript)
+edge.render('partials/xxx')          → un morceau pour UN AUTRE utilisateur (realtime_service)
+this.message.htmlView('emails/xxx')  → le contenu d'un e-mail (app/mails)</code></pre>
+<ul>
+  <li><strong><code>view</code></strong> est lié à la requête : il connaît <code>auth</code>, <code>csrfToken</code>, les messages flash… C'est lui qu'utilisent les contrôleurs.</li>
+  <li><strong><code>edge</code></strong> est le moteur seul, sans requête. <code>realtime_service.ts</code> l'utilise pour fabriquer la bulle que verra <strong>le destinataire</strong>, alors que la requête en cours est celle de l'expéditeur. C'est pour ça que <code>message-item</code> et <code>list-item</code> n'utilisent que les données qu'on leur passe, jamais <code>auth</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="remarques">11. Ce qui a été remarqué</h2>
+
+<div class="note">
+  <p><strong>Ce qui est bien fait</strong>, à mettre en avant :</p>
+  <p>• <strong>Chaque morceau est écrit une seule fois</strong> (bulle, ligne de liste, avatar, zone de saisie), et réutilisé partout, y compris par le temps réel.</p>
+  <p>• <strong>Deux pages, un seul JavaScript</strong>, grâce aux mêmes identifiants et aux adresses rangées dans <code>data-…</code>.</p>
+  <p>• <strong><code>{{ }}</code> partout pour les données</strong> : <code>{{{ }}}</code> n'est utilisé que pour les slots et le HTML écrit par nous.</p>
+  <p>• <strong>Des vues sans calcul</strong> : tout est préparé par <code>construitVueMessage</code> et les contrôleurs.</p>
+  <p>• <strong>Des liens et formulaires qui marchent sans JavaScript</strong> (recherche, liens de conversation, déconnexion), améliorés quand JavaScript est là.</p>
+  <p>• <strong>L'accessibilité</strong> : <code>aria-label</code> sur les boutons à icône, <code>aria-current</code>, <code>&lt;dt&gt;/&lt;dd&gt;</code>, <code>role="status"</code> sur le chargeur.</p>
+</div>
+
+<div class="warn">
+  <p><strong>1. Les balises de partage et l'icône sont recopiées dans les trois layouts</strong> (une vingtaine de lignes identiques dans <code>app</code>, <code>auth</code> et <code>landing</code>). Une modification doit être faite trois fois. On pourrait les ranger dans un <code>partials/head-meta.edge</code>, comme <code>head-script.edge</code>.</p>
+  <p><strong>2. L'adresse du site est écrite en dur</strong> dans <code>og:url</code> et <code>twitter:url</code> (<code>https://agora-chat-app-1.onrender.com/</code>), et le logo, l'icône et l'image de partage sont hébergés sur <strong>i.ibb.co</strong>. Si l'adresse change ou si ce service supprime les images, les aperçus et le logo seront cassés. Mieux vaut mettre ces images dans <code>public/</code> et utiliser <code>publicUrl</code> de <code>config/app.ts</code>. La CSP pourrait alors retirer <code>https://i.ibb.co</code>.</p>
+  <p><strong>3. Dans la liste des membres d'un groupe, la présence ne se met pas à jour en direct.</strong> Les avatars de <code>group-panel.edge</code> reçoivent <code>online</code> mais pas <code>userId</code>. <code>realtime.js</code> ne peut donc pas les retrouver, et la puce reste celle du chargement. Il suffit d'ajouter <code>userId: member.id</code>.</p>
+  <p><strong>4. « 1 membres » :</strong> après des retraits, un groupe peut n'avoir plus qu'un ou deux membres, et l'en-tête écrit toujours « membres » au pluriel. Un petit <code>@if(chat.group.membersCount &gt; 1)</code> réglerait le cas.</p>
+  <p><strong>5. Des commentaires dépassés :</strong> <code>errors/error.edge</code> cite encore <code>app/service/error_page.ts</code> (au lieu de <code>app/services</code>). <code>groups.edge</code> dit « messages.js d'abord : groups.js utilise ses fonctions », alors que la page ne charge que <code>groupe.js</code>, qui importe <code>message.js</code>. L'indentation de la fin de <code>chat-panel.edge</code> est aussi décalée.</p>
+  <p><strong>6. <code>field/label.edge</code> affiche son texte avec <code>{{{ }}}</code></strong>, sans échappement. C'est sans danger aujourd'hui, car tous les textes de label sont écrits par nous dans les vues. Mais il ne faudrait jamais y passer une donnée venant d'un utilisateur.</p>
+</div>
+
+</main>
+</body>
+</html>

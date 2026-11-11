@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les tests expliqués</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1f2328; --muted:#59636e; --line:#d8dee4; --code-bg:#f1f3f5; --accent:#2563eb; --note-bg:#eef4ff; --warn-bg:#fff6e5; --warn-line:#e0a400; --ok-bg:#ecf8ef; --ok-line:#2f9e44; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15181c; --fg:#e6e8eb; --muted:#9aa4ae; --line:#30363d; --code-bg:#1f242a; --accent:#6ea8ff; --note-bg:#17233a; --warn-bg:#2b2412; --warn-line:#b88a12; --ok-bg:#132a1a; --ok-line:#3fb950; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 80px; }
+  h1 { font-size:1.9rem; line-height:1.25; margin:0 0 8px; }
+  h2 { font-size:1.4rem; margin:48px 0 12px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:1.1rem; margin:28px 0 8px; }
+  h4 { font-size:1rem; margin:20px 0 6px; }
+  p, li { max-width:72ch; }
+  a { color:var(--accent); }
+  .subtitle, .file { color:var(--muted); }
+  .file { font-size:0.9rem; }
+  code { font:0.9em/1.5 ui-monospace,"Cascadia Code",Consolas,monospace; background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; margin:12px 0; }
+  pre code { background:none; padding:0; font-size:0.85rem; }
+  .table-wrap { overflow-x:auto; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; font-size:0.93rem; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); }
+  .note, .warn, .ok { border-radius:8px; padding:12px 16px; margin:16px 0; }
+  .note { background:var(--note-bg); border-left:4px solid var(--accent); }
+  .warn { background:var(--warn-bg); border-left:4px solid var(--warn-line); }
+  .ok { background:var(--ok-bg); border-left:4px solid var(--ok-line); }
+  .note p, .warn p, .ok p { margin:6px 0; }
+  .toc { border:1px solid var(--line); border-radius:8px; padding:12px 20px; }
+  .toc ol { margin:6px 0; padding-left:20px; }
+  .steps { counter-reset: s; list-style:none; padding-left:0; }
+  .steps > li { counter-increment: s; position:relative; padding-left:38px; margin:10px 0; }
+  .steps > li::before { content: counter(s); position:absolute; left:0; top:0; width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-size:0.85rem; display:flex; align-items:center; justify-content:center; font-weight:600; }
+  .qa dt { font-weight:600; margin-top:14px; }
+  .qa dd { margin:4px 0 0 0; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Les tests de Kadea Chat expliqués pas à pas</h1>
+<p class="subtitle">Pour quelqu'un qui n'a jamais écrit de test · <code>package.json</code>, <code>adonisrc.ts</code>, <code>.env.test</code>, <code>bin/test.ts</code>, <code>tests/bootstrap.ts</code>, <code>tests/helpers.ts</code>, <code>tests/functional/*.spec.ts</code></p>
+
+<p>Ce document part de zéro. Il explique d'abord ce qu'est un test et pourquoi on en écrit. Il décrit ensuite tout ce qui se passe quand on tape <code>npm test</code>, fichier par fichier. Enfin, il reprend chacun des <strong>36 tests</strong> du projet en disant ce qu'il vérifie, comment, et pourquoi c'est important.</p>
+
+<div class="note">
+  <p><strong>L'idée à retenir :</strong> un test automatique est un petit programme qui <strong>utilise ton application à ta place</strong> et qui <strong>vérifie</strong> que le résultat est celui attendu. Au lieu d'ouvrir le navigateur, de te connecter avec deux comptes et d'essayer d'écrire dans la conversation de quelqu'un d'autre, tu lances une commande. En quelques secondes, les 36 vérifications sont refaites, toujours de la même façon.</p>
+</div>
+
+<nav class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li><a href="#pourquoi">C'est quoi un test, et pourquoi en écrire ?</a></li>
+    <li><a href="#vocabulaire">Le vocabulaire indispensable</a></li>
+    <li><a href="#types">Les trois familles de tests (et celle utilisée ici)</a></li>
+    <li><a href="#lancer">Lancer les tests</a></li>
+    <li><a href="#trajet">Ce qui se passe quand on tape <code>npm test</code></a></li>
+    <li><a href="#packagejson">package.json : les outils de test installés</a></li>
+    <li><a href="#adonisrc">adonisrc.ts : les suites de tests</a></li>
+    <li><a href="#envtest">.env.test : un environnement à part</a></li>
+    <li><a href="#bintest">bin/test.ts : le point de départ</a></li>
+    <li><a href="#bootstrap">tests/bootstrap.ts : la préparation</a></li>
+    <li><a href="#helpers">tests/helpers.ts : les outils partagés</a></li>
+    <li><a href="#anatomie">Anatomie d'un test, mot par mot</a></li>
+    <li><a href="#client">Le client HTTP de test : toutes ses méthodes</a></li>
+    <li><a href="#assert">Les vérifications : assert et response.assert…</a></li>
+    <li><a href="#codes">Les codes HTTP que les tests attendent</a></li>
+    <li><a href="#transaction">La transaction globale : pourquoi les tests ne laissent aucune trace</a></li>
+    <li><a href="#fichiers">Les 7 fichiers de tests, test par test</a></li>
+    <li><a href="#exemple">Exemple complet : un test suivi de bout en bout</a></li>
+    <li><a href="#manque">Ce qui n'est pas testé, et remarques</a></li>
+    <li><a href="#jury">Questions possibles du jury, et réponses</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="pourquoi">1. C'est quoi un test, et pourquoi en écrire ?</h2>
+
+<h3>Une comparaison avec la vie courante</h3>
+<p>Pense au contrôle technique d'une voiture. Le contrôleur ne la démonte pas : il <strong>l'utilise</strong> (freine, allume les phares, klaxonne) et <strong>compare</strong> à ce qui est attendu (« la voiture doit s'arrêter en moins de X mètres »). S'il y a un écart, il le note.</p>
+<p>Un test automatique fait la même chose avec ton site :</p>
+<ol>
+  <li>il <strong>prépare</strong> une situation (crée Alice, Bob et une conversation entre eux) ;</li>
+  <li>il <strong>agit</strong> (un intrus essaie d'écrire dans cette conversation) ;</li>
+  <li>il <strong>vérifie</strong> (le serveur doit répondre « 404 » et aucun message ne doit être enregistré).</li>
+</ol>
+<p>Si la vérification échoue, le test est « rouge » et affiche ce qui ne va pas. Sinon il est « vert ».</p>
+
+<h3>Tester à la main vs tester automatiquement</h3>
+<div class="table-wrap"><table>
+<tr><th></th><th>À la main (navigateur)</th><th>Automatique (Japa)</th></tr>
+<tr><td>Temps</td><td>Plusieurs minutes par scénario</td><td>Quelques secondes pour les 36</td></tr>
+<tr><td>Fiabilité</td><td>On oublie des cas, on se trompe</td><td>Toujours exactement les mêmes étapes</td></tr>
+<tr><td>Cas difficiles</td><td>Envoyer 55 messages, falsifier une requête, dépasser 5 essais… pénible</td><td>Une boucle <code>for</code> suffit</td></tr>
+<tr><td>Après une modification</td><td>Il faudrait tout refaire</td><td>On relance une commande</td></tr>
+</table></div>
+
+<h3>Pourquoi c'est précieux (et à dire au jury)</h3>
+<ul>
+  <li><strong>Prouver</strong> que les règles de sécurité marchent : « un non-membre ne peut ni lire ni écrire », ce n'est pas une promesse, c'est vérifié à chaque lancement.</li>
+  <li><strong>Éviter les régressions</strong> : une <em>régression</em>, c'est casser sans le vouloir quelque chose qui marchait. Pendant les corrections P0, P1, P2, les tests ont permis de modifier le code sans peur.</li>
+  <li><strong>Documenter</strong> : le nom de chaque test est une phrase en français qui décrit une règle du site. La liste des tests est une liste des règles.</li>
+  <li><strong>Garder la trace des bugs corrigés</strong> : plusieurs tests sont nés d'un bug (« un champ vide ne s'affiche pas comme le texte null », « la mention NMS Tech a disparu du pied de page »). Le test empêche le bug de revenir.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="vocabulaire">2. Le vocabulaire indispensable</h2>
+<div class="table-wrap"><table>
+<tr><th>Mot</th><th>Ce que ça veut dire, simplement</th><th>Dans Kadea Chat</th></tr>
+<tr><td><strong>Test</strong></td><td>Une fonction qui prépare, agit, vérifie. Elle passe (vert) ou échoue (rouge).</td><td><code>test('un non-membre ne peut pas lire…', async () => { … })</code></td></tr>
+<tr><td><strong>Assertion</strong></td><td>Une vérification. « J'affirme que… ». Si c'est faux, le test échoue immédiatement.</td><td><code>assert.lengthOf(messages, 0)</code>, <code>response.assertStatus(404)</code></td></tr>
+<tr><td><strong>Groupe</strong></td><td>Une boîte qui range plusieurs tests sur le même sujet, avec une préparation commune.</td><td><code>test.group('Groupes : contrôle d’accès…', …)</code></td></tr>
+<tr><td><strong>Suite</strong></td><td>Une grande famille de tests (tous les fichiers d'un dossier).</td><td><code>unit</code>, <code>functional</code>, <code>browser</code> dans <code>adonisrc.ts</code></td></tr>
+<tr><td><strong>Fichier spec</strong></td><td>Un fichier qui contient des tests. « spec » = spécification. Le nom finit par <code>.spec.ts</code>.</td><td><code>tests/functional/access_control.spec.ts</code></td></tr>
+<tr><td><strong>Runner</strong> (lanceur)</td><td>Le programme qui trouve les fichiers de tests, les exécute et affiche le bilan.</td><td><strong>Japa</strong> (<code>@japa/runner</code>), l'outil officiel d'AdonisJS</td></tr>
+<tr><td><strong>Plugin</strong></td><td>Une extension qui ajoute des outils à Japa.</td><td><code>assert()</code>, <code>apiClient()</code>, <code>authApiClient(app)</code>…</td></tr>
+<tr><td><strong>Hook</strong> (crochet)</td><td>Du code exécuté automatiquement à un moment précis : avant tous les tests, avant chaque test, après…</td><td><code>setup</code>, <code>group.each.setup(…)</code></td></tr>
+<tr><td><strong>Helper</strong> (assistant)</td><td>Une petite fonction réutilisée par plusieurs tests pour ne pas répéter du code.</td><td><code>creeUtilisateur</code>, <code>creeMessages</code></td></tr>
+<tr><td><strong>Fake</strong> (faux)</td><td>Remplacer un vrai service par un faux qui ne fait rien de réel mais enregistre ce qu'on lui demande.</td><td><code>mail.fake()</code> : aucun e-mail ne part vraiment</td></tr>
+<tr><td><strong>Transaction</strong></td><td>Un paquet de modifications de la base qu'on peut annuler d'un coup (<em>rollback</em>).</td><td><code>testUtils.db().withGlobalTransaction()</code></td></tr>
+<tr><td><strong>Migration</strong> / <strong>seeder</strong></td><td>Migration = script qui crée les tables. Seeder = script qui remplit des données de départ.</td><td>Exécutés une fois avant les tests</td></tr>
+<tr><td><strong>Régression</strong></td><td>Un bug qui réapparaît ou une fonction qui casse après une modification.</td><td>Ce que les tests empêchent</td></tr>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="types">3. Les trois familles de tests (et celle utilisée ici)</h2>
+<div class="table-wrap"><table>
+<tr><th>Famille</th><th>Ce qu'elle teste</th><th>Comparaison</th><th>Dans le projet</th></tr>
+<tr><td><strong>Unitaire</strong> (<code>unit</code>)</td><td>Une seule fonction, isolée, sans serveur ni base. Ex. : « <code>decoupeAutourDuMot</code> coupe bien le texte ».</td><td>Tester une seule pièce du moteur sur un établi</td><td>Suite déclarée, <strong>aucun fichier</strong> (le dossier <code>tests/unit</code> n'existe pas)</td></tr>
+<tr><td><strong>Fonctionnel</strong> (<code>functional</code>)</td><td>Une vraie requête HTTP envoyée au vrai serveur, avec la vraie base. On regarde la réponse et la base.</td><td>Faire rouler la voiture sur un banc d'essai</td><td><strong>Les 36 tests sont ici</strong> (7 fichiers)</td></tr>
+<tr><td><strong>Navigateur</strong> (<code>browser</code>)</td><td>Un vrai navigateur piloté (clics, saisie) : teste aussi le JavaScript du front.</td><td>Un essai sur route avec un conducteur</td><td>Suite déclarée, <strong>aucun fichier</strong></td></tr>
+</table></div>
+<p><strong>Pourquoi le choix des tests fonctionnels ?</strong> Les risques principaux d'une messagerie sont la sécurité et les droits d'accès : qui peut lire, écrire, supprimer. Ces règles vivent côté serveur (routes, middlewares, policies, contrôleurs). Un test fonctionnel traverse <em>toute</em> cette chaîne en une seule requête. C'est donc le meilleur rapport effort / garantie pour ce projet.</p>
+
+<!-- ============================================================ -->
+<h2 id="lancer">4. Lancer les tests</h2>
+
+<h3>Préparation (une seule fois)</h3>
+<ol>
+  <li>PostgreSQL doit tourner sur la machine (le même serveur que pour le développement).</li>
+  <li>Créer une base <strong>séparée</strong> pour les tests :
+<pre><code>psql -U postgres -c "CREATE DATABASE kadea_chat_test OWNER &lt;DB_USER&gt;;"</code></pre>
+  Pourquoi une autre base ? Parce que les tests créent des tables, des utilisateurs, puis effacent tout à la fin. On ne veut <strong>jamais</strong> toucher aux données de développement.</li>
+</ol>
+
+<h3>Les commandes</h3>
+<div class="table-wrap"><table>
+<tr><th>Commande</th><th>Effet</th></tr>
+<tr><td><code>npm test</code></td><td>Lance toutes les suites. C'est un raccourci vers <code>node ace test</code> (voir <code>package.json</code>).</td></tr>
+<tr><td><code>node ace test functional</code></td><td>Seulement la suite fonctionnelle.</td></tr>
+<tr><td><code>node ace test --files=tests/functional/security.spec.ts</code></td><td>Un seul fichier.</td></tr>
+<tr><td><code>node ace test --tests="un non-membre ne peut pas lire la conversation (404)"</code></td><td>Un seul test, par son titre exact.</td></tr>
+<tr><td><code>node ace test --groups="Paramètres : changement du mot de passe"</code></td><td>Un seul groupe.</td></tr>
+<tr><td><code>node ace test --watch</code></td><td>Relance automatiquement les tests à chaque enregistrement d'un fichier.</td></tr>
+</table></div>
+
+<h3>Ce que l'on voit à l'écran</h3>
+<p>Japa affiche chaque groupe, puis chaque test avec un symbole et sa durée. Voici l'allure du résultat (exemple illustratif, les durées varient) :</p>
+<pre><code>functional / Conversations privées : contrôle d’accès (tests/functional/access_control.spec.ts)
+  ✔ un visiteur non connecté est redirigé vers la connexion (25ms)
+  ✔ un participant peut ouvrir sa conversation et y écrire (180ms)
+  ✔ un non-membre ne peut pas lire la conversation (404) (60ms)
+  …
+
+ PASSED
+
+Tests  36 passed (36)
+ Time  6s</code></pre>
+<p>Si un test échoue, il est marqué <code>✖</code>, et Japa montre la valeur attendue et la valeur reçue, par exemple : <em>expected 200 to equal 404</em> avec la ligne du fichier en cause. La commande se termine alors avec un code d'erreur (1), ce qui permet à un outil d'intégration continue de bloquer une mise en ligne.</p>
+
+<div class="warn">
+  <p><strong>Si PostgreSQL n'est pas démarré</strong>, rien ne se lance : on voit <code>Acquire connection error … ECONNREFUSED</code>. Ce n'est pas un test qui échoue : c'est la base qui n'est pas joignable (« connexion refusée »). Il suffit de démarrer le service PostgreSQL.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="trajet">5. Ce qui se passe quand on tape <code>npm test</code></h2>
+<p>Voici la chaîne complète. Chaque étape est détaillée dans les sections suivantes.</p>
+<ol class="steps">
+  <li><strong><code>package.json</code></strong> : <code>"test": "node ace test"</code>. npm lance la commande <code>test</code> d'Ace (l'outil en ligne de commande d'AdonisJS).</li>
+  <li><strong>Ace</strong> lit <code>adonisrc.ts</code> : il exécute les hooks <code>init</code> (génération des fichiers <code>#generated/controllers</code> et <code>#generated/policies</code>, d'où les lignes <code>codegen: created 4 file(s)</code>), puis démarre <code>bin/test.ts</code>.</li>
+  <li><strong><code>bin/test.ts</code></strong> met <code>NODE_ENV=test</code>. AdonisJS charge alors <code>.env</code> <em>puis</em> <code>.env.test</code>, qui remplace quelques valeurs (base, session, limiteur).</li>
+  <li>L'application démarre (providers, <code>start/env.ts</code> qui valide les variables…), mais <strong>en mode test</strong>.</li>
+  <li><strong><code>tests/bootstrap.ts</code></strong> fournit les plugins (outils) et les hooks.</li>
+  <li><strong>Hook <code>setup</code> global</strong> : migrations sur <code>kadea_chat_test</code> (création des tables), puis seeders (types de conversation, rôles, types de message).</li>
+  <li><strong><code>configureSuite</code></strong> : pour la suite <code>functional</code>, démarrage d'un vrai serveur HTTP local.</li>
+  <li>Japa parcourt <code>tests/functional/**/*.spec.ts</code>. Pour <strong>chaque test</strong> : ouverture d'une transaction → le test s'exécute → annulation de la transaction.</li>
+  <li><strong>Teardown</strong> (après tous les tests) : les migrations sont annulées (tables supprimées), puis l'application s'arrête proprement.</li>
+  <li>Japa affiche le bilan : combien de tests réussis, échoués.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="packagejson">6. package.json : les outils de test installés</h2>
+<p class="file">Fichier : <code>package.json</code></p>
+<pre><code>"scripts": {
+  "test": "node ace test",
+  …
+},
+"imports": {
+  …
+  "#tests/*": "./tests/*.js",
+},
+"devDependencies": {
+  "@japa/api-client": "^3.2.1",
+  "@japa/assert": "^4.2.0",
+  "@japa/browser-client": "^2.3.0",
+  "@japa/plugin-adonisjs": "^5.2.0",
+  "@japa/runner": "^5.3.0",
+  …
+}</code></pre>
+<ul>
+  <li><strong><code>"test": "node ace test"</code></strong> : <code>npm test</code> est un alias. C'est une convention : dans tout projet Node, <code>npm test</code> lance les tests.</li>
+  <li><strong><code>"#tests/*"</code></strong> : un alias d'import, comme <code>#models/*</code>. Il n'est pas utilisé par les tests actuels (ils importent <code>'../helpers.ts'</code> en chemin relatif).</li>
+  <li><strong><code>devDependencies</code></strong> : des paquets utiles seulement pendant le développement. En production, ils ne sont pas nécessaires.</li>
+</ul>
+<div class="table-wrap"><table>
+<tr><th>Paquet</th><th>Rôle</th></tr>
+<tr><td><code>@japa/runner</code></td><td>Le lanceur : fournit la fonction <code>test()</code>, les groupes, les hooks, l'affichage du bilan.</td></tr>
+<tr><td><code>@japa/assert</code></td><td>Fournit l'objet <code>assert</code> (<code>assert.equal</code>, <code>assert.include</code>…). Basé sur la bibliothèque Chai.</td></tr>
+<tr><td><code>@japa/api-client</code></td><td>Fournit l'objet <code>client</code> qui envoie des requêtes HTTP au serveur (<code>client.get('/messages')</code>).</td></tr>
+<tr><td><code>@japa/plugin-adonisjs</code></td><td>Fait le lien entre Japa et AdonisJS (connaît l'adresse du serveur, les routes…).</td></tr>
+<tr><td><code>@japa/browser-client</code></td><td>Pour piloter un vrai navigateur (suite <code>browser</code>). Installé, mais aucun test ne l'utilise.</td></tr>
+</table></div>
+<p>D'autres outils viennent des paquets AdonisJS déjà installés pour l'application : <code>@adonisjs/session</code>, <code>@adonisjs/auth</code>, <code>@adonisjs/shield</code> et <code>@adonisjs/lucid</code> contiennent chacun un plugin Japa (voir <a href="#bootstrap">bootstrap.ts</a>).</p>
+
+<!-- ============================================================ -->
+<h2 id="adonisrc">7. adonisrc.ts : les suites de tests</h2>
+<p class="file">Fichier : <code>adonisrc.ts</code> (partie <code>tests</code>)</p>
+<pre><code>tests: {
+  suites: [
+    {
+      files: ['tests/unit/**/*.spec.ts'],
+      name: 'unit',
+      timeout: 2000,
+    },
+    {
+      files: ['tests/functional/**/*.spec.ts'],
+      name: 'functional',
+      timeout: 30000,
+    },
+    {
+      files: ['tests/browser/**/*.spec.ts'],
+      name: 'browser',
+      timeout: 300000,
+    },
+  ],
+  forceExit: false,
+},</code></pre>
+<ul>
+  <li><strong><code>suites</code></strong> : la liste des familles de tests (voir <a href="#types">section 3</a>).</li>
+  <li><strong><code>files</code></strong> : où chercher les fichiers. C'est un <em>motif glob</em> : <code>**</code> veut dire « n'importe quel sous-dossier », <code>*.spec.ts</code> « tout fichier qui finit par <code>.spec.ts</code> ». Un fichier nommé <code>truc.ts</code> (sans <code>.spec</code>) n'est jamais exécuté comme un test : c'est pour ça que <code>helpers.ts</code> n'est pas lancé, il est seulement importé.</li>
+  <li><strong><code>name</code></strong> : le nom qu'on tape dans <code>node ace test functional</code>.</li>
+  <li><strong><code>timeout</code></strong> : durée maximale d'<strong>un</strong> test, en millisecondes. 2 s pour un test unitaire (il doit être instantané), 30 s pour un test fonctionnel (base + serveur), 5 min pour un navigateur. Au-delà, le test est déclaré échoué : cela évite qu'un test bloqué fige tout.</li>
+  <li><strong><code>forceExit: false</code></strong> : à la fin, Japa n'arrête pas brutalement Node. Il attend que tout se ferme proprement (connexion à la base, serveur), grâce au <code>app.terminate()</code> de <code>bin/test.ts</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="envtest">8. .env.test : un environnement à part</h2>
+<p class="file">Fichier : <code>.env.test</code></p>
+<pre><code>SESSION_DRIVER=memory
+# Base dédiée aux tests : jamais la base de développement (créée avec CREATE DATABASE kadea_chat_test;)
+DB_DATABASE=kadea_chat_test
+
+# Limiteur en mémoire pendant les tests
+LIMITER_STORE=memory</code></pre>
+<p><strong>Comment ça marche :</strong> quand <code>NODE_ENV=test</code>, AdonisJS lit d'abord <code>.env</code> (toutes les variables normales : mot de passe de la base, clés Cloudinary…), <strong>puis</strong> <code>.env.test</code>. Les variables de <code>.env.test</code> écrasent celles de <code>.env</code>. Ici, on ne change que trois choses :</p>
+<ul>
+  <li><strong><code>SESSION_DRIVER=memory</code></strong> : les sessions sont gardées dans la mémoire du programme, pas dans un cookie chiffré ni dans la base. C'est <strong>obligatoire</strong> pour les tests : l'outil <code>loginAs()</code> (voir plus bas) écrit directement la session « Alice est connectée » dans ce store mémoire. Le store <code>memory</code> n'est pas écrit dans <code>config/session.ts</code>, mais <code>defineConfig</code> de <code>@adonisjs/session</code> l'ajoute toujours automatiquement. <code>start/env.ts</code> accepte la valeur : <code>SESSION_DRIVER: Env.schema.enum(['cookie', 'memory', 'database'])</code>.</li>
+  <li><strong><code>DB_DATABASE=kadea_chat_test</code></strong> : la sécurité principale. Même serveur PostgreSQL, même utilisateur, mais une <strong>autre base</strong>. Les tests peuvent tout créer et tout effacer sans risque pour tes données.</li>
+  <li><strong><code>LIMITER_STORE=memory</code></strong> : le limiteur d'essais (5 connexions par minute…) compte en mémoire au lieu d'écrire dans la table <code>rate_limits</code>. Voir <code>config/limiter.ts</code> : <code>default: env.get('LIMITER_STORE', 'database')</code>.</li>
+</ul>
+<div class="note">
+  <p><strong>À noter :</strong> la session et le limiteur en mémoire <strong>ne sont pas</strong> annulés par la transaction de chaque test (ils ne sont pas dans la base). Ils durent pendant tout le lancement. C'est une des raisons pour lesquelles chaque utilisateur de test reçoit une adresse e-mail unique (voir <a href="#helpers">helpers.ts</a>) : le compteur « 5 essais de connexion » est calculé par adresse IP + e-mail, donc un test ne peut pas bloquer le suivant.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="bintest">9. bin/test.ts : le point de départ</h2>
+<p class="file">Fichier : <code>bin/test.ts</code> (fourni par AdonisJS à la création du projet, non modifié)</p>
+<pre><code>process.env.NODE_ENV = 'test'</code></pre>
+<p>La toute première ligne. Elle dit à toute l'application « tu tournes en mode test ». Conséquences : <code>.env.test</code> est lu, <code>app.inTest</code> vaut <code>true</code>, le seeder des comptes de démonstration (<code>static environment = ['development']</code>) ne tourne pas.</p>
+
+<pre><code>import 'reflect-metadata'
+import { Ignitor, prettyPrintError } from '@adonisjs/core/ignitor'
+import { configure, processCLIArgs, run } from '@japa/runner'</code></pre>
+<ul>
+  <li><strong><code>reflect-metadata</code></strong> : une bibliothèque dont AdonisJS a besoin pour l'injection de dépendances (les décorateurs comme <code>@inject</code>). Elle doit être chargée en premier.</li>
+  <li><strong><code>Ignitor</code></strong> (« l'allumeur ») : la classe qui démarre une application AdonisJS. Les fichiers <code>bin/server.ts</code> (site) et <code>bin/console.ts</code> (commandes) l'utilisent aussi, chacun dans un mode différent.</li>
+  <li><strong><code>prettyPrintError</code></strong> : affiche joliment une erreur de démarrage.</li>
+  <li><strong><code>configure</code>, <code>processCLIArgs</code>, <code>run</code></strong> : les trois fonctions de Japa. Configurer, lire les options tapées (<code>--files</code>, <code>--tests</code>…), lancer.</li>
+</ul>
+
+<pre><code>const APP_ROOT = new URL('../', import.meta.url)
+
+const IMPORTER = (filePath: string) => {
+  if (filePath.startsWith('./') || filePath.startsWith('../')) {
+    return import(new URL(filePath, APP_ROOT).href)
+  }
+  return import(filePath)
+}</code></pre>
+<ul>
+  <li><strong><code>APP_ROOT</code></strong> : le dossier racine du projet. <code>import.meta.url</code> est l'adresse du fichier actuel (<code>bin/test.ts</code>) ; <code>'../'</code> remonte d'un dossier.</li>
+  <li><strong><code>IMPORTER</code></strong> : une fonction qui charge un fichier. Si le chemin est relatif (<code>./…</code>), il est résolu depuis la racine du projet, pas depuis <code>bin/</code>.</li>
+</ul>
+
+<pre><code>new Ignitor(APP_ROOT, { importer: IMPORTER })
+  .tap((app) => {
+    app.booting(async () => {
+      await import('#start/env')
+    })
+    app.listen('SIGTERM', () => app.terminate())
+    app.listenIf(app.managedByPm2, 'SIGINT', () => app.terminate())
+  })</code></pre>
+<ul>
+  <li><strong><code>.tap((app) => …)</code></strong> : « avant de démarrer, laisse-moi régler l'application ».</li>
+  <li><strong><code>app.booting(…)</code></strong> : pendant le démarrage, charger <code>start/env.ts</code>. C'est là que les variables (y compris celles de <code>.env.test</code>) sont <strong>validées</strong>. Si une variable manque, les tests ne démarrent même pas.</li>
+  <li><strong><code>SIGTERM</code> / <code>SIGINT</code></strong> : des signaux envoyés par le système pour demander l'arrêt (par exemple Ctrl+C). On arrête alors l'application proprement.</li>
+</ul>
+
+<pre><code>  .testRunner()
+  .configure(async (app) => {
+    const { runnerHooks, ...config } = await import('../tests/bootstrap.js')
+
+    processCLIArgs(process.argv.splice(2))
+    configure({
+      ...app.rcFile.tests,
+      ...config,
+      ...{
+        setup: runnerHooks.setup,
+        teardown: runnerHooks.teardown.concat([() => app.terminate()]),
+      },
+    })
+  })
+  .run(() => run())
+  .catch((error) => {
+    process.exitCode = 1
+    prettyPrintError(error)
+  })</code></pre>
+<ul>
+  <li><strong><code>.testRunner()</code></strong> : démarre l'application en mode « lanceur de tests ».</li>
+  <li><strong><code>await import('../tests/bootstrap.js')</code></strong> : charge <code>tests/bootstrap.ts</code> (le <code>.js</code> est normal : en TypeScript moderne, on écrit l'extension du fichier compilé). On sépare <code>runnerHooks</code> du reste (<code>plugins</code>, <code>configureSuite</code>), rangé dans <code>config</code>.</li>
+  <li><strong><code>process.argv.splice(2)</code></strong> : les options tapées après la commande. <code>argv[0]</code> est <code>node</code>, <code>argv[1]</code> le fichier ; à partir de 2, ce sont tes options.</li>
+  <li><strong><code>configure({ … })</code></strong> : fusionne trois sources avec l'opérateur <code>...</code> (« étale le contenu ») :
+    <ol>
+      <li><code>app.rcFile.tests</code> : les suites d'<code>adonisrc.ts</code> ;</li>
+      <li><code>config</code> : les plugins et <code>configureSuite</code> de <code>bootstrap.ts</code> ;</li>
+      <li>les hooks <code>setup</code> et <code>teardown</code>, auxquels on <strong>ajoute</strong> (<code>concat</code>) <code>app.terminate()</code> à la toute fin : fermer la connexion à la base, le serveur, etc.</li>
+    </ol>
+  </li>
+  <li><strong><code>.run(() => run())</code></strong> : lance enfin les tests.</li>
+  <li><strong><code>.catch(…)</code></strong> : si le démarrage plante (base injoignable, variable manquante), on affiche l'erreur et on met le code de sortie à 1 (« échec »).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="bootstrap">10. tests/bootstrap.ts : la préparation</h2>
+<p class="file">Fichier : <code>tests/bootstrap.ts</code></p>
+<p>Ce fichier répond à trois questions : <strong>quels outils</strong> les tests reçoivent (plugins), <strong>que faire avant et après</strong> tous les tests (runnerHooks), <strong>que faire pour chaque suite</strong> (configureSuite).</p>
+
+<h3>Les imports</h3>
+<pre><code>import { assert } from '@japa/assert'
+import { apiClient } from '@japa/api-client'
+import app from '@adonisjs/core/services/app'
+import type { Config } from '@japa/runner/types'
+import { browserClient } from '@japa/browser-client'
+import { pluginAdonisJS } from '@japa/plugin-adonisjs'
+import { dbAssertions } from '@adonisjs/lucid/plugins/db'
+import testUtils from '@adonisjs/core/services/test_utils'
+import { authBrowserClient } from '@adonisjs/auth/plugins/browser_client'
+import { sessionBrowserClient } from '@adonisjs/session/plugins/browser_client'
+import { sessionApiClient } from '@adonisjs/session/plugins/api_client'
+import { authApiClient } from '@adonisjs/auth/plugins/api_client'
+import { shieldApiClient } from '@adonisjs/shield/plugins/api_client'</code></pre>
+<ul>
+  <li><strong><code>app</code></strong> : l'application AdonisJS elle-même. Plusieurs plugins en ont besoin pour lire sa configuration.</li>
+  <li><strong><code>import type { Config }</code></strong> : on importe seulement un <em>type</em> TypeScript (la forme de la configuration Japa), pas du code. Il sert à vérifier qu'on écrit une configuration valide.</li>
+  <li><strong><code>testUtils</code></strong> : la boîte à outils de test d'AdonisJS (<code>testUtils.db()</code> pour la base, <code>testUtils.httpServer()</code> pour le serveur).</li>
+</ul>
+
+<h3>Les plugins</h3>
+<pre><code>export const plugins: Config['plugins'] = [
+  assert(),
+  apiClient(),
+  pluginAdonisJS(app),
+  dbAssertions(app),
+  browserClient({ runInSuites: ['browser'] }),
+  sessionBrowserClient(app),
+  authBrowserClient(app),
+  // Requêtes HTTP de test : session, connexion (loginAs) et jeton CSRF (withCsrfToken)
+  sessionApiClient(app),
+  authApiClient(app),
+  shieldApiClient(),
+]</code></pre>
+<p>Chaque plugin ajoute un outil. Ce sont ces outils que l'on récupère dans chaque test avec <code>async ({ client, assert }) =&gt; …</code>.</p>
+<div class="table-wrap"><table>
+<tr><th>Plugin</th><th>Ce qu'il apporte</th><th>Utilisé ?</th></tr>
+<tr><td><code>assert()</code></td><td>L'objet <code>assert</code> pour vérifier des valeurs.</td><td>Oui, partout</td></tr>
+<tr><td><code>apiClient()</code></td><td>L'objet <code>client</code> pour envoyer des requêtes HTTP.</td><td>Oui, partout</td></tr>
+<tr><td><code>pluginAdonisJS(app)</code></td><td>Branche Japa sur AdonisJS : le client connaît l'adresse du serveur de test.</td><td>Oui (indirectement)</td></tr>
+<tr><td><code>dbAssertions(app)</code></td><td>Des vérifications toutes faites sur la base (<code>assert.database.has('users', …)</code>).</td><td>Installé, non utilisé : les tests font des requêtes Lucid à la place</td></tr>
+<tr><td><code>browserClient({ runInSuites: ['browser'] })</code></td><td>Un vrai navigateur, seulement pour la suite <code>browser</code>.</td><td>Non (aucun test navigateur)</td></tr>
+<tr><td><code>sessionBrowserClient</code>, <code>authBrowserClient</code></td><td>Session et connexion pour les tests navigateur.</td><td>Non</td></tr>
+<tr><td><code>sessionApiClient(app)</code></td><td>Permet au client HTTP de porter une session. Utilise toujours le store <code>memory</code>.</td><td>Oui</td></tr>
+<tr><td><code>authApiClient(app)</code></td><td>Ajoute <code>.loginAs(user)</code> : faire la requête « en tant que » cet utilisateur, sans passer par le formulaire de connexion.</td><td>Oui, très souvent</td></tr>
+<tr><td><code>shieldApiClient()</code></td><td>Ajoute <code>.withCsrfToken()</code> : joint un jeton CSRF valide pour que Shield accepte les <code>POST</code>/<code>DELETE</code>.</td><td>Oui, à chaque requête qui modifie</td></tr>
+</table></div>
+<div class="note">
+  <p><strong>Pourquoi <code>withCsrfToken()</code> est nécessaire :</strong> dans le vrai site, chaque formulaire contient un jeton CSRF caché (protection contre les sites malveillants qui enverraient des requêtes à ta place, voir <a href="explication-socle.html">le socle</a>). Shield refuse tout <code>POST</code> sans ce jeton (erreur 419). Les tests ne remplissent pas de formulaire : ils doivent donc demander un jeton valide. C'est aussi une preuve que la protection CSRF reste active pendant les tests : on ne l'a pas désactivée.</p>
+</div>
+
+<h3>Les hooks avant / après tous les tests</h3>
+<pre><code>export const runnerHooks: Required&lt;Pick&lt;Config, 'setup' | 'teardown'&gt;&gt; = {
+  setup: [() => testUtils.db().migrate(), () => testUtils.db().seed()],
+  teardown: [],
+}</code></pre>
+<ul>
+  <li><strong>Le type <code>Required&lt;Pick&lt;Config, 'setup' | 'teardown'&gt;&gt;</code></strong> se lit de l'intérieur : <code>Pick</code> prend seulement les champs <code>setup</code> et <code>teardown</code> de la config Japa ; <code>Required</code> les rend obligatoires. C'est ce qui permet à <code>bin/test.ts</code> d'écrire <code>runnerHooks.teardown.concat(…)</code> sans risque que <code>teardown</code> soit absent.</li>
+  <li><strong><code>setup</code></strong> : deux fonctions exécutées <strong>une seule fois</strong>, dans l'ordre, avant le premier test.
+    <ol>
+      <li><code>testUtils.db().migrate()</code> lance <code>node ace migration:run</code> sur la base de test : toutes les tables sont créées. Cette fonction <strong>renvoie une fonction de nettoyage</strong> (<code>migration:reset</code>). Japa la garde et l'exécute automatiquement après le dernier test : toutes les tables sont alors supprimées.</li>
+      <li><code>testUtils.db().seed()</code> lance <code>node ace db:seed</code> : <code>01_reference_data_seeder.ts</code> insère les types de conversation (<code>Privee</code>, groupe), les rôles (<code>admin</code>, membre) et les types de message (<code>texte</code>…). Sans ces lignes, impossible de créer une conversation ou un message. Le seeder <code>02_demo_users_seeder.ts</code> ne tourne pas : il est réservé à <code>development</code>.</li>
+    </ol>
+  </li>
+  <li><strong><code>teardown: []</code></strong> : rien à ajouter ; <code>bin/test.ts</code> y ajoute <code>app.terminate()</code>.</li>
+</ul>
+
+<h3>La préparation par suite</h3>
+<pre><code>export const configureSuite: Config['configureSuite'] = (suite) => {
+  if (['browser', 'functional', 'e2e'].includes(suite.name)) {
+    return suite.setup(() => testUtils.httpServer().start())
+  }
+}</code></pre>
+<ul>
+  <li>Pour chaque suite, Japa appelle cette fonction.</li>
+  <li>Si la suite a besoin de HTTP (<code>functional</code>, <code>browser</code>, ou <code>e2e</code>), on démarre <strong>un vrai serveur HTTP</strong> AdonisJS avant ses tests (<code>testUtils.httpServer().start()</code>). Il écoute sur une adresse locale ; le client y envoie ses requêtes. Ce serveur s'arrête à la fin de la suite.</li>
+  <li>La suite <code>unit</code> n'en a pas besoin : on n'y teste que des fonctions.</li>
+  <li>Important : ce serveur tourne <strong>dans le même programme</strong> que les tests. C'est ce qui permet à la transaction globale de couvrir à la fois ce que fait le test et ce que fait le serveur (voir <a href="#transaction">section 16</a>).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="helpers">11. tests/helpers.ts : les outils partagés</h2>
+<p class="file">Fichier : <code>tests/helpers.ts</code></p>
+<pre><code>import { randomUUID } from 'node:crypto'
+import { DateTime } from 'luxon'
+import User from '#models/user'
+import Message from '#models/message'
+import MessageType from '#models/message_type'
+
+export const TEST_PASSWORD = 'MotDePasse123'</code></pre>
+<ul>
+  <li><strong><code>randomUUID</code></strong> : fonction de Node qui fabrique un identifiant unique au monde, du genre <code>3f2a…-…-…</code>.</li>
+  <li><strong><code>TEST_PASSWORD</code></strong> : le mot de passe commun à tous les comptes de test. Exporté pour que les tests puissent s'en servir (se connecter, supprimer son compte…). Il respecte les règles du validateur (8 caractères minimum). C'est une valeur fictive : elle n'existe que dans la base de test, qui est vidée.</li>
+</ul>
+
+<h3><code>creeUtilisateur(fullName)</code></h3>
+<pre><code>export function creeUtilisateur(fullName: string) {
+  return User.create({
+    fullName,
+    email: `${randomUUID()}@example.com`,
+    password: TEST_PASSWORD,
+    emailVerifiedAt: DateTime.now(),
+  })
+}</code></pre>
+<ul>
+  <li>Crée un utilisateur <strong>directement en base</strong>, sans passer par l'inscription (formulaire + e-mail + code). C'est plus rapide, et le test reste centré sur ce qu'il vérifie.</li>
+  <li><strong><code>fullName</code></strong> : écriture courte de <code>fullName: fullName</code>.</li>
+  <li><strong><code>email: `${randomUUID()}@example.com`</code></strong> : une adresse unique à chaque appel. La colonne <code>email</code> est unique en base : deux « Alice Test » auraient sinon la même adresse et la seconde création planterait. Le domaine <code>example.com</code> est réservé aux exemples : aucun vrai e-mail ne peut y arriver.</li>
+  <li><strong><code>password: TEST_PASSWORD</code></strong> : en clair ici, mais le modèle <code>User</code> utilise <code>withAuthFinder</code>, qui le <strong>hache automatiquement</strong> avant l'enregistrement (voir <a href="explication-authentification.html">l'authentification</a>).</li>
+  <li><strong><code>emailVerifiedAt: DateTime.now()</code></strong> : le compte est considéré comme confirmé, comme un vrai utilisateur qui a fini son inscription.</li>
+  <li>La fonction <strong>renvoie une promesse</strong> (<code>User.create</code> est asynchrone) : les tests écrivent donc <code>await creeUtilisateur('Alice Test')</code>.</li>
+</ul>
+
+<h3><code>creeMessages(conversationId, author, count)</code></h3>
+<pre><code>export async function creeMessages(conversationId: number, author: User, count: number) {
+  const textType = await MessageType.findByOrFail('type', 'texte')
+  const messages: Message[] = []
+  for (let index = 1; index &lt;= count; index++) {
+    messages.push(
+      await Message.create({
+        conversationId,
+        userId: author.id,
+        messageTypeId: textType.id,
+        content: `Message numéro ${index}`,
+      })
+    )
+  }
+  return messages
+}</code></pre>
+<ul>
+  <li><strong><code>MessageType.findByOrFail('type', 'texte')</code></strong> : cherche la ligne « texte » insérée par le seeder. <code>OrFail</code> : si elle n'existe pas, erreur immédiate (plutôt que de continuer avec <code>null</code>).</li>
+  <li><strong>La boucle</strong> crée <code>count</code> messages numérotés « Message numéro 1, 2, 3… », <strong>un par un, dans l'ordre</strong> (grâce au <code>await</code> dans la boucle). Leurs identifiants sont donc croissants : <code>messages[0]</code> est le plus ancien, <code>messages.at(-1)</code> le plus récent. Les tests de pagination comptent sur cet ordre.</li>
+  <li><strong>Pourquoi ne pas passer par la route <code>POST /conversations/:id/messages</code> ?</strong> Le commentaire le dit : c'est plus rapide. Créer 55 messages par HTTP serait lent, et le test de pagination ne vérifie pas l'envoi, mais l'affichage.</li>
+  <li>Renvoie le tableau des messages créés, pour que le test puisse vérifier leurs identifiants.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="anatomie">12. Anatomie d'un test, mot par mot</h2>
+<p>Prenons un test court de <code>access_control.spec.ts</code> et décortiquons chaque morceau.</p>
+<pre><code>import { test } from '@japa/runner'
+import testUtils from '@adonisjs/core/services/test_utils'
+import { chercheOuCreeConversationPrivee } from '#services/conversation_service'
+import { creeUtilisateur } from '../helpers.ts'
+
+test.group('Conversations privées : contrôle d’accès', (group) => {
+  group.each.setup(() => testUtils.db().withGlobalTransaction())
+
+  test('un non-membre ne peut pas lire la conversation (404)', async ({ client }) => {
+    // PRÉPARER
+    const alice = await creeUtilisateur('Alice Test')
+    const bob = await creeUtilisateur('Bob Test')
+    const intrus = await creeUtilisateur('Intrus Test')
+    const conversation = await chercheOuCreeConversationPrivee(alice, bob)
+
+    // AGIR
+    const response = await client.get(`/conversations/${conversation.id}`).loginAs(intrus)
+
+    // VÉRIFIER
+    response.assertStatus(404)
+  })
+})</code></pre>
+
+<div class="table-wrap"><table>
+<tr><th>Morceau</th><th>Explication</th></tr>
+<tr><td><code>import { test } from '@japa/runner'</code></td><td>La fonction principale. Elle sert à déclarer un test et, avec <code>test.group</code>, un groupe.</td></tr>
+<tr><td><code>test.group('titre', (group) =&gt; { … })</code></td><td>Crée un groupe. Le titre apparaît dans le bilan. La fonction reçoit l'objet <code>group</code>, qui permet d'ajouter des hooks.</td></tr>
+<tr><td><code>group.each.setup(…)</code></td><td><em>each</em> = « pour chaque test du groupe ». <em>setup</em> = « avant ». Donc : avant <strong>chaque</strong> test, ouvrir une transaction globale. La fonction renvoie une fonction d'annulation, que Japa appelle automatiquement <strong>après</strong> chaque test.</td></tr>
+<tr><td><code>test('titre', async (…) =&gt; { … })</code></td><td>Déclare un test. Le titre est une phrase qui décrit la règle vérifiée. La fonction est <code>async</code> car presque tout (base, HTTP) prend du temps et s'attend avec <code>await</code>.</td></tr>
+<tr><td><code>({ client })</code> ou <code>({ client, assert })</code></td><td>Le <strong>contexte</strong> du test. Japa passe un objet qui contient les outils fournis par les plugins. Les accolades sont une <em>déstructuration</em> : on sort seulement les outils dont on a besoin.</td></tr>
+<tr><td>Préparer</td><td>On fabrique la situation de départ : trois utilisateurs et une conversation entre Alice et Bob. On appelle directement les vraies fonctions du projet (<code>chercheOuCreeConversationPrivee</code>, voir <a href="explication-services.html">les services</a>).</td></tr>
+<tr><td>Agir</td><td>Une seule action, celle que l'on teste : l'intrus demande la page de la conversation.</td></tr>
+<tr><td>Vérifier</td><td>Le serveur doit répondre 404. Si ce n'est pas le cas, le test échoue et affiche le code reçu.</td></tr>
+</table></div>
+
+<div class="ok">
+  <p><strong>Le schéma Préparer → Agir → Vérifier</strong> (en anglais <em>Arrange, Act, Assert</em>, « AAA ») est écrit en commentaire en tête de <code>access_control.spec.ts</code>. Tous les tests du projet le suivent. Si le jury te demande comment tu écris un test, c'est la réponse.</p>
+</div>
+
+<p><strong>Pourquoi chaque test recrée-t-il ses propres utilisateurs ?</strong> Pour que chaque test soit <strong>indépendant</strong> : il ne dépend ni de l'ordre des tests, ni des données laissées par un autre. On peut lancer un seul test, ou tous, dans n'importe quel ordre : le résultat est le même. Quand la préparation se répète, on la range dans une fonction, comme <code>prepareGroupe()</code> dans le même fichier.</p>
+
+<!-- ============================================================ -->
+<h2 id="client">13. Le client HTTP de test : toutes ses méthodes</h2>
+<p>L'objet <code>client</code> construit une requête morceau par morceau, comme une phrase : <em>envoie un POST à telle adresse, avec tel en-tête, tel contenu, un jeton CSRF, en tant qu'Alice</em>. La requête ne part qu'au moment du <code>await</code>.</p>
+<pre><code>const envoi = await client
+  .post(`/conversations/${conversation.id}/messages`)   // méthode + adresse
+  .header('Accept', 'application/json')                 // je veux une réponse JSON
+  .json({ content: 'Bonjour Bob' })                     // le contenu envoyé
+  .withCsrfToken()                                      // jeton anti-CSRF
+  .loginAs(alice)                                       // en tant qu'Alice</code></pre>
+
+<div class="table-wrap"><table>
+<tr><th>Méthode</th><th>Rôle</th><th>Pourquoi dans Kadea Chat</th></tr>
+<tr><td><code>client.get(url)</code>, <code>.post(url)</code>, <code>.delete(url)</code></td><td>Choisit le verbe HTTP et l'adresse.</td><td>Mêmes routes que dans <code>start/routes.ts</code>.</td></tr>
+<tr><td><code>.header('Accept', 'application/json')</code></td><td>Ajoute un en-tête. <code>Accept</code> dit au serveur quel format on préfère.</td><td>Le front (<code>message.js</code>, <code>fetch</code>) envoie cet en-tête. Avec lui, le contrôleur et le gestionnaire d'erreurs (<code>handler.ts</code>) répondent en <strong>JSON</strong> (<code>{ message: "…" }</code>) au lieu d'une redirection ou d'une page HTML. Le test imite donc le vrai front.</td></tr>
+<tr><td><code>.json({ … })</code></td><td>Envoie un corps JSON.</td><td>Comme un <code>fetch</code> qui envoie du JSON.</td></tr>
+<tr><td><code>.form({ … })</code></td><td>Envoie un corps « formulaire » (<code>application/x-www-form-urlencoded</code>), comme un formulaire HTML classique.</td><td>Connexion, profil, mot de passe oublié.</td></tr>
+<tr><td><code>.qs({ before: 12 })</code></td><td>Ajoute des paramètres d'adresse (<em>query string</em>) : <code>?before=12</code>.</td><td>Pagination, recherche de membres.</td></tr>
+<tr><td><code>.withCsrfToken()</code></td><td>Joint un jeton CSRF valide (plugin Shield).</td><td>Obligatoire pour tout <code>POST</code>/<code>DELETE</code>, sinon 419.</td></tr>
+<tr><td><code>.loginAs(user)</code></td><td>Envoie la requête en tant que cet utilisateur connecté (plugin Auth + session mémoire).</td><td>Évite de remplir le formulaire de connexion dans chaque test. Le middleware <code>auth</code> voit un vrai utilisateur connecté.</td></tr>
+<tr><td><code>.redirects(0)</code></td><td>Ne pas suivre les redirections. Par défaut, le client suit une réponse 302 jusqu'à la page finale.</td><td>Pour vérifier la redirection <em>elle-même</em> (« vers <code>/login</code> », « vers <code>/messages</code> »).</td></tr>
+</table></div>
+
+<h3>Lire la réponse</h3>
+<div class="table-wrap"><table>
+<tr><th>Méthode</th><th>Renvoie</th></tr>
+<tr><td><code>response.status()</code></td><td>Le code HTTP (200, 404…).</td></tr>
+<tr><td><code>response.text()</code></td><td>Le corps brut sous forme de texte (le HTML de la page).</td></tr>
+<tr><td><code>response.body()</code></td><td>Le corps JSON transformé en objet JavaScript (<code>body.hasMore</code>, <code>body.message</code>…).</td></tr>
+<tr><td><code>response.header('nom')</code></td><td>La valeur d'un en-tête de réponse (ex. <code>content-security-policy</code>).</td></tr>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="assert">14. Les vérifications : assert et response.assert…</h2>
+<p>Il y a deux sortes de vérifications. Les deux arrêtent le test dès qu'une vérification est fausse.</p>
+
+<h3>Sur la réponse HTTP</h3>
+<div class="table-wrap"><table>
+<tr><th>Vérification</th><th>Réussit si…</th></tr>
+<tr><td><code>response.assertStatus(404)</code></td><td>le code HTTP vaut exactement 404.</td></tr>
+<tr><td><code>response.assertHeader('location', '/login')</code></td><td>l'en-tête <code>location</code> (destination d'une redirection) vaut <code>/login</code>.</td></tr>
+</table></div>
+
+<h3>Avec l'objet <code>assert</code></h3>
+<div class="table-wrap"><table>
+<tr><th>Vérification</th><th>Réussit si…</th><th>Exemple du projet</th></tr>
+<tr><td><code>assert.equal(a, b)</code></td><td>a égale b.</td><td><code>assert.equal(statutBob.status, 'delivered')</code></td></tr>
+<tr><td><code>assert.notEqual(a, b)</code></td><td>a est différent de b.</td><td>Le mot de passe stocké n'est pas le texte clair.</td></tr>
+<tr><td><code>assert.isTrue(x)</code> / <code>assert.isFalse(x)</code></td><td>x vaut exactement <code>true</code> / <code>false</code>.</td><td><code>assert.isFalse(message.isDeleted)</code></td></tr>
+<tr><td><code>assert.isNull(x)</code> / <code>assert.isNotNull(x)</code></td><td>x vaut / ne vaut pas <code>null</code>.</td><td>Le texte d'un message supprimé est <code>null</code>.</td></tr>
+<tr><td><code>assert.isDefined(x)</code></td><td>x n'est pas <code>undefined</code>.</td><td>Le nonce CSP a bien été trouvé.</td></tr>
+<tr><td><code>assert.lengthOf(liste, n)</code></td><td>la liste contient exactement n éléments.</td><td><code>assert.lengthOf(messages, 0)</code> : aucun message enregistré.</td></tr>
+<tr><td><code>assert.include(texte, morceau)</code></td><td>le texte contient le morceau.</td><td>La page contient <code>data-load-older-button</code>.</td></tr>
+<tr><td><code>assert.notInclude(texte, morceau)</code></td><td>le texte <strong>ne</strong> contient <strong>pas</strong> le morceau.</td><td>La page ne contient pas <code>value="null"</code>.</td></tr>
+</table></div>
+<p>Le troisième argument facultatif (ex. <code>assert.include(texte, MENTION, adresse)</code>) est un message affiché en cas d'échec : on sait alors <em>quelle</em> adresse a posé problème.</p>
+
+<div class="note">
+  <p><strong>Une bonne habitude visible dans les tests :</strong> on ne vérifie pas seulement la réponse, on vérifie aussi <strong>la base</strong>. Exemple : « un non-membre ne peut pas écrire » vérifie le 404 <em>et</em> qu'il y a 0 message en base. Un serveur pourrait répondre 404 tout en ayant enregistré le message par erreur : la deuxième vérification attrape ce cas.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="codes">15. Les codes HTTP que les tests attendent</h2>
+<p>Un code HTTP est un nombre à trois chiffres renvoyé par le serveur avec chaque réponse. Le premier chiffre donne la famille : 2 = réussi, 3 = redirection, 4 = erreur de la demande, 5 = erreur du serveur.</p>
+<div class="table-wrap"><table>
+<tr><th>Code</th><th>Signification</th><th>Quand Kadea Chat le renvoie</th></tr>
+<tr><td><strong>200</strong> OK</td><td>Tout va bien.</td><td>Page affichée, action réussie.</td></tr>
+<tr><td><strong>201</strong> Created</td><td>Quelque chose a été créé.</td><td>Un message vient d'être envoyé.</td></tr>
+<tr><td><strong>302</strong> Found</td><td>Redirection vers une autre adresse (en-tête <code>location</code>).</td><td>Visiteur non connecté → <code>/login</code> ; connexion réussie → <code>/messages</code>.</td></tr>
+<tr><td><strong>400</strong> Bad Request</td><td>Demande incorrecte.</td><td>Mauvais e-mail ou mot de passe à la connexion (<code>E_INVALID_CREDENTIALS</code>).</td></tr>
+<tr><td><strong>403</strong> Forbidden</td><td>« Je sais qui tu es, mais tu n'as pas le droit. »</td><td>Refus d'une <strong>policy</strong> Bouncer : supprimer le message d'un autre, gérer un groupe sans être admin, écrire à quelqu'un qui t'a bloqué.</td></tr>
+<tr><td><strong>404</strong> Not Found</td><td>Introuvable.</td><td>Adresse inconnue, identifiant non numérique, <strong>et</strong> conversation dont on n'est pas membre.</td></tr>
+<tr><td><strong>419</strong></td><td>Jeton CSRF absent ou invalide.</td><td>Ce que les tests évitent avec <code>withCsrfToken()</code>.</td></tr>
+<tr><td><strong>422</strong> Unprocessable</td><td>Données reçues mais invalides.</td><td>Validation VineJS ratée ; l'admin essaie de se retirer lui-même.</td></tr>
+<tr><td><strong>429</strong> Too Many Requests</td><td>Trop d'essais.</td><td>Plus de 5 connexions par minute (limiteur).</td></tr>
+<tr><td><strong>500</strong></td><td>Le serveur a planté.</td><td>Ce qu'un test cherche à éviter (ex. <code>/conversations/abc</code> doit donner 404, pas 500).</td></tr>
+</table></div>
+
+<div class="note">
+  <p><strong>Pourquoi 404 et pas 403 pour un non-membre ?</strong> Le contrôleur cherche la conversation <em>parmi celles de l'utilisateur connecté</em>. Si l'intrus n'en est pas membre, elle « n'existe pas » pour lui. Un 403 dirait « elle existe, mais pas pour toi » : l'intrus pourrait alors deviner quels numéros de conversation existent en essayant 1, 2, 3… Le 404 ne révèle rien. Le 403 est réservé aux cas où l'utilisateur voit déjà la ressource (il est membre du groupe, il voit le message) mais n'a pas le droit d'agir dessus.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="transaction">16. La transaction globale : pourquoi les tests ne laissent aucune trace</h2>
+<pre><code>group.each.setup(() => testUtils.db().withGlobalTransaction())</code></pre>
+<p>Cette ligne est en tête de presque chaque groupe. C'est le mécanisme le plus important à comprendre.</p>
+
+<h3>Le problème à résoudre</h3>
+<p>Chaque test crée des utilisateurs, des conversations, des messages. Sans nettoyage, après 36 tests, la base serait pleine de « Alice Test ». Pire : un test pourrait voir les données d'un autre et donner un résultat faux (par exemple, une recherche qui trouve le message d'un test précédent).</p>
+
+<h3>La solution : une transaction annulée</h3>
+<p>Une <strong>transaction</strong> est un ensemble de modifications de la base qui reste « en brouillon » tant qu'on ne la valide pas (<em>commit</em>). On peut tout annuler d'un coup (<em>rollback</em>), comme si rien n'avait eu lieu.</p>
+<ol class="steps">
+  <li><strong>Avant le test</strong> : <code>withGlobalTransaction()</code> ouvre une transaction <em>globale</em> : toutes les requêtes Lucid de l'application passent désormais par elle.</li>
+  <li><strong>Pendant le test</strong> : le test crée Alice et Bob, envoie des requêtes ; le serveur (qui tourne dans le même programme) enregistre des messages… Tout passe par la même transaction. À l'intérieur, tout est visible et cohérent.</li>
+  <li><strong>Après le test</strong> : <code>withGlobalTransaction()</code> a renvoyé une fonction <code>rollbackGlobalTransaction</code>. Japa l'appelle : tout est annulé. La base redevient identique à ce qu'elle était après les seeders.</li>
+</ol>
+<p>C'est aussi très rapide : annuler une transaction coûte presque rien, beaucoup moins que vider toutes les tables.</p>
+
+<h3>Ce qu'elle n'annule pas</h3>
+<ul>
+  <li>Ce qui n'est pas dans PostgreSQL : sessions et compteurs du limiteur (en mémoire), e-mails simulés.</li>
+  <li>Les envois vers des services externes (Cloudinary, Brevo). Aucun test n'en fait : les e-mails sont simulés avec <code>mail.fake()</code>, et aucun test n'envoie de fichier.</li>
+</ul>
+
+<div class="note">
+  <p><strong>Les trois niveaux de nettoyage, du plus fin au plus large :</strong></p>
+  <p>1. Après <strong>chaque test</strong> : rollback de la transaction (données du test).<br>
+  2. Après <strong>tous les tests</strong> : <code>migration:reset</code> (toutes les tables).<br>
+  3. À la toute fin : <code>app.terminate()</code> (connexions fermées).</p>
+</div>
+<p class="file">Remarque technique : dans la version installée de Lucid, <code>withGlobalTransaction()</code> est marquée « dépréciée » (ancienne) au profit de <code>wrapInGlobalTransaction()</code>, qui fait exactement la même chose. Elle fonctionne ; on pourrait simplement la renommer un jour.</p>
+
+<!-- ============================================================ -->
+<h2 id="fichiers">17. Les 7 fichiers de tests, test par test</h2>
+<p>Résumé : 7 fichiers, 12 groupes, <strong>36 tests</strong>.</p>
+<div class="table-wrap"><table>
+<tr><th>Fichier</th><th>Sujet</th><th>Tests</th></tr>
+<tr><td><code>access_control.spec.ts</code></td><td>Qui peut lire, écrire, supprimer, gérer un groupe</td><td>12</td></tr>
+<tr><td><code>messages_history.spec.ts</code></td><td>Pagination, suppression, statut « reçu »</td><td>7</td></tr>
+<tr><td><code>policies.spec.ts</code></td><td>Messages de refus des policies, recherche de membres, CSP</td><td>5</td></tr>
+<tr><td><code>security.spec.ts</code></td><td>Identifiants invalides, connexion, limite d'essais, e-mail</td><td>4</td></tr>
+<tr><td><code>password_change.spec.ts</code></td><td>Changement du mot de passe</td><td>3</td></tr>
+<tr><td><code>profile.spec.ts</code></td><td>Profil et page de finalisation de l'inscription</td><td>3</td></tr>
+<tr><td><code>pages.spec.ts</code></td><td>Pied de page et page 404</td><td>2</td></tr>
+</table></div>
+
+<!-- ---------- access_control ---------- -->
+<h3 id="f-access">17.1 <code>tests/functional/access_control.spec.ts</code></h3>
+<p>Le fichier le plus important pour la soutenance : il prouve que les données privées sont protégées.</p>
+<pre><code>import { test } from '@japa/runner'
+import testUtils from '@adonisjs/core/services/test_utils'
+import Message from '#models/message'
+import UserConversation from '#models/user_conversation'
+import { chercheOuCreeConversationPrivee } from '#services/conversation_service'
+import { creeGroupe } from '#services/group'
+import { creeUtilisateur, TEST_PASSWORD } from '../helpers.ts'</code></pre>
+<p>Les tests importent les <strong>vrais</strong> modèles et services de l'application. <code>chercheOuCreeConversationPrivee(alice, bob)</code> et <code>creeGroupe(admin, nom, ids)</code> sont les mêmes fonctions que celles appelées par les contrôleurs. La préparation crée donc des données exactement comme le site le ferait.</p>
+
+<h4>Groupe « Conversations privées : contrôle d’accès » (6 tests)</h4>
+
+<p><strong>1. « un visiteur non connecté est redirigé vers la connexion »</strong></p>
+<pre><code>const response = await client.get('/messages').redirects(0)
+response.assertStatus(302)
+response.assertHeader('location', '/login')</code></pre>
+<p>Pas de <code>loginAs</code> : c'est un visiteur anonyme. <code>.redirects(0)</code> empêche de suivre la redirection, pour voir la réponse 302 et sa destination. <strong>Code testé :</strong> le middleware <code>auth</code> (<code>app/middleware/auth_middleware.ts</code>), qui renvoie vers <code>/login</code>.</p>
+
+<p><strong>2. « un participant peut ouvrir sa conversation et y écrire »</strong></p>
+<pre><code>const page = await client.get(`/conversations/${conversation.id}`).loginAs(alice)
+page.assertStatus(200)
+
+const envoi = await client.post(`/conversations/${conversation.id}/messages`)
+  .header('Accept', 'application/json').json({ content: 'Bonjour Bob' })
+  .withCsrfToken().loginAs(alice)
+
+envoi.assertStatus(201)
+const messages = await Message.query().where('conversationId', conversation.id)
+assert.lengthOf(messages, 1)</code></pre>
+<p>Le <strong>cas positif</strong>. Il est indispensable : sans lui, un bug qui refuserait <em>tout le monde</em> ferait passer tous les tests de refus. On vérifie qu'Alice voit la page (200), que l'envoi réussit (201) et qu'il y a bien 1 message en base. <strong>Code testé :</strong> <code>ConversationsController.donneConversation</code>, <code>MessagesController</code> (envoi), <code>ConversationPolicy</code>.</p>
+
+<p><strong>3. « un non-membre ne peut pas lire la conversation (404) »</strong> : décortiqué en <a href="#anatomie">section 12</a>.</p>
+
+<p><strong>4. « un non-membre ne peut pas écrire dans la conversation »</strong></p>
+<p>L'intrus envoie un message dans la conversation d'Alice et Bob. Attendu : 404, et <code>assert.lengthOf(messages, 0)</code> : rien n'a été enregistré. Double vérification (réponse <em>et</em> base).</p>
+
+<p><strong>5. « on ne peut pas supprimer le message d'un autre (403) »</strong></p>
+<pre><code>// Alice envoie un message (préparation par la vraie route)
+await client.post(…).json({ content: "Message d'Alice" }).withCsrfToken().loginAs(alice)
+const message = await Message.query().where('conversationId', conversation.id).firstOrFail()
+
+// Bob, qui est pourtant membre, essaie de le supprimer
+const response = await client.delete(`/messages/${message.id}`)
+  .header('Accept', 'application/json').withCsrfToken().loginAs(bob)
+
+response.assertStatus(403)
+await message.refresh()
+assert.isFalse(message.isDeleted)</code></pre>
+<p>Ici on attend <strong>403</strong>, pas 404 : Bob est membre, il voit le message, mais seul l'auteur peut le supprimer. <code>message.refresh()</code> relit la ligne en base (l'objet en mémoire pourrait être périmé), puis on vérifie que <code>isDeleted</code> est resté <code>false</code>. <strong>Code testé :</strong> <code>ConversationPolicy</code> (règle « supprimer un message »), <code>handler.ts</code> qui transforme le refus en 403. C'est l'exemple suivi pas à pas dans <a href="explication-socle.html">le socle</a> (Jo et Ana).</p>
+
+<p><strong>6. « la recherche ne trouve pas les messages des conversations d'autrui »</strong></p>
+<pre><code>// Alice écrit un mot unique
+….json({ content: 'motsecretintrouvable' })…loginAs(alice)
+
+const response = await client.get('/search?q=motsecretintrouvable').loginAs(intrus)
+response.assertStatus(200)
+assert.notInclude(response.text(), `/conversations/${conversation.id}`)</code></pre>
+<p>Un mot inventé, que personne d'autre ne peut avoir écrit. L'intrus le cherche : la page s'affiche (200), mais ne doit contenir <strong>aucun lien</strong> vers la conversation d'Alice. Le commentaire explique un piège : on ne peut pas vérifier « la page ne contient pas le mot », car la barre de recherche affiche le mot tapé. On vérifie donc l'absence de <em>résultat</em> (un résultat est un lien vers la conversation). <strong>Code testé :</strong> <code>SearchController</code> (la requête limite aux conversations de l'utilisateur, voir <a href="explication-utilisateurs-recherche.html">utilisateurs et recherche</a>).</p>
+
+<h4>Groupe « Groupes : contrôle d’accès et gestion des membres » (6 tests)</h4>
+<pre><code>async function prepareGroupe() {
+  const admin = await creeUtilisateur('Admin Test')
+  const membre1 = await creeUtilisateur('Membre Un')
+  const membre2 = await creeUtilisateur('Membre Deux')
+  const exterieur = await creeUtilisateur('Exterieur Test')
+  const groupe = await creeGroupe(admin, 'Groupe de test', [membre1.id, membre2.id])
+  return { admin, membre1, membre2, exterieur, groupe }
+}</code></pre>
+<p>Une préparation commune, déclarée dans le groupe : un administrateur (le créateur), deux membres, une personne extérieure. Chaque test l'appelle et ne garde que ce dont il a besoin : <code>const { exterieur, groupe } = await prepareGroupe()</code>. Elle est appelée <em>dans</em> chaque test (et non une seule fois pour tout le groupe) car la transaction annule tout après chaque test.</p>
+
+<div class="table-wrap"><table>
+<tr><th>Test</th><th>Agir</th><th>Vérifier</th><th>Règle prouvée</th></tr>
+<tr><td>7. « un non-membre ne peut ni lire ni écrire dans le groupe »</td><td><code>exterieur</code> fait <code>GET /groups/:id</code>, puis <code>POST /groups/:id/messages</code></td><td>404 et 404, 0 message en base</td><td>Même règle que pour les conversations privées, appliquée aux groupes.</td></tr>
+<tr><td>8. « un membre qui n'est pas administrateur ne peut pas ajouter de membre (403) »</td><td><code>membre1</code> fait <code>POST /groups/:id/members</code> avec <code>member_ids: [exterieur.id]</code></td><td>403</td><td><code>GroupPolicy</code> : seul l'admin ajoute.</td></tr>
+<tr><td>9. « … ne peut pas retirer un membre (403) »</td><td><code>membre1</code> fait <code>DELETE /groups/:id/members/:membre2</code></td><td>403, et <code>membre2</code> est toujours dans <code>user_conversations</code> (<code>isNotNull</code>)</td><td><code>GroupPolicy</code> : seul l'admin retire.</td></tr>
+<tr><td>10. « l'administrateur retire un membre, qui perd aussitôt l'accès au groupe »</td><td><code>admin</code> retire <code>membre2</code>, puis <code>membre2</code> essaie de lire et d'écrire</td><td>200 ; plus de ligne en base (<code>isNull</code>) ; puis 404 et 404</td><td>Le retrait est effectif immédiatement : pas de « fantôme » qui continue à lire.</td></tr>
+<tr><td>11. « le créateur d'un groupe peut supprimer son compte : le groupe passe au plus ancien membre »</td><td><code>admin</code> fait <code>POST /settings/delete-account</code> avec son mot de passe</td><td>200 ; <code>groupe.createdById</code> vaut <code>membre1.id</code> ; le rôle de <code>membre1</code> est <code>admin</code></td><td>Voir ci-dessous.</td></tr>
+<tr><td>12. « l'administrateur ne peut pas se retirer lui-même »</td><td><code>admin</code> fait <code>DELETE /groups/:id/members/:admin</code></td><td>422</td><td>Un groupe ne doit pas se retrouver sans administrateur. Le 422 vient d'une vérification du contrôleur (<code>memberId === user.id</code>) : « supprimez plutôt le groupe ».</td></tr>
+</table></div>
+
+<p><strong>Zoom sur le test 11.</strong> La colonne <code>created_by_id</code> du groupe est liée à l'utilisateur avec une règle <code>RESTRICT</code> : la base <strong>refuse</strong> de supprimer un utilisateur tant qu'un groupe pointe vers lui. Si <code>supprimeCompteUtilisateur</code> (voir <a href="explication-services.html">les services</a>) oubliait de transmettre le groupe, la suppression planterait (500). Le test vérifie donc : la suppression réussit (200), le groupe a un nouveau créateur, et ce créateur a le rôle <code>admin</code>. <code>.preload('role')</code> charge la relation pour lire <code>newAdmin.role.title</code>. C'est un bug réel corrigé pendant le projet : le test garantit qu'il ne revient pas.</p>
+
+<!-- ---------- messages_history ---------- -->
+<h3 id="f-history">17.2 <code>tests/functional/messages_history.spec.ts</code></h3>
+<pre><code>import Message from '#models/message'
+import MessageStatus from '#models/message_status'
+import { chercheOuCreeConversationPrivee } from '#services/conversation_service'
+import { MESSAGES_PER_PAGE } from '#services/chat_service'
+import { marqueMessagesCommeRecus } from '#services/realtime_service'
+import { creeMessages, creeUtilisateur } from '../helpers.ts'</code></pre>
+<p><strong><code>MESSAGES_PER_PAGE</code></strong> (50) est importé au lieu d'écrire « 50 » en dur : si un jour on passe à 30 messages par page, les tests s'adaptent tout seuls.</p>
+
+<h4>Groupe « Messages : historique complet (pagination) » (4 tests)</h4>
+
+<p><strong>13. « les pages Messages et Groupes s’affichent sans discussion ouverte »</strong> : Alice, sans aucune conversation, ouvre <code>/messages</code> puis <code>/groups</code> : 200 et 200. Test simple, mais il attrape un cas fréquent : une vue Edge qui plante quand une liste est vide ou qu'aucune discussion n'est sélectionnée.</p>
+
+<p><strong>14. « l'ouverture affiche la dernière page et propose les messages précédents »</strong></p>
+<pre><code>const messages = await creeMessages(conversation.id, alice, MESSAGES_PER_PAGE + 5)  // 55 messages
+const page = await client.get(`/conversations/${conversation.id}`).loginAs(alice)
+
+page.assertStatus(200)
+assert.include(page.text(), 'data-load-older-button')
+assert.include(page.text(), `data-message-id="${messages.at(-1)!.id}"`)
+assert.notInclude(page.text(), `data-message-id="${messages[0].id}"`)</code></pre>
+<p>55 messages, soit une page complète + 5. À l'ouverture, on doit voir les 50 <strong>plus récents</strong>, avec le bouton « messages précédents ». Le test cherche dans le HTML les attributs <code>data-*</code> que les vues Edge posent sur chaque message : le plus récent (<code>messages.at(-1)</code>, « le dernier ») est présent, le plus ancien (<code>messages[0]</code>) ne l'est pas. Le <code>!</code> après <code>at(-1)</code> dit à TypeScript « je sais que ce n'est pas <code>undefined</code> ». <strong>Code testé :</strong> <code>chargePageMessages</code> (récupère 51 lignes pour savoir s'il en reste), la vue <code>chat-panel</code>.</p>
+
+<p><strong>15. « « messages précédents » renvoie les plus anciens, puis plus rien »</strong></p>
+<pre><code>const oldestDisplayed = messages[5]  // la première page contient les 50 derniers
+
+const response = await client.get(`/conversations/${conversation.id}/messages`)
+  .qs({ before: oldestDisplayed.id })
+  .header('Accept', 'application/json').loginAs(bob)
+
+const body = response.body()
+assert.isFalse(body.hasMore)
+assert.equal(body.oldestId, messages[0].id)
+for (const message of messages.slice(0, 5)) {
+  assert.include(body.html, `data-message-id="${message.id}"`)
+}
+assert.notInclude(body.html, `data-message-id="${oldestDisplayed.id}"`)</code></pre>
+<p>On imite le clic sur « messages précédents » : le front demande les messages <strong>avant</strong> le plus ancien affiché. Sur 55 messages (indices 0 à 54), la première page montre les indices 5 à 54 ; le plus ancien affiché est donc <code>messages[5]</code>. La réponse JSON doit :</p>
+<ul>
+  <li>dire qu'il n'y a plus rien après (<code>hasMore: false</code>) ;</li>
+  <li>donner l'identifiant du plus ancien (<code>oldestId</code> = <code>messages[0]</code>), que le front gardera pour la demande suivante ;</li>
+  <li>contenir les 5 messages manquants (<code>slice(0, 5)</code> = indices 0 à 4) dans le HTML ;</li>
+  <li><strong>ne pas</strong> répéter <code>messages[5]</code>, déjà affiché (le filtre est <code>id &lt; before</code>, strictement inférieur).</li>
+</ul>
+<p>La demande est faite par <strong>Bob</strong>, alors qu'Alice a écrit les messages : cela vérifie au passage que l'autre participant a aussi accès à l'historique.</p>
+
+<p><strong>16. « un non-membre ne peut pas lire les messages précédents (404) »</strong> : la nouvelle route de pagination est protégée comme les autres. Une route ajoutée tardivement est un endroit classique où l'on oublie un contrôle d'accès : ce test le vérifie.</p>
+
+<h4>Groupe « Messages : suppression et statut « reçu » » (3 tests)</h4>
+
+<p><strong>17. « un message supprimé ne garde pas son texte en base »</strong> : Alice supprime son propre message (200). Après <code>refresh()</code> : <code>isDeleted</code> est vrai <strong>et</strong> <code>content</code> est <code>null</code>. Le texte est réellement effacé, pas seulement caché à l'écran. C'est une question de vie privée. <code>Boolean(message.isDeleted)</code> convertit la valeur en vrai booléen, au cas où la base renverrait <code>1</code>/<code>0</code>.</p>
+
+<p><strong>18. « un message envoyé à une personne en ligne est « reçu », sinon « envoyé » »</strong></p>
+<pre><code>bobEnLigne.isOnline = true
+await bobEnLigne.save()
+const chloeHorsLigne = await creeUtilisateur('Chloe Test')
+// Alice écrit « Bonjour » à chacun
+…
+assert.equal(statutBob.status, 'delivered')
+assert.equal(statutChloe.status, 'sent')</code></pre>
+<p>On place Bob « en ligne » en modifiant directement sa colonne <code>is_online</code>. Alice écrit aux deux. Le statut créé pour Bob doit être <code>delivered</code> (deux coches grises), celui de Chloé <code>sent</code> (une coche). <strong>Code testé :</strong> la logique <code>onlineIds</code> dans l'envoi de message (<a href="explication-messages-controller.html">contrôleur des messages</a>).</p>
+
+<p><strong>19. « à sa connexion, les messages en attente passent en « reçu » »</strong></p>
+<pre><code>// Alice envoie « Tu es là ? » à Bob, hors ligne → statut 'sent'
+…
+// Bob ouvre l'application (start/transmit.ts appelle cette fonction à sa connexion)
+await marqueMessagesCommeRecus(bob.id)
+…
+assert.equal(statut.status, 'delivered')
+assert.isFalse(Boolean(statut.isRead))</code></pre>
+<p>Le temps réel (SSE avec Transmit) est difficile à tester par HTTP. Le test appelle donc <strong>directement</strong> la fonction que <code>start/transmit.ts</code> exécute quand Bob se connecte. Il vérifie que le statut passe à <code>delivered</code>, mais <strong>pas</strong> à « lu » : recevoir n'est pas lire. C'est une technique courante : tester la fonction métier plutôt que le canal qui la déclenche. Voir <a href="explication-temps-reel.html">le temps réel</a>.</p>
+
+<!-- ---------- policies ---------- -->
+<h3 id="f-policies">17.3 <code>tests/functional/policies.spec.ts</code></h3>
+
+<h4>Groupe « Policies : refus avec un message clair » (2 tests)</h4>
+<p><strong>20. « on ne peut plus écrire à quelqu'un qui nous a bloqué (403) »</strong></p>
+<pre><code>await bloqueUtilisateur(bob.id, alice.id) // Bob bloque Alice
+// Alice essaie d'écrire
+response.assertStatus(403)
+assert.equal(response.body().message, "Impossible d'envoyer ce message à cet utilisateur.")
+assert.lengthOf(messages, 0)</code></pre>
+<p>Trois vérifications : refus (403), <strong>message en français</strong> exact, rien en base. Le commentaire précise l'enjeu : sans réglage, Bouncer renvoie un message anglais « Access denied ». Le projet fait renvoyer à <code>ConversationPolicy</code> un <code>AuthorizationResponse.deny("…")</code> avec un texte clair, que le front affiche à l'utilisateur. <code>bloqueUtilisateur</code> vient de <code>#services/block_service</code>.</p>
+
+<p><strong>21. « un membre qui n'est pas administrateur ne peut pas supprimer le groupe »</strong> : <code>DELETE /groups/:id</code> par <code>membre1</code> → 403 avec le message « Seul l'administrateur du groupe peut le supprimer. » (<code>GroupPolicy</code>).</p>
+
+<h4>Groupe « Groupes : recherche des personnes à ajouter » (2 tests)</h4>
+<p><strong>22. « la recherche filtre par nom et exclut les membres du groupe »</strong></p>
+<p>Trois requêtes vers <code>/groups/candidates</code> (la recherche du formulaire « ajouter des membres ») :</p>
+<ol>
+  <li><code>?q=Recherchée</code> sans groupe (création d'un nouveau groupe) : Zoé apparaît, <code>membre1</code> non (son nom ne correspond pas) → le filtre par nom marche ;</li>
+  <li><code>?q=Recherchée&amp;group=:id</code> : Zoé, qui n'est pas membre, est proposée ;</li>
+  <li><code>?q=Membre Un&amp;group=:id</code> : <code>membre1</code> correspond au nom, mais il est déjà membre, donc il <strong>n'est pas</strong> proposé.</li>
+</ol>
+<p>Le test cherche l'attribut <code>data-member-id="…"</code> que la vue pose sur chaque candidat. Le nom « Zoé Recherchée » contient des accents : on vérifie aussi que la recherche les gère.</p>
+
+<p><strong>23. « on ne peut pas chercher pour un groupe dont on n'est pas membre (404) »</strong> : <code>exterieur</code> demande les candidats pour le groupe → 404. Sinon, il pourrait découvrir qui en fait partie, en regardant qui n'est <em>pas</em> proposé.</p>
+
+<h4>Groupe « Sécurité : politique de sécurité du contenu (CSP) » (1 test)</h4>
+<p><strong>24. « les pages envoient une CSP et le script en ligne porte son nonce »</strong></p>
+<pre><code>const csp = String(response.header('content-security-policy'))
+assert.include(csp, "script-src 'self' 'nonce-")
+assert.include(csp, "object-src 'none'")
+
+const nonce = csp.match(/'nonce-([^']+)'/)?.[1]
+assert.isDefined(nonce)
+assert.include(response.text(), `&lt;script nonce="${nonce}"&gt;`)
+assert.notInclude(response.text(), 'onerror=')</code></pre>
+<ul>
+  <li>La <strong>CSP</strong> (Content Security Policy) est un en-tête qui dit au navigateur quels scripts il a le droit d'exécuter. C'est une protection forte contre l'injection de scripts (XSS). Voir <a href="explication-socle.html">le socle</a>, <code>config/shield.ts</code>.</li>
+  <li>On vérifie que l'en-tête existe, qu'il n'autorise que les scripts du site (<code>'self'</code>) plus ceux qui portent un <strong>nonce</strong>, et qu'il interdit les plugins (<code>object-src 'none'</code>).</li>
+  <li><strong>L'expression régulière</strong> <code>/'nonce-([^']+)'/</code> se lit : « le texte <code>'nonce-</code>, puis un ou plusieurs caractères qui ne sont pas une apostrophe (capturés grâce aux parenthèses), puis <code>'</code> ». <code>?.[1]</code> prend ce qui a été capturé, ou <code>undefined</code> si rien ne correspond.</li>
+  <li>Le nonce est un code aléatoire, <strong>différent à chaque page</strong>. Le test vérifie que le script en ligne de la page porte <em>exactement</em> ce code. Sinon, le navigateur le bloquerait et le site ne marcherait plus.</li>
+  <li><code>notInclude(…, 'onerror=')</code> : aucun attribut d'événement en ligne (<code>onerror="…"</code>) ne reste dans la page, car la CSP les bloquerait. Ce test est né des corrections P2 où ces attributs ont été retirés.</li>
+</ul>
+
+<!-- ---------- security ---------- -->
+<h3 id="f-security">17.4 <code>tests/functional/security.spec.ts</code></h3>
+<pre><code>import mail from '@adonisjs/mail/services/main'
+import { publicUrl } from '#config/app'
+import ReinitialisationMotDePasseMail from '#mails/reinitialisation_mot_de_passe_mail'</code></pre>
+
+<p><strong>25. « un identifiant non numérique donne une 404, pas une erreur 500 »</strong> : <code>GET /conversations/abc</code> et <code>DELETE /messages/abc</code> → 404. Sans protection, <code>abc</code> serait envoyé à PostgreSQL dans une colonne numérique, qui répondrait par une erreur, transformée en 500. Les <strong>matchers</strong> de route (<code>ID_NUMERIQUE</code> dans <code>start/routes.ts</code>) n'acceptent que des chiffres : la route ne correspond pas, donc 404.</p>
+
+<p><strong>26. « après la connexion, on arrive sur la messagerie »</strong></p>
+<pre><code>const response = await client.post('/login')
+  .form({ email: alice.email, password: TEST_PASSWORD })
+  .withCsrfToken().redirects(0)
+response.assertStatus(302)
+response.assertHeader('location', '/messages')</code></pre>
+<p>Ici, <strong>pas de <code>loginAs</code></strong> : on teste justement la vraie connexion, avec le vrai formulaire (<code>.form</code>). Le mot de passe est vérifié contre le hash en base, puis redirection vers <code>/messages</code>. <strong>Code testé :</strong> <code>SessionController</code>, <code>verifyCredentials</code>.</p>
+
+<p><strong>27. « au-delà de 5 essais de connexion par minute, la requête est refusée (429) »</strong></p>
+<pre><code>for (let attempt = 1; attempt &lt;= 5; attempt++) {
+  const response = await client.post('/login')
+    .header('Accept', 'application/json')
+    .form({ email: alice.email, password: 'mauvais-mot-de-passe' })
+    .withCsrfToken()
+  response.assertStatus(400)
+}
+
+// Même avec le BON mot de passe : la limite s'applique avant toute vérification
+const blocked = await client.post('/login') … .form({ email: alice.email, password: TEST_PASSWORD }) …
+blocked.assertStatus(429)</code></pre>
+<p>Cinq essais ratés (400 chacun), puis un sixième <strong>avec le bon mot de passe</strong> : refusé (429). C'est le point clé : le limiteur (<code>limiteConnexion</code> dans <code>start/limiter.ts</code> : 5 essais par minute, puis blocage 5 minutes) agit <strong>avant</strong> la vérification du mot de passe. Un pirate qui essaie des milliers de mots de passe est bloqué, même s'il finit par tomber sur le bon. C'est la protection contre la <em>force brute</em>.</p>
+
+<p><strong>28. « l'e-mail de réinitialisation part de APP_URL et échappe le nom »</strong></p>
+<pre><code>const { mails } = mail.fake()
+const user = await creeUtilisateur('&lt;b&gt;Pirate&lt;/b&gt; Test')
+
+const response = await client.post('/forgoPassword')
+  .header('Accept', 'application/json').form({ email: user.email }).withCsrfToken()
+
+response.assertStatus(200)
+mails.assertSent(ReinitialisationMotDePasseMail, (sent) => sent.message.hasTo(user.email))
+
+const [sent] = mails.sent()
+await sent.buildWithContents()
+sent.message.assertHtmlIncludes(`${publicUrl}/forgoPassword/`)
+sent.message.assertHtmlIncludes('&amp;lt;b&amp;gt;Pirate&amp;lt;/b&amp;gt;')
+
+mail.restore()</code></pre>
+<ul>
+  <li><strong><code>mail.fake()</code></strong> : remplace le vrai envoi (Brevo) par un faux qui <strong>garde</strong> les e-mails en mémoire. Aucun e-mail ne part ; on peut inspecter ceux qui « seraient » partis.</li>
+  <li><strong>Un nom piégé</strong> : <code>&lt;b&gt;Pirate&lt;/b&gt;</code>. Si l'e-mail insérait ce nom tel quel dans le HTML, un attaquant pourrait injecter du HTML (lien trompeur, image…) dans un e-mail officiel du site.</li>
+  <li><strong><code>mails.assertSent(Classe, condition)</code></strong> : un e-mail de type <code>ReinitialisationMotDePasseMail</code> a été envoyé à la bonne adresse.</li>
+  <li><strong><code>buildWithContents()</code></strong> : fabrique le contenu HTML final de l'e-mail (rendu de la vue Edge), pour pouvoir le lire.</li>
+  <li><strong>Le lien</strong> commence par <code>publicUrl</code> (calculé depuis <code>APP_URL</code>) : il pointe vers le vrai site, et non vers une adresse fournie par la requête (l'en-tête <code>Host</code> peut être falsifié par un attaquant).</li>
+  <li><strong>Le nom est échappé</strong> : <code>&lt;</code> devient <code>&amp;lt;</code>, <code>&gt;</code> devient <code>&amp;gt;</code>. Le navigateur affichera le texte « &lt;b&gt;Pirate&lt;/b&gt; » au lieu de l'interpréter. C'est le travail de <code>{{ }}</code> dans Edge.</li>
+  <li><strong><code>mail.restore()</code></strong> : remet le vrai système d'envoi, pour ne pas influencer les autres tests.</li>
+</ul>
+
+<!-- ---------- password_change ---------- -->
+<h3 id="f-password">17.5 <code>tests/functional/password_change.spec.ts</code></h3>
+<p>Un groupe « Paramètres : changement du mot de passe » de 3 tests, tous sur <code>POST /settings/password</code> avec <code>current_password</code>, <code>password</code>, <code>password_confirmation</code>.</p>
+<div class="table-wrap"><table>
+<tr><th>Test</th><th>Envoi</th><th>Vérification</th></tr>
+<tr><td>29. « un mot de passe actuel incorrect est refusé (422) »</td><td>Ancien mot de passe faux</td><td>422, et le mot de passe en base est <strong>toujours</strong> l'ancien : <code>hash.verify(user.password, TEST_PASSWORD)</code> est vrai</td></tr>
+<tr><td>30. « une confirmation différente est refusée (422) »</td><td>Nouveau et confirmation différents</td><td>422 (règle <code>confirmed()</code> de VineJS)</td></tr>
+<tr><td>31. « le mot de passe est changé et stocké haché »</td><td>Tout correct</td><td>200 ; la colonne n'est <strong>pas</strong> le texte clair ; <code>hash.verify</code> avec le nouveau mot de passe est vrai</td></tr>
+</table></div>
+<p><strong><code>hash.verify(hashEnBase, motEnClair)</code></strong> : on ne peut pas « déchiffrer » un hash. Pour savoir si un mot de passe correspond, on le hache de la même façon et on compare : c'est ce que fait <code>verify</code>. Le test 31 prouve donc deux choses : le mot de passe n'est jamais stocké en clair, et c'est bien le nouveau qui fonctionne. <code>user.refresh()</code> relit l'utilisateur en base avant de vérifier. Voir <a href="explication-profil-parametres.html">profil et paramètres</a>.</p>
+
+<!-- ---------- profile ---------- -->
+<h3 id="f-profile">17.6 <code>tests/functional/profile.spec.ts</code></h3>
+<h4>Groupe « Profil : champs facultatifs vides » (2 tests)</h4>
+<p><strong>32. « un champ vide ne s’affiche pas comme le texte « null » »</strong> : Alice n'a ni téléphone ni biographie. Sa page <code>/profile</code> ne doit pas contenir <code>value="null"</code> (champ de saisie) ni <code>&gt;null&lt;/textarea&gt;</code> (zone de texte). C'était un bug réel : Edge affichait la valeur <code>null</code> comme le mot « null ». Corrigé dans <code>ProfileController</code>, qui envoie <code>user.phoneNumber ?? ''</code> à la vue (une chaîne vide au lieu de <code>null</code>) ; ce test empêche son retour.</p>
+<p><strong>33. « le profil s’enregistre sans numéro de téléphone »</strong></p>
+<pre><code>.form({ full_name: 'Alice Test', bio: 'Étudiante à Kadea Academy', phone_number: '', birth_date: '2000-03-15' })
+…
+response.assertStatus(200)
+await user.refresh()
+assert.equal(user.bio, 'Étudiante à Kadea Academy')
+assert.isNull(user.phoneNumber)</code></pre>
+<p>Un téléphone vide (<code>''</code>) doit être accepté et enregistré comme <code>null</code> (absence de valeur), pas comme une chaîne vide, et ne pas bloquer le reste (la bio est bien enregistrée).</p>
+
+<h4>Groupe « Inscription : page de finalisation du compte » (1 test)</h4>
+<p><strong>34. « la date de naissance est affichée au format jj/mm/aaaa »</strong></p>
+<pre><code>const code = 'code-de-test-123'
+const inscription = await Inscription.create({
+  email: 'eric@example.com', fullName: 'Éric Test',
+  birthDate: DateTime.fromISO('1998-04-12'),
+  codeAleatoire: await hash.make(code),
+  expiredAt: DateTime.now().plus({ days: 2 }),
+})
+const page = await client.get(`/signup/${inscription.id}/${code}`)
+page.assertStatus(200)
+assert.include(page.text(), '12/04/1998')
+assert.notInclude(page.text(), '1998-04-12T')</code></pre>
+<p>On fabrique une inscription en attente, comme après le premier formulaire. Le code est <strong>haché</strong> en base (<code>hash.make</code>), comme dans le vrai site ; le test garde le code clair pour construire le lien reçu par e-mail. On ouvre ce lien : la date doit s'afficher <code>12/04/1998</code>, et non le format technique <code>1998-04-12T00:00:00.000+01:00</code>. L'adresse fixe <code>eric@example.com</code> ne gêne pas : la transaction l'efface après le test.</p>
+
+<!-- ---------- pages ---------- -->
+<h3 id="f-pages">17.7 <code>tests/functional/pages.spec.ts</code></h3>
+<p>Seul fichier sans <code>withGlobalTransaction</code> : ses tests n'écrivent rien dans la base, il n'y a rien à annuler.</p>
+<pre><code>const MENTION = "© 2026 Kadea Chat · Projet chef-d'œuvre Kadea Academy"
+
+for (const adresse of ['/', '/login', '/adresse-qui-n-existe-pas']) {
+  const page = await client.get(adresse)
+  // Edge échappe l'apostrophe : on compare avec le texte affiché
+  const texte = page.text().replaceAll('&amp;#39;', "'").replaceAll('&amp;#x27;', "'")
+  assert.include(texte, MENTION, adresse)
+  assert.notInclude(texte, 'NMS Tech', adresse)
+}</code></pre>
+<p><strong>35. « l'accueil, la connexion et la page d'erreur affichent la bonne mention »</strong> : une boucle sur trois pages qui utilisent trois mises en page différentes (<code>landing</code>, <code>auth</code>, page d'erreur). Chacune doit afficher la bonne mention et plus l'ancienne « NMS Tech ». Le piège : Edge échappe l'apostrophe de « chef-d'œuvre » en <code>&amp;#39;</code> ou <code>&amp;#x27;</code> dans le HTML. On remet donc l'apostrophe avant de comparer. Le troisième argument (<code>adresse</code>) dit quelle page a échoué. Ce test vient du dernier commit (« remplace la mention NMS Tech du pied de page »).</p>
+<p><strong>36. « une adresse inconnue renvoie la page 404 du site »</strong> : 404 et le texte « Page introuvable », la page d'erreur en français du projet (<code>error_page.ts</code>), et non une page brute.</p>
+
+<!-- ============================================================ -->
+<h2 id="exemple">18. Exemple complet : un test suivi de bout en bout</h2>
+<p>Suivons le test 5 « on ne peut pas supprimer le message d'un autre (403) » à travers tout le système.</p>
+<ol class="steps">
+  <li><strong>Avant le test</strong> : <code>group.each.setup</code> ouvre la transaction globale.</li>
+  <li><strong>Préparer</strong> : <code>creeUtilisateur</code> × 2 insère Alice et Bob (mots de passe hachés par <code>withAuthFinder</code>). <code>chercheOuCreeConversationPrivee</code> crée la conversation de type <code>Privee</code> (ligne venue du seeder) et deux lignes dans <code>user_conversations</code>.</li>
+  <li>Alice envoie un message : le client construit <code>POST /conversations/7/messages</code> (par exemple), avec <code>Accept: application/json</code>, un corps JSON, un jeton CSRF et une session « Alice connectée » dans le store mémoire.</li>
+  <li>Le serveur de test reçoit la requête : <strong>middlewares</strong> (session lue → Shield vérifie le CSRF → <code>auth</code> reconnaît Alice → Bouncer initialisé) → <strong>route</strong> → <strong>contrôleur</strong> → message enregistré → 201.</li>
+  <li><code>Message.query()…firstOrFail()</code> relit le message en base (toujours dans la transaction).</li>
+  <li><strong>Agir</strong> : <code>DELETE /messages/:id</code> en tant que Bob. Même trajet, jusqu'à la policy : <code>ConversationPolicy</code> constate que Bob n'est pas l'auteur → refus → <code>handler.ts</code> voit un <code>Accept: application/json</code> et répond <code>403</code> en JSON avec un message français.</li>
+  <li><strong>Vérifier</strong> : <code>assertStatus(403)</code> ✔ ; <code>message.refresh()</code> puis <code>isFalse(message.isDeleted)</code> ✔.</li>
+  <li><strong>Après le test</strong> : rollback. Alice, Bob, la conversation et le message disparaissent.</li>
+</ol>
+<p>En une quinzaine de lignes, ce test a donc vérifié : la session, le CSRF, l'authentification, les routes, le contrôleur, la policy, le gestionnaire d'erreurs, et la base. C'est la force d'un test fonctionnel.</p>
+
+<!-- ============================================================ -->
+<h2 id="manque">19. Ce qui n'est pas testé, et remarques</h2>
+
+<h3>Zones sans test automatique</h3>
+<p>Il faut savoir le dire honnêtement au jury, avec la raison.</p>
+<div class="table-wrap"><table>
+<tr><th>Zone</th><th>Pourquoi pas (encore)</th><th>Comment on pourrait</th></tr>
+<tr><td>Le parcours d'inscription complet (formulaire → e-mail → code → mot de passe)</td><td>Seule la page de finalisation est testée (test 34).</td><td>Avec <code>mail.fake()</code>, comme le test 28 : récupérer le lien dans l'e-mail simulé, puis l'ouvrir.</td></tr>
+<tr><td>L'envoi de fichiers (Cloudinary)</td><td>Service externe payant, réseau nécessaire.</td><td>Remplacer <code>cloudinary_service</code> par une fausse version pendant les tests (<em>fake</em> / <em>mock</em>).</td></tr>
+<tr><td>Le temps réel (SSE avec Transmit)</td><td>Difficile par simple requête HTTP.</td><td>Déjà en partie couvert en testant la fonction appelée (test 19).</td></tr>
+<tr><td>Le JavaScript du navigateur (<code>message.js</code>, <code>groupe.js</code>…)</td><td>Aucun test navigateur.</td><td>Suite <code>browser</code> déjà prévue (<code>@japa/browser-client</code> installé), avec Playwright.</td></tr>
+<tr><td>Fonctions isolées (<code>decoupeAutourDuMot</code>, <code>protegeCaracteresRecherche</code>, <code>genereCodeUnique</code>)</td><td>Pas de tests unitaires.</td><td>Créer <code>tests/unit/</code> ; la suite est déjà déclarée dans <code>adonisrc.ts</code>.</td></tr>
+<tr><td>Blocage dans le sens inverse, suppression de compte d'un simple membre, mot de passe oublié jusqu'au bout</td><td>Non écrits.</td><td>Même modèle que les tests existants.</td></tr>
+</table></div>
+
+<h3>Remarques sur les fichiers de test</h3>
+<div class="warn">
+  <p><strong>1. <code>mail.restore()</code> n'est pas protégé.</strong> Dans le test 28, si une vérification échoue avant la dernière ligne, <code>mail.restore()</code> n'est jamais appelé : les tests suivants garderaient le faux système d'e-mails. Sans conséquence aujourd'hui (aucun autre test n'envoie d'e-mail), mais plus propre avec un nettoyage automatique : <code>cleanup(() =&gt; mail.restore())</code> (fonction fournie dans le contexte du test, juste après <code>mail.fake()</code>).</p>
+  <p><strong>2. <code>withGlobalTransaction()</code> est l'ancien nom</strong> de <code>wrapInGlobalTransaction()</code> dans la version installée de Lucid. Même comportement ; renommage facultatif.</p>
+  <p><strong>3. Plugins et suites inutilisés.</strong> <code>dbAssertions</code>, <code>browserClient</code>, <code>sessionBrowserClient</code>, <code>authBrowserClient</code> et les suites <code>unit</code>/<code>browser</code> sont déclarés sans aucun test. Ils ne gênent pas (fichiers de départ d'AdonisJS) ; il faut juste savoir que <code>node ace test unit</code> ne trouvera aucun fichier.</p>
+  <p><strong>4. Pas de lancement automatique.</strong> Il n'y a pas de dossier <code>.github/workflows</code> : les tests ne sont lancés qu'à la main. Une <em>intégration continue</em> (GitHub Actions avec un service PostgreSQL) les lancerait à chaque <code>push</code> et bloquerait une fusion si un test casse.</p>
+  <p><strong>5. Pas de mesure de couverture.</strong> Aucun outil ne mesure quel pourcentage du code est exécuté par les tests (ex. <code>c8</code>). Le chiffre à donner est donc « 36 tests fonctionnels sur les règles d'accès et de sécurité », pas un pourcentage.</p>
+</div>
+
+<div class="ok">
+  <p><strong>Ce qui est bien fait, à mettre en avant :</strong> base de test séparée ; chaque test indépendant grâce à la transaction ; schéma Préparer → Agir → Vérifier ; vérification de la réponse <strong>et</strong> de la base ; cas positifs <strong>et</strong> négatifs ; protections (CSRF, limiteur) laissées actives pendant les tests ; tests écrits après des bugs réels pour empêcher leur retour ; titres en français lisibles comme une liste de règles.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="jury">20. Questions possibles du jury, et réponses</h2>
+<dl class="qa">
+  <dt>Quel outil de test as-tu utilisé, et pourquoi ?</dt>
+  <dd>Japa, le lanceur officiel d'AdonisJS. Il est déjà intégré au framework (<code>node ace test</code>, <code>bin/test.ts</code>), avec des plugins pour la session, la connexion (<code>loginAs</code>), le CSRF et la base. Pas besoin d'installer et de configurer Jest ou Vitest.</dd>
+
+  <dt>Quel type de tests ?</dt>
+  <dd>Des tests fonctionnels : de vraies requêtes HTTP vers le vrai serveur avec une vraie base PostgreSQL. Ils traversent toute la chaîne (middlewares, policies, contrôleurs, vues, base). C'est le plus utile pour une messagerie, où le risque principal est l'accès aux données des autres.</dd>
+
+  <dt>Tes tests ne risquent-ils pas d'abîmer tes données ?</dt>
+  <dd>Non. <code>.env.test</code> les dirige vers une base séparée, <code>kadea_chat_test</code>. Et chaque test tourne dans une transaction annulée à la fin, donc même la base de test reste propre.</dd>
+
+  <dt>Comment un test « se connecte-t-il » ?</dt>
+  <dd>Avec <code>.loginAs(user)</code> du plugin Auth : il écrit une session « connecté » dans le store mémoire (d'où <code>SESSION_DRIVER=memory</code> dans <code>.env.test</code>). Le vrai formulaire de connexion est testé à part (test 26), ainsi que sa limite d'essais (test 27).</dd>
+
+  <dt>Et le CSRF, tu l'as désactivé pour les tests ?</dt>
+  <dd>Non. Les tests demandent un jeton valide avec <code>.withCsrfToken()</code>. Sans lui, Shield répondrait 419 : la protection reste donc réellement active et vérifiée.</dd>
+
+  <dt>Pourquoi 404 et pas 403 quand un intrus ouvre une conversation ?</dt>
+  <dd>Pour ne pas révéler qu'elle existe. Un 403 confirmerait l'existence de la conversation n°7 ; un 404 ne dit rien. Le 403 est utilisé quand la personne voit déjà la ressource mais n'a pas le droit d'agir (supprimer le message d'un autre, gérer un groupe sans être admin).</dd>
+
+  <dt>Quel est ton test préféré / le plus important ?</dt>
+  <dd>« Au-delà de 5 essais, la requête est refusée, même avec le bon mot de passe » : il prouve que le limiteur agit avant la vérification, donc qu'une attaque par force brute est bloquée. Ou « l'administrateur retire un membre, qui perd aussitôt l'accès » : il vérifie une suite d'actions complète.</dd>
+
+  <dt>Qu'est-ce que tu n'as pas testé ?</dt>
+  <dd>L'envoi de fichiers (Cloudinary, service externe), le JavaScript du navigateur et le parcours d'inscription complet. Les suites <code>unit</code> et <code>browser</code> sont prêtes dans <code>adonisrc.ts</code> pour les ajouter. Prochaine étape : lancer les tests automatiquement à chaque push avec GitHub Actions.</dd>
+
+  <dt>Combien de tests ?</dt>
+  <dd>36 tests, dans 12 groupes et 7 fichiers, tous dans la suite <code>functional</code>.</dd>
+
+  <dt>Qu'est-ce qu'une assertion ?</dt>
+  <dd>Une vérification : « j'affirme que le code de réponse vaut 404 ». Si c'est faux, le test s'arrête et échoue en montrant la valeur attendue et la valeur reçue.</dd>
+</dl>
+
+<p class="file" style="margin-top:40px">Document rédigé le 08/11/2026 d'après le code du dépôt (branche <code>fix/footer-mentions</code>). Les tests n'ont pas pu être lancés lors de la rédaction (PostgreSQL arrêté sur la machine) : pense à les lancer une fois avant la soutenance pour vérifier qu'ils sont tous verts.</p>
+
+</main>
+</body>
+</html>

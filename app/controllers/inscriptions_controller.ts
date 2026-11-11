@@ -66,6 +66,20 @@ export default class InscriptionsController {
       session.flash('success', 'Votre compte a été créé. Vérifiez votre e-mail.')
       return response.redirect().toRoute('home')
     } catch (error) {
+      // Afficher les détails complets de l'erreur Brevo / Ky dans les logs de Render
+      console.log('DETAILS ERREUR BREVO COMPLETS :', error)
+      if (error && typeof error === 'object' && 'response' in error) {
+        const apiResponse = error.response
+        if (
+          apiResponse &&
+          typeof apiResponse === 'object' &&
+          'text' in apiResponse &&
+          typeof apiResponse.text === 'function'
+        ) {
+          console.log('REPONSE API BREVO :', await apiResponse.text())
+        }
+      }
+
       logger.error({ err: error }, "Erreur lors de l'envoi de l'e-mail de confirmation")
       return response.status(500).json({
         success: false,

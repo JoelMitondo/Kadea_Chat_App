@@ -38,16 +38,17 @@
 <main>
 
 <h1>Le temps réel de Kadea Chat expliqué ligne par ligne</h1>
-<p class="subtitle">Fichiers : <code>start/transmit.ts</code> · <code>app/service/realtime_service.ts</code> · <code>app/controllers/realtime_controller.ts</code> · <code>resources/js/realtime.js</code> · <code>resources/js/message.js</code> (partie 8)</p>
+<p class="subtitle">Fichiers : <code>start/transmit.ts</code> · <code>app/services/realtime_service.ts</code> · <code>app/controllers/realtime_controller.ts</code> · <code>resources/js/realtime.js</code> · <code>resources/js/message.js</code> (partie 8)</p>
 
-<p>Le « temps réel », c'est ce qui fait qu'un message, une coche bleue ou une puce verte apparaissent <strong>sans recharger la page</strong>. Il repose sur plusieurs fichiers qui travaillent ensemble. On commence par le principe, puis on suit chaque fichier.</p>
+<p>Le « temps réel », c'est ce qui fait qu'un message, une coche grise ou bleue, ou une puce verte apparaissent <strong>sans recharger la page</strong>. Il repose sur plusieurs fichiers qui travaillent ensemble. On commence par le principe, puis on suit chaque fichier.</p>
+<p class="file">Mis à jour le 06/11/2026 pour suivre les corrections P0, P1 et P2 : nouveau statut « reçu » (<code>marqueMessagesCommeRecus</code>, événement <code>messages:delivered</code>), constantes <code>STATUS_*</code>, alias <code>#services/...</code> et identifiants vérifiés dans les routes.</p>
 
 <nav class="toc">
   <strong>Sommaire</strong>
   <ol>
     <li><a href="#principe">Le principe : SSE, Transmit et canaux</a></li>
     <li><a href="#transmit">start/transmit.ts : qui écoute quoi, qui est en ligne</a></li>
-    <li><a href="#service">realtime_service.ts : envoyer les événements</a></li>
+    <li><a href="#service">realtime_service.ts : envoyer les événements</a> (dont <a href="#recus">le statut « reçu »</a>)</li>
     <li><a href="#controller">realtime_controller.ts : compteurs et lecture</a></li>
     <li><a href="#navigateur">realtime.js : recevoir dans le navigateur</a></li>
     <li><a href="#page">message.js : mettre la page à jour</a></li>
@@ -107,8 +108,13 @@ transmit.registerRoutes((route) =&gt; {
 <pre><code>import db from '@adonisjs/lucid/services/db'
 import logger from '@adonisjs/core/services/logger'
 import transmit from '@adonisjs/transmit/services/main'
-import { PRESENCE_CHANNEL, annoncePresence, convertitEnIdentifiantCanal } from '../app/service/realtime_service.ts'</code></pre>
-<p><code>db</code> pour mettre à jour la colonne <code>is_online</code>, <code>logger</code> pour noter les erreurs, <code>transmit</code> pour le temps réel, et trois outils de <code>realtime_service.ts</code> (expliqués au point 3).</p>
+import {
+  PRESENCE_CHANNEL,
+  annoncePresence,
+  convertitEnIdentifiantCanal,
+  marqueMessagesCommeRecus,
+} from '#services/realtime_service'</code></pre>
+<p><code>db</code> pour mettre à jour la colonne <code>is_online</code>, <code>logger</code> pour noter les erreurs, <code>transmit</code> pour le temps réel, et quatre outils de <code>realtime_service.ts</code>, expliqués au point 3. <code>marqueMessagesCommeRecus</code> est le nouveau. L'alias <code>#services/...</code> remplace l'ancien chemin <code>'../app/service/realtime_service.ts'</code>.</p>
 
 <h3>Partie 1 : qui a le droit de s'abonner à quel canal ?</h3>
 
@@ -189,8 +195,16 @@ const offlineTimers = new Map&lt;string, NodeJS.Timeout&gt;()</code></pre>
   if (!wasOnline) {
     await changeStatutEnLigne(userId, true)
   }
+
+  // Les messages reçus pendant son absence arrivent maintenant sur son appareil : statut « reçu »
+  try {
+    await marqueMessagesCommeRecus(userId)
+  } catch (error) {
+    logger.error({ err: error, userId }, 'Échec du passage des messages en « reçu »')
+  }
 })</code></pre>
 <p>S'il est revenu avant la fin des 8 secondes, on <strong>annule</strong> le passage hors ligne. Et on n'annonce « en ligne » que s'il ne l'était pas déjà : inutile de prévenir tout le monde à chaque changement de page.</p>
+<p><strong>Nouveau : le passage en « reçu ».</strong> Dès qu'une connexion s'ouvre, l'appareil de l'utilisateur est joignable. Les messages qui l'attendaient (statut <code>'sent'</code>) sont donc maintenant arrivés chez lui, et <code>marqueMessagesCommeRecus</code> les passe en <code>'delivered'</code>. Elle est expliquée <a href="#recus">plus bas</a>. Le <code>try/catch</code> suit la règle du fichier : un souci de coches ne doit jamais empêcher la connexion de fonctionner. Elle est appelée à <strong>chaque</strong> connexion, pas seulement la première. Si rien n'attend, elle s'arrête après une seule requête.</p>
 
 <h3>Une connexion se ferme</h3>
 <pre><code>transmit.on('disconnect', ({ uid }) =&gt; {
@@ -248,12 +262,16 @@ import type Conversation from '#models/conversation'
 import type Message from '#models/message'
 import type User from '#models/user'
 import type UserConversation from '#models/user_conversation'
-import { construitVueMessage, construitApercu, donneInitiales, donneHeureDeLaListe,
-         estPremierMessageVisible, besoinSeparateurDeJour } from './chat_service.ts'</code></pre>
+import {
+  STATUS_DELIVERED, STATUS_READ, STATUS_SENT,
+  construitVueMessage, construitApercu, donneInitiales, donneHeureDeLaListe,
+  estPremierMessageVisible, besoinSeparateurDeJour,
+} from '#services/chat_service'</code></pre>
 <ul>
   <li><strong><code>edge</code> :</strong> le moteur de vues, utilisé directement. Dans un contrôleur on a <code>view</code> (lié à la requête) ; ici on fabrique du HTML pour <strong>d'autres</strong> personnes que celle qui a fait la requête, donc on utilise <code>edge</code> sans contexte.</li>
   <li><strong>Les modèles :</strong> importés avec <code>type</code>, car ils ne servent qu'à décrire les paramètres.</li>
   <li><strong>Les outils de <code>chat_service.ts</code> :</strong> les mêmes qu'au chargement de la page, pour que tout s'affiche à l'identique.</li>
+  <li><strong><code>STATUS_SENT</code>, <code>STATUS_DELIVERED</code> et <code>STATUS_READ</code> :</strong> les valeurs <code>'sent'</code>, <code>'delivered'</code> et <code>'read'</code> de la colonne <code>status</code> de <code>message_statuses</code>. C'est le trajet d'un message pour <strong>un</strong> destinataire : envoyé (enregistré), puis reçu (arrivé sur son appareil), puis lu (conversation ouverte).</li>
 </ul>
 
 <pre><code>export const PRESENCE_CHANNEL = 'presence'
@@ -481,8 +499,8 @@ export function donneCanalUtilisateur(userId: string): string {
     .from('message_statuses')
     .where('user_id', userId)
     .whereIn('message_id', messageIds)
-    .update({ is_read: true, status: 'read', updated_at: new Date() })</code></pre>
-<p><strong>2.</strong> On les passe à « lu », en une seule requête <code>UPDATE</code>.</p>
+    .update({ is_read: true, status: STATUS_READ, updated_at: new Date() })</code></pre>
+<p><strong>2.</strong> On les passe à « lu », en une seule requête <code>UPDATE</code>. <code>is_read</code> (vrai ou faux) sert aux compteurs de non-lus, et <code>status</code> aux coches.</p>
 
 <pre><code>  const fullyReadMessages = await db
     .from('messages')
@@ -508,6 +526,64 @@ export function donneCanalUtilisateur(userId: string): string {
   }
 }</code></pre>
 <p><strong>5.</strong> Chaque auteur reçoit un seul événement avec la liste de ses messages lus, et ses coches passent au bleu. <code>for (const [clé, valeur] of map)</code> parcourt une <code>Map</code> en décomposant chaque paire.</p>
+
+<h3 id="recus">Réception des messages : <code>marqueMessagesCommeRecus</code></h3>
+<p>Appelée par <code>start/transmit.ts</code> quand un utilisateur ouvre une connexion. C'est la <strong>sœur</strong> de la fonction précédente, mais pour l'étape « reçu » au lieu de « lu ».</p>
+<pre><code>export async function marqueMessagesCommeRecus(userId: string) {
+  // 1. Les messages encore « envoyés » à cet utilisateur
+  const waitingRows = await db
+    .from('message_statuses')
+    .where('user_id', userId)
+    .where('status', STATUS_SENT)
+    .select('message_id')
+
+  if (waitingRows.length === 0) {
+    return
+  }
+
+  const messageIds = waitingRows.map((row) =&gt; row.message_id as number)</code></pre>
+<p><strong>1.</strong> Ses statuts encore à <code>'sent'</code>, dans <strong>toutes</strong> ses conversations : l'appareil reçoit tout d'un coup, pas seulement une conversation. Si rien n'attend, on s'arrête.</p>
+
+<pre><code>  // 2. On les passe en « reçu »
+  await db
+    .from('message_statuses')
+    .where('user_id', userId)
+    .whereIn('message_id', messageIds)
+    .where('status', STATUS_SENT)
+    .update({ status: STATUS_DELIVERED, updated_at: new Date() })</code></pre>
+<p><strong>2.</strong> On les passe à <code>'delivered'</code>. Le <code>.where('status', STATUS_SENT)</code> est répété volontairement. Entre la lecture (étape 1) et cette mise à jour, l'utilisateur a pu ouvrir une conversation : certains statuts sont peut-être déjà passés à <code>'read'</code>. Sans cette condition, on les ferait <strong>reculer</strong> de « lu » à « reçu ». <code>is_read</code> n'est pas touché, car un message reçu n'est pas encore lu.</p>
+
+<pre><code>  // 3. Ceux qui sont maintenant reçus par TOUS leurs destinataires
+  const fullyDelivered = await db
+    .from('messages')
+    .whereIn('id', messageIds)
+    .whereNotExists((query) =&gt; {
+      query
+        .from('message_statuses')
+        .whereRaw('message_statuses.message_id = messages.id')
+        .where('message_statuses.status', STATUS_SENT)
+    })
+    .select('id', 'user_id')</code></pre>
+<p><strong>3.</strong> Le même principe <code>whereNotExists</code> que pour la lecture : on garde les messages pour lesquels il <strong>n'existe plus</strong> aucun statut <code>'sent'</code>. Dans un groupe, les deux coches grises n'apparaissent que quand <em>tous</em> les membres ont reçu le message.</p>
+
+<pre><code>  // 4. On prévient chaque auteur
+  const idsByAuthor = new Map&lt;string, number[]&gt;()
+  for (const row of fullyDelivered) {
+    const authorId = row.user_id as string
+    idsByAuthor.set(authorId, [...(idsByAuthor.get(authorId) ?? []), row.id as number])
+  }
+
+  for (const [authorId, ids] of idsByAuthor) {
+    envoieAUtilisateur(authorId, { type: 'messages:delivered', messageIds: ids })
+  }
+}</code></pre>
+<p><strong>4.</strong> Les messages sont regroupés par auteur, exactement comme pour la lecture. Chaque auteur reçoit un événement <code>messages:delivered</code>. Il n'y a pas de <code>conversationId</code> : les messages peuvent venir de plusieurs conversations à la fois.</p>
+
+<div class="note">
+  <p><strong>Les deux chemins vers « reçu » :</strong></p>
+  <p>• <strong>Le destinataire est en ligne au moment de l'envoi :</strong> <code>envoieMessage</code>, dans <code>messages_controller.ts</code>, crée directement son statut à <code>'delivered'</code>, parce que <code>isOnline</code> est vrai. Pas besoin d'événement : la bulle de l'auteur s'affiche tout de suite avec deux coches grises.</p>
+  <p>• <strong>Il est hors ligne :</strong> le statut est créé à <code>'sent'</code>, avec une seule coche grise. À sa prochaine connexion, <code>marqueMessagesCommeRecus</code> le passe à <code>'delivered'</code> et prévient l'auteur, dont la coche se double.</p>
+</div>
 
 <h3>L'outil <code>afficheLigneListe</code></h3>
 <pre><code>function afficheLigneListe(item: Record&lt;string, unknown&gt;, isGroup: boolean): Promise&lt;string&gt; {
@@ -819,6 +895,7 @@ programmerRafraichissement()</code></pre>
   if (donnees.type === 'message:new') { traiterNouveauMessage(donnees) }
   if (donnees.type === 'message:updated') { traiterMessageModifie(donnees) }
   if (donnees.type === 'messages:read') { traiterLecture(donnees) }
+  if (donnees.type === 'messages:delivered') { traiterReception(donnees) }
   if (donnees.type === 'group:updated') { traiterGroupeModifie(donnees) }
   if (donnees.type === 'conversation:removed') { traiterConversationSupprimee(donnees) }
 
@@ -826,7 +903,7 @@ programmerRafraichissement()</code></pre>
     ajouterElementListe(donnees.itemHtml)
   }
 })</code></pre>
-<p>La page Messages ne s'occupe que des conversations privées, la page Groupes que des groupes : on ignore les événements dont le <code>kind</code> ne correspond pas. Ceux qui n'ont pas de <code>kind</code> (comme <code>messages:read</code>) passent toujours. Ensuite, chaque type appelle sa fonction.</p>
+<p>La page Messages ne s'occupe que des conversations privées, la page Groupes que des groupes : on ignore les événements dont le <code>kind</code> ne correspond pas. Ceux qui n'ont pas de <code>kind</code> (comme <code>messages:read</code> et <code>messages:delivered</code>) passent toujours. Ensuite, chaque type appelle sa fonction.</p>
 
 <h3>Un nouveau message arrive : <code>traiterNouveauMessage</code></h3>
 <pre><code>function traiterNouveauMessage(donnees) {
@@ -879,18 +956,47 @@ programmerRafraichissement()</code></pre>
 }</code></pre>
 <p><code>outerHTML</code> remplace <strong>toute</strong> la bulle (l'élément lui-même, pas seulement son contenu) par la nouvelle version. Si c'était le dernier message, l'aperçu de la liste change aussi.</p>
 
-<pre><code>function traiterLecture(donnees) {
+<pre><code>function afficherCoche(bulle, etat) {
+  let coches = {
+    sent: bulle.querySelector('[data-tick-sent]'),
+    delivered: bulle.querySelector('[data-tick-delivered]'),
+    read: bulle.querySelector('[data-tick-read]'),
+  }
+  Object.keys(coches).forEach(function (nom) {
+    if (coches[nom] !== null) { coches[nom].classList.toggle('hidden', nom !== etat) }
+  })
+}</code></pre>
+<p>Les <strong>trois</strong> coches existent déjà dans chaque bulle de l'auteur (<code>message-bubble.edge</code>), et une seule est visible :</p>
+<ul>
+  <li><code>data-tick-sent</code> : une coche grise ;</li>
+  <li><code>data-tick-delivered</code> : deux coches grises ;</li>
+  <li><code>data-tick-read</code> : deux coches bleues.</li>
+</ul>
+<p><code>afficherCoche(bulle, 'read')</code> affiche celle demandée et cache les deux autres. <code>Object.keys(coches)</code> donne <code>['sent', 'delivered', 'read']</code>. <code>classList.toggle('hidden', condition)</code> <strong>ajoute</strong> la classe si la condition est vraie et la <strong>retire</strong> sinon : chaque coche est cachée, sauf celle dont le nom vaut <code>etat</code>. Avant, le code cachait et montrait les coches une par une. Cette petite fonction évite de le répéter pour chaque événement.</p>
+
+<pre><code>// Quelqu'un a lu nos messages : leurs coches passent en bleu
+function traiterLecture(donnees) {
+  donnees.messageIds.forEach(function (idMessage) {
+    let bulle = document.querySelector('[data-message-id="' + idMessage + '"]')
+    if (bulle !== null) { afficherCoche(bulle, 'read') }
+  })
+}
+
+// Nos messages sont arrivés chez leurs destinataires : deux coches grises
+// (sauf s'ils sont déjà lus : on ne repasse jamais du bleu au gris)
+function traiterReception(donnees) {
   donnees.messageIds.forEach(function (idMessage) {
     let bulle = document.querySelector('[data-message-id="' + idMessage + '"]')
     if (bulle === null) { return }
-
-    let cocheEnvoye = bulle.querySelector('[data-tick-sent]')
     let cocheLu = bulle.querySelector('[data-tick-read]')
-    if (cocheEnvoye !== null) { cocheEnvoye.classList.add('hidden') }
-    if (cocheLu !== null) { cocheLu.classList.remove('hidden') }
+    let dejaLu = cocheLu !== null &amp;&amp; !cocheLu.classList.contains('hidden')
+    if (!dejaLu) { afficherCoche(bulle, 'delivered') }
   })
 }</code></pre>
-<p>Pour chaque message lu : on cache la coche simple et on affiche la double coche bleue. Les deux coches existent déjà dans la bulle (<code>message-bubble.edge</code>), une seule est visible.</p>
+<ul>
+  <li><strong><code>traiterLecture</code> :</strong> pour chaque message lu, on affiche les coches bleues.</li>
+  <li><strong><code>traiterReception</code> :</strong> pour chaque message reçu, on affiche deux coches grises, <strong>sauf</strong> si la coche bleue est déjà visible. Les événements peuvent arriver dans le désordre : « lu » pourrait arriver avant « reçu ». Un message ne doit jamais repasser du bleu au gris. C'est la même précaution que le <code>where('status', STATUS_SENT)</code> côté serveur.</li>
+</ul>
 
 <pre><code>function traiterGroupeModifie(donnees) {
   if (page.dataset.activeId !== String(donnees.conversationId)) { return }
@@ -947,17 +1053,22 @@ programmerRafraichissement()</code></pre>
   <tr><td><code>presence</code></td><td><code>annoncePresence</code></td><td>Première page ouverte / dernière page fermée depuis 8 s</td><td>Puces vertes et textes « En ligne »</td></tr>
   <tr><td><code>message:new</code></td><td><code>previensNouveauMessage</code></td><td>Envoi d'un message</td><td>Bulle ajoutée ou badge +1, liste à jour, notification, pastilles</td></tr>
   <tr><td><code>message:updated</code></td><td><code>previensMessageModifie</code></td><td>Modification ou suppression d'un message</td><td>Bulle remplacée, aperçu si dernier, pastilles</td></tr>
+  <tr><td><code>messages:delivered</code></td><td><code>marqueMessagesCommeRecus</code></td><td>Le destinataire s'est connecté (ses messages en attente lui arrivent)</td><td>Deux coches grises chez l'auteur (jamais par-dessus des bleues)</td></tr>
   <tr><td><code>messages:read</code></td><td><code>marqueConversationCommeLueEtPrevient</code></td><td>Le destinataire a lu</td><td>Coches bleues chez l'auteur</td></tr>
   <tr><td><code>conversation:added</code></td><td><code>previensConversationAjoutee</code></td><td>Ajout à un groupe</td><td>Groupe ajouté à la liste, notification</td></tr>
-  <tr><td><code>group:updated</code></td><td><code>previensGroupeModifie</code></td><td>Membres du groupe modifiés</td><td>Panneau du groupe rechargé</td></tr>
-  <tr><td><code>conversation:removed</code></td><td><code>previensConversationSupprimee</code></td><td>Groupe ou conversation supprimés</td><td>Ligne retirée, discussion fermée, notification</td></tr>
+  <tr><td><code>group:updated</code></td><td><code>previensGroupeModifie</code></td><td>Membres ajoutés ou retirés</td><td>Panneau du groupe rechargé</td></tr>
+  <tr><td><code>conversation:removed</code></td><td><code>previensConversationSupprimee</code></td><td>Groupe ou conversation supprimés, ou membre retiré d'un groupe</td><td>Ligne retirée, discussion fermée, notification</td></tr>
 </table>
 </div>
 
 <!-- ============================================================ -->
 <h2 id="parcours">8. Le parcours complet d'un message</h2>
 <pre><code>Ana envoie "Salut" à Jo
-  → messages_controller : enregistrement en base (statut "non lu" pour Jo)
+  → messages_controller : Jo est-il en ligne ?
+      oui → statut 'delivered' (Ana voit tout de suite ✓✓ gris)
+      non → statut 'sent' (Ana voit ✓ gris)
+          → plus tard, Jo ouvre une page : transmit.ts 'connect' → marqueMessagesCommeRecus
+          → { type: 'messages:delivered' } → chez Ana : traiterReception → ✓✓ gris
   → previensNouveauMessage : bulle HTML fabriquée pour Jo
   → envoieAUtilisateur → transmit.broadcast('users/&lt;id de Jo&gt;', { type: 'message:new', ... })
 
@@ -982,7 +1093,11 @@ Dans le navigateur d'Ana
   <p><strong>Redémarrage du serveur :</strong> au démarrage, tout le monde passe hors ligne. Les navigateurs encore ouverts se reconnectent automatiquement et repassent en ligne, mais <code>kc:reconnecte</code> rechargera alors aussi les pages Messages et Groupes.</p>
   <p><strong>Événements perdus pendant une coupure :</strong> les SSE de Transmit ne rejouent pas les événements manqués. C'est pour ça que la page se recharge après une reconnexion ; les autres pages ne rafraîchissent que les pastilles.</p>
   <p><strong>La présence est visible par tous :</strong> toute personne connectée reçoit les changements de statut de tout le monde sur le canal <code>presence</code>, même de personnes avec qui elle n'a jamais parlé. C'est cohérent avec la page Utilisateurs, qui les affiche déjà.</p>
-  <p><strong>Identifiant non numérique :</strong> comme ailleurs, <code>Number(params.id)</code> dans <code>marqueCommeLu</code> peut donner <code>NaN</code>, avec probablement une erreur 500 au lieu d'une 404.</p>
+  <p><strong>« En ligne » ne garantit pas « reçu » :</strong> le statut <code>'delivered'</code> est donné à l'envoi si <code>isOnline</code> est vrai. Pendant les 8 secondes du délai hors ligne, l'utilisateur est encore « en ligne » sans connexion ouverte. Un message envoyé à ce moment est marqué reçu un peu trop tôt. Ça reste un cas rare et sans conséquence.</p>
+</div>
+
+<div class="note">
+  <p><strong>Corrigé depuis la première version de ce document :</strong> l'identifiant de <code>POST /conversations/:id/read</code> est vérifié dans la route (<code>.where('id', ID_NUMERIQUE)</code>). <code>/conversations/abc/read</code> donne une 404, et plus une erreur 500.</p>
 </div>
 
 </main>

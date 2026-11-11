@@ -84,10 +84,12 @@
 <p>Ce contrôleur gère <strong>la messagerie privée</strong> : afficher la page, ouvrir une conversation et en supprimer une de ta liste. On le suit de haut en bas, en expliquant chaque fonction importée au moment où elle sert.</p>
 
 <div class="note">
-  <p><strong>Trois méthodes publiques, une par route :</strong> elles reçoivent les requêtes, et les deux méthodes privées en bas préparent les données. Les petits outils réutilisés ailleurs sont rangés dans <code>chat_service.ts</code>.</p>
+  <p><strong>Quatre méthodes publiques, une par route :</strong> elles reçoivent les requêtes, et les trois méthodes privées en bas préparent les données. Les petits outils réutilisés ailleurs sont rangés dans <code>chat_service.ts</code>.</p>
   <p><strong>Tout tourne autour de <code>user_conversations</code> :</strong> une ligne de cette table veut dire « cet utilisateur participe à cette conversation ». Le contrôleur l'appelle <code>membership</code>.</p>
   <p><strong>Supprimer une conversation ne supprime rien :</strong> le code enregistre seulement une date, <code>removedAt</code>, puis cache ce qui est plus ancien.</p>
+  <p><strong>L'historique est paginé :</strong> à l'ouverture, seuls les 50 derniers messages sont chargés. Le bouton « Afficher les messages précédents » charge les 50 d'avant, et ainsi de suite.</p>
 </div>
+<p class="file">Mis à jour le 06/11/2026 pour suivre les corrections P0, P1 et P2 : pagination, dossier <code>app/services</code>, alias <code>#services/...</code>, identifiants vérifiés dans les routes et lecture signalée à la suppression.</p>
 
 <nav class="toc">
   <strong>Sommaire</strong>
@@ -97,9 +99,11 @@
     <li><a href="#imports">Les imports</a></li>
     <li><a href="#page">donnePageMessages : la page de messagerie</a></li>
     <li><a href="#ouvrir">donneConversation : ouvrir une conversation</a></li>
+    <li><a href="#precedents">donneMessagesPrecedents : les messages plus anciens</a></li>
     <li><a href="#supprimer">supprimeConversation : retirer une conversation</a></li>
     <li><a href="#liste">donneListeConversations : la liste de gauche</a></li>
     <li><a href="#discussion">donneDiscussion : la conversation ouverte</a></li>
+    <li><a href="#pagination">chargeMessages et chargePageMessages : la pagination</a></li>
     <li><a href="#parcours">Le parcours complet d'un clic</a></li>
     <li><a href="#remarques">Ce qui a été remarqué</a></li>
   </ol>
@@ -135,12 +139,14 @@
   <tr><th>Requête</th><th>Méthode appelée</th><th>Rôle</th></tr>
   <tr><td><code>GET /messages</code></td><td><code>donnePageMessages</code></td><td>La page, sans conversation ouverte</td></tr>
   <tr><td><code>GET /conversations/:id</code></td><td><code>donneConversation</code></td><td>Ouvrir une conversation</td></tr>
+  <tr><td><code>GET /conversations/:id/messages?before=345</code></td><td><code>donneMessagesPrecedents</code></td><td>Charger la page de messages d'avant</td></tr>
   <tr><td><code>DELETE /conversations/:id</code></td><td><code>supprimeConversation</code></td><td>La retirer de ta liste</td></tr>
 </table>
 </div>
+<p>Chaque route avec <code>:id</code> porte maintenant <code>.where('id', ID_NUMERIQUE)</code>, avec en haut du fichier <code>const ID_NUMERIQUE = router.matchers.number()</code>. La route ne correspond que si <code>:id</code> est un nombre. Pour <code>/conversations/abc</code>, aucune route ne correspond, donc <strong>404</strong>, et le contrôleur n'est même pas appelé. Le matcher convertit aussi la valeur : <code>params.id</code> arrive déjà en nombre, et le <code>Number(...)</code> du contrôleur ne change plus rien.</p>
 
 <!-- ============================================================ -->
-<h2 id="imports">1. Les imports (lignes 1 à 16)</h2>
+<h2 id="imports">1. Les imports (lignes 1 à 19)</h2>
 
 <pre><code>import type { HttpContext } from '@adonisjs/core/http'</code></pre>
 <p>C'est le type du contexte de requête (<code>auth</code>, <code>request</code>, <code>view</code>...). <code>import type</code> ne sert qu'à TypeScript et disparaît une fois le code compilé.</p>
@@ -149,23 +155,30 @@
 <p>Luxon gère les dates. Ici, il sert à <code>DateTime.now()</code> dans la suppression.</p>
 
 <pre><code>import type User from '#models/user'
-import Message from '#models/message'
-import UserConversation from '#models/user_conversation'</code></pre>
+import type Message from '#models/message'
+import UserConversation from '#models/user_conversation'
+import { olderMessagesValidator } from '#validators/message'</code></pre>
 <ul>
-  <li><strong><code>User</code> :</strong> importé avec <code>type</code>, car il sert seulement à décrire les paramètres.</li>
-  <li><strong><code>Message</code> et <code>UserConversation</code> :</strong> importés normalement, car le code appelle vraiment leurs méthodes, comme <code>.query()</code>.</li>
+  <li><strong><code>User</code> et <code>Message</code> :</strong> importés avec <code>type</code>, car ils servent seulement à décrire des types. <code>Message</code> n'est plus interrogé ici : la requête des messages a déménagé dans <code>chargePageMessages</code>, dans <code>chat_service.ts</code>.</li>
+  <li><strong><code>UserConversation</code> :</strong> importé normalement, car le code appelle vraiment ses méthodes, comme <code>.query()</code>.</li>
   <li><strong><code>#models/...</code> :</strong> un raccourci de chemin défini dans <code>package.json</code>, qui évite d'écrire <code>../../models/...</code>.</li>
+  <li><strong><code>olderMessagesValidator</code> :</strong> le validateur de <code>?before=345</code> pour « Messages précédents ». Il est expliqué au point 4.</li>
 </ul>
 
-<pre><code>import { construitVueMessage, construitApercu, chercheParticipationPrivee,
-         donneInitiales, donneHeureDeLaListe, marqueConversationCommeLue,
-         donneNombreMessagesNonLus } from '../service/chat_service.ts'
-import { marqueConversationCommeLueEtPrevient } from './../service/realtime_service.ts'
-import { aBloque } from '../service/block_service.ts'</code></pre>
+<pre><code>import {
+  PRIVATE_TYPE, construitVueMessage, construitApercu, chargePageMessages,
+  chercheParticipationPrivee, donneInitiales, donneHeureDeLaListe,
+  memeJourQueLePremierAffiche, donneNombreMessagesNonLus,
+} from '#services/chat_service'
+import { marqueConversationCommeLueEtPrevient } from '#services/realtime_service'
+import { aBloque } from '#services/block_service'</code></pre>
 <p>Ce sont les outils venus d'autres fichiers. Chacun est expliqué plus bas, là où il est utilisé.</p>
+<ul>
+  <li><strong><code>#services/...</code> :</strong> un alias, comme <code>#models</code>. Il remplace l'ancien <code>'../service/chat_service.ts'</code>, depuis que le dossier s'appelle <code>app/services</code>.</li>
+  <li><strong><code>PRIVATE_TYPE</code> :</strong> la constante <code>'Privee'</code>. Avant, le texte était écrit en dur dans la requête de la liste.</li>
+</ul>
 
-<pre><code>const MESSAGES_LIMIT = 100</code></pre>
-<p>C'est le nombre maximum de messages chargés à l'ouverture d'une conversation. Une constante nommée est plus claire qu'un <code>100</code> écrit au milieu d'une requête.</p>
+<p>L'ancienne constante <code>MESSAGES_LIMIT = 100</code> a disparu. La taille d'une page est maintenant <code>MESSAGES_PER_PAGE = 50</code>, dans <span class="file">app/services/chat_service.ts</span>, et elle est partagée avec les groupes.</p>
 
 <pre><code>export default class ConversationsController {</code></pre>
 <p>C'est la classe que les routes appellent avec <code>controllers.Conversations</code>.</p>
@@ -181,7 +194,7 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
 }</code></pre>
 <ul>
   <li><strong><code>getUserOrFail()</code> :</strong> récupère l'utilisateur connecté, ou lance une erreur s'il n'y en a pas.</li>
-  <li><strong><code>this.donneListeConversations(user)</code> :</strong> prépare la liste de gauche, expliquée en détail au point 5. <code>this</code> désigne le contrôleur.</li>
+  <li><strong><code>this.donneListeConversations(user)</code> :</strong> prépare la liste de gauche, expliquée en détail au point 6. <code>this</code> désigne le contrôleur.</li>
   <li><strong><code>chat: null</code> :</strong> aucune conversation n'est ouverte, et la vue utilise <code>@if(chat)</code> pour afficher le panneau vide. C'est le <code>@include('partials/chat-empty')</code> de <span class="file">resources/views/partials/chat-panel.edge</span>.</li>
 </ul>
 
@@ -192,8 +205,8 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
   const user = auth.getUserOrFail()
   const chat = await this.donneDiscussion(user, Number(params.id))</code></pre>
 <ul>
-  <li><strong><code>params.id</code> :</strong> le <code>:id</code> de l'adresse. Pour <code>/conversations/12</code>, il vaut le texte <code>'12'</code>, et <code>Number(...)</code> le convertit en nombre <code>12</code>.</li>
-  <li><strong><code>this.donneDiscussion</code> :</strong> vérifie que tu fais partie de la conversation, puis prépare ses messages (point 6). Si tu n'en fais pas partie, l'erreur arrête tout ici.</li>
+  <li><strong><code>params.id</code> :</strong> le <code>:id</code> de l'adresse, par exemple <code>12</code> pour <code>/conversations/12</code>. Grâce au matcher de la route, c'est déjà un nombre. <code>Number(...)</code> reste comme sécurité, sans effet.</li>
+  <li><strong><code>this.donneDiscussion</code> :</strong> vérifie que tu fais partie de la conversation, puis prépare ses messages (point 7). Si tu n'en fais pas partie, l'erreur arrête tout ici.</li>
 </ul>
 
 <pre><code>  if (request.header('x-requested-with') === 'XMLHttpRequest') {
@@ -211,10 +224,89 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
   <li>La liste est calculée ensuite, et cette conversation n'affiche donc plus de badge de non-lus.</li>
 </ol>
 <p>Inversés, ces deux appels afficheraient un badge « 3 » à côté d'une conversation que tu es en train de lire.</p>
-<p><code>chat.id</code> est passé pour que la conversation ouverte reste visible dans la liste, même si elle était cachée (point 5).</p>
+<p><code>chat.id</code> est passé pour que la conversation ouverte reste visible dans la liste, même si elle était cachée (point 6).</p>
 
 <!-- ============================================================ -->
-<h2 id="supprimer">4. <code>supprimeConversation</code> : retirer une conversation de ta liste</h2>
+<h2 id="precedents">4. <code>donneMessagesPrecedents</code> : charger les messages plus anciens</h2>
+
+<p>Elle est appelée par le bouton « Afficher les messages précédents », en haut de la discussion. Elle renvoie la page de 50 messages juste avant le plus ancien déjà affiché.</p>
+
+<pre><code>async donneMessagesPrecedents({ auth, params, request, response, view }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const conversationId = Number(params.id)
+  const { before } = await olderMessagesValidator.validate(request.qs())</code></pre>
+<ul>
+  <li><strong><code>request.qs()</code> :</strong> la « query string », c'est-à-dire ce qui suit le <code>?</code> dans l'adresse. Pour <code>/conversations/12/messages?before=345</code>, elle vaut <code>{ before: '345' }</code>.</li>
+  <li><strong><code>olderMessagesValidator.validate(...)</code> :</strong> on valide un objet donné, au lieu de <code>request.validateUsing</code> qui lit le corps de la requête. Le validateur, dans <span class="file">app/validators/message.ts</span> :
+<pre><code>export const olderMessagesValidator = vine.create({
+  before: vine.number().withoutDecimals().positive(),
+})</code></pre>
+  <code>before</code> doit être un nombre entier et positif. VineJS convertit aussi le texte <code>'345'</code> en nombre <code>345</code>. Si la valeur manque ou ne convient pas, la réponse est une erreur 422.</li>
+  <li><strong><code>before</code> :</strong> l'identifiant du <strong>plus ancien message déjà affiché</strong>. On veut les messages qui viennent juste avant lui.</li>
+</ul>
+
+<pre><code>  const membership = await chercheParticipationPrivee(user.id, conversationId).firstOrFail()
+  const otherMembership = await UserConversation.query()
+    .where('conversationId', conversationId)
+    .whereNot('userId', user.id)
+    .firstOrFail()</code></pre>
+<ul>
+  <li><strong>Première requête :</strong> le même contrôle d'accès qu'à l'ouverture. Sans participation, la réponse est une 404, sinon n'importe qui pourrait lire l'historique d'une conversation en devinant son numéro. On garde aussi <code>membership</code> pour son <code>removedAt</code>.</li>
+  <li><strong>Seconde requête :</strong> la participation de <strong>l'autre</strong> personne, c'est-à-dire la ligne de cette conversation qui n'est pas la tienne. Son <code>userId</code> sert à charger les bonnes coches.</li>
+</ul>
+
+<pre><code>  const page = await this.chargeMessages(
+    conversationId,
+    otherMembership.userId,
+    membership.removedAt,
+    before
+  )</code></pre>
+<p>Elle charge la page, avec les mêmes règles qu'à l'ouverture : les messages cachés par <code>removedAt</code> restent cachés. La seule différence est le curseur <code>before</code>, au lieu de <code>null</code>. Voir le <a href="#pagination">point 8</a>.</p>
+
+<pre><code>  return response.ok({
+    html: await view.render('partials/messages-page', {
+      messages: page.messages.map((message) =&gt; construitVueMessage(message, user.id)),
+    }),
+    hasMore: page.hasMore,
+    oldestId: page.oldestId,
+    dropFirstSeparator: await memeJourQueLePremierAffiche(page.messages, conversationId, before),
+  })
+}</code></pre>
+<p>La réponse est du JSON qui <strong>contient du HTML</strong> :</p>
+<ul>
+  <li><strong><code>html</code> :</strong> les bulles déjà fabriquées par le serveur. <code>partials/messages-page.edge</code> appelle simplement <code>components/message-list</code>, le <strong>même composant</strong> qu'à l'ouverture de la discussion. Une bulle a donc toujours le même aspect, qu'elle soit chargée tout de suite ou plus tard.</li>
+  <li><strong><code>hasMore</code> :</strong> reste-t-il des messages encore plus anciens ? Si ce n'est pas le cas, le bouton disparaît.</li>
+  <li><strong><code>oldestId</code> :</strong> le nouveau « plus ancien affiché », c'est-à-dire le prochain <code>before</code>.</li>
+  <li><strong><code>dropFirstSeparator</code> :</strong> faut-il retirer le séparateur de jour qui est déjà en haut ? <code>memeJourQueLePremierAffiche</code>, dans <span class="file">chat_service.ts</span>, compare le jour du <strong>dernier message chargé</strong> avec celui du <strong>premier message déjà affiché</strong>. S'ils sont du même jour, le séparateur « Hier », par exemple, apparaîtrait deux fois : une fois au-dessus de la page chargée, et une fois au milieu de la journée. On retire donc celui du milieu.</li>
+</ul>
+
+<h3>Côté navigateur : <code>chargerMessagesPrecedents</code> dans <span class="file">resources/js/message.js</span></h3>
+<pre><code>reponse = await fetch(bouton.dataset.url + '?before=' + bouton.dataset.before, { headers: { Accept: 'application/json', ... } })
+...
+if (corps.dropFirstSeparator) {
+  let separateur = zone.querySelector('[data-day-separator]')
+  if (separateur !== null) { separateur.remove() }
+}
+
+let hauteurAvant = zone.scrollHeight
+bloc.insertAdjacentHTML('afterend', corps.html)
+zone.scrollTop += zone.scrollHeight - hauteurAvant
+
+if (corps.hasMore) {
+  bouton.dataset.before = corps.oldestId
+  bouton.disabled = false
+} else {
+  bloc.remove()
+}</code></pre>
+<ul>
+  <li><strong>L'adresse et le curseur</strong> sont écrits dans le bouton par <code>components/load-older.edge</code> (<code>data-url</code> et <code>data-before</code>). Le bouton n'est affiché que si <code>hasMore</code> est vrai.</li>
+  <li><strong><code>insertAdjacentHTML('afterend', ...)</code> :</strong> insère les anciennes bulles juste <strong>sous le bouton</strong>, donc tout en haut des messages.</li>
+  <li><strong>Le calcul avec <code>scrollHeight</code> :</strong> ajouter du contenu en haut ferait sauter l'affichage, et tu perdrais le message que tu regardais. On mesure la hauteur avant l'ajout, puis on descend de la différence : l'écran reste immobile.</li>
+  <li><strong>Enfin :</strong> le bouton reçoit le nouveau curseur, ou disparaît quand tout l'historique est affiché.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="supprimer">5. <code>supprimeConversation</code> : retirer une conversation de ta liste</h2>
 
 <pre><code>async supprimeConversation({ auth, params, response }: HttpContext) {
   const user = auth.getUserOrFail()
@@ -223,7 +315,7 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
 
 <pre><code>  const membership = await chercheParticipationPrivee(user.id, conversationId).firstOrFail()</code></pre>
 
-<p><strong><code>chercheParticipationPrivee</code></strong> vient de <span class="file">app/service/chat_service.ts</span> :</p>
+<p><strong><code>chercheParticipationPrivee</code></strong> vient de <span class="file">app/services/chat_service.ts</span> :</p>
 <pre><code>export function chercheParticipationPrivee(userId, conversationId) {
   return UserConversation.query()
     .where('userId', userId)                    // ma participation...
@@ -235,7 +327,7 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
     })
 }</code></pre>
 <ul>
-  <li><strong>Elle ne fait que préparer :</strong> la fonction n'a pas d'<code>async</code> et renvoie une requête sans l'exécuter. Ça permet à chaque appelant d'ajouter ce qu'il veut, comme <code>.preload(...)</code> au point 6.</li>
+  <li><strong>Elle ne fait que préparer :</strong> la fonction n'a pas d'<code>async</code> et renvoie une requête sans l'exécuter. Ça permet à chaque appelant d'ajouter ce qu'il veut, comme <code>.preload(...)</code> au point 7.</li>
   <li><strong><code>whereHas</code> :</strong> veut dire « garde seulement les lignes qui ont une relation correspondant à ce critère ». Ici, deux niveaux sont imbriqués : la participation doit mener à une conversation, dont le type doit être <code>'Privee'</code>.</li>
   <li><strong><code>.firstOrFail()</code> :</strong> exécute la requête et prend la première ligne. S'il n'y en a aucune, il lance une erreur que AdonisJS transforme en <strong>404</strong>.</li>
 </ul>
@@ -247,23 +339,18 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
   await membership.save()</code></pre>
 <p>Elle enregistre la date actuelle dans <strong>ta</strong> ligne de participation. Aucun message n'est supprimé, et la ligne de l'autre personne ne change pas, donc elle garde toute la conversation. Plus tard, le code ne te montrera que les messages postérieurs à cette date.</p>
 
-<pre><code>  await marqueConversationCommeLue(user.id, conversationId)</code></pre>
-<p><strong><code>marqueConversationCommeLue</code></strong> vient de <span class="file">app/service/chat_service.ts</span> :</p>
-<pre><code>await db
-  .from('message_statuses')
-  .where('user_id', userId)              // mes statuts...
-  .where('is_read', false)               // ...encore non lus...
-  .whereIn('message_id',                 // ...pour les messages de cette conversation
-    db.from('messages').select('id').where('conversation_id', conversationId))
-  .update({ is_read: true, status: 'read', updated_at: new Date() })</code></pre>
-<p>Elle passe tous tes messages non lus de cette conversation à « lu », en une seule requête SQL <code>UPDATE</code> avec une sous-requête. Sans elle, ton compteur de non-lus compterait encore des messages que tu ne peux plus voir.</p>
+<pre><code>  await marqueConversationCommeLueEtPrevient(user.id, conversationId)</code></pre>
+<p>Elle passe tous tes messages non lus de cette conversation à « lu ». Sans ça, ton compteur de non-lus compterait encore des messages que tu ne peux plus voir. La fonction est la même qu'à l'ouverture d'une conversation (voir le <a href="#discussion">point 7</a>). Elle <strong>prévient aussi l'autre personne</strong> : ses coches passent au bleu en direct.</p>
+<div class="note">
+  <p><strong>Ce qui a changé :</strong> avant, cette ligne appelait <code>marqueConversationCommeLue</code>, une version qui ne prévenait personne. Les messages étaient « lus » en base, mais l'autre ne voyait pas ses coches changer. Cette ancienne fonction a été supprimée de <code>chat_service.ts</code> : il n'y a plus qu'une seule façon de marquer comme lu.</p>
+</div>
 
 <pre><code>  return response.ok({ message: 'La conversation a été supprimée.' })
 }</code></pre>
 <p>Elle répond par un code <strong>200</strong> avec du JSON, et c'est le JavaScript de la page qui affiche le message.</p>
 
 <!-- ============================================================ -->
-<h2 id="liste">5. <code>donneListeConversations</code> : la liste de gauche</h2>
+<h2 id="liste">6. <code>donneListeConversations</code> : la liste de gauche</h2>
 
 <p>C'est la méthode la plus longue. Elle se fait en quatre temps : charger les données, compter les non-lus, filtrer et préparer chaque ligne, puis trier.</p>
 
@@ -281,7 +368,7 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
 
 <pre><code>  .whereHas('conversation', (conversationQuery) =&gt; {
     conversationQuery.whereHas('type', (typeQuery) =&gt; {
-      typeQuery.where('type', 'Privee')
+      typeQuery.where('type', PRIVATE_TYPE)
     })
   })</code></pre>
 <p>Elle ne garde que les conversations privées, avec le même filtre que dans <code>chercheParticipationPrivee</code>. Les groupes ont leur propre contrôleur.</p>
@@ -318,7 +405,7 @@ import { aBloque } from '../service/block_service.ts'</code></pre>
 )</code></pre>
 <p>Elle extrait d'abord la liste des identifiants, par exemple <code>[12, 15, 20]</code>, avec <code>map</code>.</p>
 
-<p><strong><code>donneNombreMessagesNonLus</code></strong> vient de <span class="file">app/service/chat_service.ts</span> :</p>
+<p><strong><code>donneNombreMessagesNonLus</code></strong> vient de <span class="file">app/services/chat_service.ts</span> :</p>
 <pre><code>const counts = new Map&lt;number, number&gt;()
 
 if (conversationIds.length === 0) {
@@ -396,7 +483,7 @@ for (const membership of memberships) {</code></pre>
       isOnline: otherUser.isOnline,</code></pre>
 <p>La seconde, <strong><code>view</code></strong>, contient ce que la vue affichera. <code>userId</code> sert à la puce de présence mise à jour en direct.</p>
 
-<p><strong><code>donneInitiales</code></strong> vient de <span class="file">app/service/chat_service.ts</span> :</p>
+<p><strong><code>donneInitiales</code></strong> vient de <span class="file">app/services/chat_service.ts</span> :</p>
 <pre><code>return fullName
   .split(' ')                        // "Jean  Paul Dupont" → ['Jean', '', 'Paul', 'Dupont']
   .filter(Boolean)                   // retire les vides  → ['Jean', 'Paul', 'Dupont']
@@ -405,7 +492,7 @@ for (const membership of memberships) {</code></pre>
   .join('')                          // assemble          → 'JP'</code></pre>
 
 <pre><code>      preview: lastMessage ? construitApercu(lastMessage, user.id) : 'Aucun message',</code></pre>
-<p><strong><code>construitApercu</code></strong> vient de <span class="file">app/service/chat_service.ts</span> :</p>
+<p><strong><code>construitApercu</code></strong> vient de <span class="file">app/services/chat_service.ts</span> :</p>
 <pre><code>if (message.isDeleted) {
   return 'Message supprimé'
 }
@@ -431,7 +518,7 @@ return text</code></pre>
 </div>
 
 <pre><code>      time: lastMessage ? donneHeureDeLaListe(lastMessage.createdAt) : '',</code></pre>
-<p><strong><code>donneHeureDeLaListe</code></strong> vient de <span class="file">app/service/chat_service.ts</span> :</p>
+<p><strong><code>donneHeureDeLaListe</code></strong> vient de <span class="file">app/services/chat_service.ts</span> :</p>
 <pre><code>return donneNombreJoursEcoules(date) === 0 ? formateHeure(date) : donneLibelleDuJour(date)</code></pre>
 <p>Elle s'appuie sur des petites fonctions du même fichier :</p>
 <ul>
@@ -458,7 +545,7 @@ return items.map((item) =&gt; item.view)</code></pre>
 <p>Le tri se fait en JavaScript, car la date utilisée dépend de règles calculées dans la boucle, comme les messages cachés.</p>
 
 <!-- ============================================================ -->
-<h2 id="discussion">6. <code>donneDiscussion</code> : préparer la conversation ouverte</h2>
+<h2 id="discussion">7. <code>donneDiscussion</code> : préparer la conversation ouverte</h2>
 
 <pre><code>private async donneDiscussion(user: User, conversationId: number) {
   const membership = await chercheParticipationPrivee(user.id, conversationId)
@@ -477,7 +564,7 @@ return items.map((item) =&gt; item.view)</code></pre>
 <p>Contrairement à la liste, où on pouvait simplement ignorer la ligne, ici il n'y a rien à afficher sans interlocuteur. <code>throw</code> arrête donc la requête avec une erreur.</p>
 
 <pre><code>  await marqueConversationCommeLueEtPrevient(user.id, conversationId)</code></pre>
-<p>Ouvrir une conversation veut dire la lire. <strong><code>marqueConversationCommeLueEtPrevient</code></strong> vient de <span class="file">app/service/realtime_service.ts</span>, et fait plus que <code>marqueConversationCommeLue</code> :</p>
+<p>Ouvrir une conversation veut dire la lire. <strong><code>marqueConversationCommeLueEtPrevient</code></strong> vient de <span class="file">app/services/realtime_service.ts</span>, et fait plus que <code>marqueConversationCommeLue</code> :</p>
 <ol>
   <li><strong>Elle trouve tes messages non lus</strong> dans cette conversation. S'il n'y en a aucun, elle s'arrête tout de suite.</li>
   <li><strong>Elle les passe à « lu ».</strong></li>
@@ -485,39 +572,20 @@ return items.map((item) =&gt; item.view)</code></pre>
   <li><strong>Elle prévient chaque auteur en temps réel</strong>, avec <code>envoieAUtilisateur</code> et un événement <code>messages:read</code>. C'est ce qui fait passer ses coches au bleu sans qu'il recharge sa page.</li>
 </ol>
 
-<pre><code>  const messagesQuery = Message.query()
-    .where('conversationId', conversationId)</code></pre>
-<p>Elle prépare la requête des messages de la conversation.</p>
-
-<pre><code>    .preload('attachments')</code></pre>
-<p>Elle charge les fichiers joints de chaque message.</p>
-
-<pre><code>    .preload('statuses', (statusQuery) =&gt; {
-      statusQuery.where('userId', otherUser.id)
-    })</code></pre>
-<p>Elle charge seulement les statuts de <strong>l'autre personne</strong>. Pour tes messages, ils indiquent si elle les a lus, donc si les coches sont bleues. Tes propres statuts ne servent à rien ici, puisque tu viens de tout lire.</p>
-
-<pre><code>    .orderBy('createdAt', 'desc')
-    .orderBy('id', 'desc')
-    .limit(MESSAGES_LIMIT)</code></pre>
-<p>Elle prend les <strong>100 plus récents</strong>. Le tri descendant met les plus récents en premier, et <code>limit</code> garde les 100 premiers. Le second tri sur <code>id</code> départage deux messages envoyés à la même seconde, pour que l'ordre reste toujours le même.</p>
-
-<pre><code>  if (membership.removedAt) {
-    messagesQuery.where('createdAt', '&gt;', membership.removedAt.toJSDate())
-  }</code></pre>
-<p>Si tu avais supprimé la conversation, elle n'affiche que les messages arrivés <strong>après</strong>. <code>.toJSDate()</code> convertit la date Luxon en date JavaScript classique, que la base comprend. Ce <code>where</code> s'ajoute à la même requête, sans avoir besoin de réaffecter la variable.</p>
-
-<pre><code>  const messages = await messagesQuery
-  messages.reverse()</code></pre>
+<pre><code>  // La page la plus récente ; les plus anciennes se chargent avec « Messages précédents »
+  const page = await this.chargeMessages(conversationId, otherUser.id, membership.removedAt, null)</code></pre>
+<p>Avant, la requête des messages était écrite ici, avec ses 100 messages au maximum. Elle est maintenant dans <code>chargeMessages</code> (voir le <a href="#pagination">point 8</a>), qui sert <strong>aussi</strong> à « Messages précédents ».</p>
 <ul>
-  <li><strong><code>await messagesQuery</code> :</strong> c'est ici que la requête s'exécute.</li>
-  <li><strong><code>reverse()</code> :</strong> remet les messages du plus ancien au plus récent, l'ordre de lecture normal. Il fallait trier à l'envers pour obtenir les 100 derniers, puis les remettre dans l'ordre.</li>
+  <li><strong><code>otherUser.id</code> :</strong> pour charger les statuts de l'autre personne, donc les coches de tes messages.</li>
+  <li><strong><code>membership.removedAt</code> :</strong> pour cacher les messages antérieurs à la suppression de la conversation.</li>
+  <li><strong><code>null</code> :</strong> pas de curseur, donc la page <strong>la plus récente</strong>, avec les 50 derniers messages.</li>
 </ul>
+<p><code>page</code> vaut alors <code>{ messages, hasMore, oldestId }</code>.</p>
 
 <pre><code>  return {
     id: conversationId,
     blockedByMe: await aBloque(user.id, otherUser.id),</code></pre>
-<p><strong><code>aBloque</code></strong> vient de <span class="file">app/service/block_service.ts</span> :</p>
+<p><strong><code>aBloque</code></strong> vient de <span class="file">app/services/block_service.ts</span> :</p>
 <pre><code>const row = await BlockedUser.query()
   .where('blockerId', blockerId)   // celui qui bloque : toi
   .where('blockedId', blockedId)   // celui qui est bloqué : l'autre
@@ -535,16 +603,20 @@ return row !== null                // une ligne existe → tu l'as bloqué</code
     },</code></pre>
 <p>Ce sont les informations de l'en-tête du panneau : avatar, nom et statut en ligne.</p>
 
-<pre><code>    messages: messages.map((message) =&gt; construitVueMessage(message, user.id)),
+<pre><code>    messages: page.messages.map((message) =&gt; construitVueMessage(message, user.id)),
+    hasMore: page.hasMore,
+    oldestId: page.oldestId,
   }
 }</code></pre>
-<p><strong><code>construitVueMessage</code></strong> vient de <span class="file">app/service/chat_service.ts</span>. Elle transforme chaque message en objet simple, prêt pour <code>message-bubble.edge</code> :</p>
+<p><code>hasMore</code> et <code>oldestId</code> vont au composant <code>load-older</code> de <span class="file">chat-panel.edge</span>. Si des messages plus anciens existent, il affiche le bouton « Afficher les messages précédents », avec <code>data-before</code> égal à <code>oldestId</code>.</p>
+<p><strong><code>construitVueMessage</code></strong> vient de <span class="file">app/services/chat_service.ts</span>. Elle transforme chaque message en objet simple, prêt pour <code>message-bubble.edge</code> :</p>
 
 <div class="table-wrap">
 <table>
   <tr><th>Propriété</th><th>Calcul</th><th>Utilité</th></tr>
   <tr><td><code>isMine</code></td><td><code>message.userId === currentUserId</code></td><td>Bulle à droite, en bleu, avec les boutons Modifier / Supprimer</td></tr>
   <tr><td><code>isRead</code></td><td>Au moins un statut, et tous à <code>isRead</code></td><td>Coches bleues</td></tr>
+  <tr><td><code>isDelivered</code></td><td>Au moins un statut, et aucun encore à <code>'sent'</code></td><td>Deux coches grises (« reçu »)</td></tr>
   <tr><td><code>isEdited</code></td><td><code>updatedAt</code> dépasse <code>createdAt</code> de plus d'une seconde</td><td>Mention « modifié »</td></tr>
   <tr><td><code>time</code></td><td><code>formateHeure</code></td><td><code>14:05</code></td></tr>
   <tr><td><code>dayKey</code></td><td><code>donneCleDuJour</code>, par exemple <code>2026-10-12</code></td><td>Savoir si deux messages sont du même jour</td></tr>
@@ -553,7 +625,83 @@ return row !== null                // une ligne existe → tu l'as bloqué</code
 </table>
 </div>
 <p><code>isEdited</code> n'utilise pas de colonne dédiée : un message modifié a forcément été enregistré plus tard que sa création. La marge d'une seconde évite qu'un écart minuscule à la création le marque à tort.</p>
-<p><code>dayKey</code> explique aussi la condition dans <code>chat-panel.edge</code> : un séparateur de jour est ajouté quand la clé change d'un message au suivant.</p>
+<p><strong>Les trois états d'une coche</strong>, avec les constantes de <span class="file">chat_service.ts</span> :</p>
+<ul>
+  <li><code>STATUS_SENT = 'sent'</code> : enregistré sur le serveur. Une coche grise.</li>
+  <li><code>STATUS_DELIVERED = 'delivered'</code> : arrivé sur l'appareil du destinataire. Deux coches grises.</li>
+  <li><code>STATUS_READ = 'read'</code> : la conversation a été ouverte. Deux coches bleues.</li>
+</ul>
+<p>Un message lu a forcément été reçu. <code>isDelivered</code> teste donc « pas encore <code>'sent'</code> », ce qui couvre à la fois « reçu » et « lu ». L'état « reçu » est expliqué dans les fichiers sur les messages et le temps réel.</p>
+<p><code>dayKey</code> explique aussi la condition dans <code>components/message-list.edge</code>, le composant qui affiche une page de messages : un séparateur de jour est ajouté quand la clé change d'un message au suivant.</p>
+
+<!-- ============================================================ -->
+<h2 id="pagination">8. <code>chargeMessages</code> et <code>chargePageMessages</code> : la pagination</h2>
+
+<pre><code>private chargeMessages(
+  conversationId: number,
+  otherUserId: User['id'],
+  removedAt: DateTime | null,
+  before: number | null
+) {
+  return chargePageMessages({
+    conversationId,
+    before,
+    visibleAfter: removedAt,
+    prepare: (query) =&gt; {
+      query.preload('attachments').preload('statuses', (statusQuery) =&gt; {
+        statusQuery.where('userId', otherUserId) // pour les coches de mes messages
+      })
+    },
+  })
+}</code></pre>
+<p>Elle ne contient que ce qui est <strong>propre aux conversations privées</strong> : les fichiers joints et les statuts de l'autre personne. Le reste est fait par <code>chargePageMessages</code>, qui sert aussi aux groupes.</p>
+<ul>
+  <li><strong>Pas de <code>async</code> :</strong> elle renvoie directement la promesse de <code>chargePageMessages</code>. Les appelants font le <code>await</code>.</li>
+  <li><strong><code>prepare</code> :</strong> une <strong>fonction passée en paramètre</strong>. <code>chargePageMessages</code> l'appelle avec sa requête en construction, et chaque contrôleur y ajoute ses <code>preload</code>. En groupe, par exemple, on charge en plus l'auteur de chaque message.</li>
+</ul>
+
+<p><strong><code>chargePageMessages</code></strong>, dans <span class="file">app/services/chat_service.ts</span> :</p>
+<pre><code>export async function chargePageMessages(options: {
+  conversationId: number
+  before: number | null
+  visibleAfter: DateTime | null
+  prepare: (query: ModelQueryBuilderContract&lt;typeof Message&gt;) =&gt; void
+}) {
+  const query = Message.query()
+    .where('conversationId', options.conversationId)
+    .orderBy('id', 'desc')
+    .limit(MESSAGES_PER_PAGE + 1)
+
+  if (options.before !== null) {
+    query.where('id', '&lt;', options.before)
+  }
+  if (options.visibleAfter !== null) {
+    query.where('createdAt', '&gt;', options.visibleAfter.toJSDate())
+  }
+  options.prepare(query)
+
+  const rows = await query
+  const hasMore = rows.length &gt; MESSAGES_PER_PAGE
+  const messages = rows.slice(0, MESSAGES_PER_PAGE).reverse()
+
+  return { messages, hasMore, oldestId: messages[0]?.id ?? null }
+}</code></pre>
+<ul>
+  <li><strong>Un seul paramètre <code>options</code> :</strong> un objet avec des noms. À l'appel, <code>{ conversationId, before, visibleAfter, prepare }</code> se lit mieux que quatre valeurs dans un ordre à retenir.</li>
+  <li><strong><code>ModelQueryBuilderContract&lt;typeof Message&gt;</code> :</strong> le type d'une requête Lucid sur le modèle <code>Message</code>. TypeScript sait ainsi que <code>query.preload('attachments')</code> est valide.</li>
+  <li><strong><code>orderBy('id', 'desc')</code> :</strong> du plus récent au plus ancien. Les identifiants augmentent avec le temps, donc un identifiant plus grand veut dire un message plus récent.</li>
+  <li><strong><code>limit(MESSAGES_PER_PAGE + 1)</code> :</strong> on demande <strong>51</strong> messages pour une page de 50. Le 51ᵉ n'est pas affiché : il sert seulement à savoir s'il en reste d'autres. Ça évite une seconde requête <code>count</code>.</li>
+  <li><strong><code>where('id', '&lt;', before)</code> :</strong> la pagination <strong>par curseur</strong>. « Donne-moi ceux qui sont avant le message 345 ».</li>
+  <li><strong><code>visibleAfter</code> :</strong> la règle de <code>removedAt</code>, appliquée à chaque page. Les anciens messages restent cachés, même avec le bouton.</li>
+  <li><strong><code>options.prepare(query)</code> :</strong> ajoute les <code>preload</code> propres à l'appelant.</li>
+  <li><strong><code>hasMore</code> :</strong> vrai si la base a renvoyé plus de 50 lignes.</li>
+  <li><strong><code>slice(0, 50).reverse()</code> :</strong> on garde 50 messages, puis on les remet du plus ancien au plus récent, l'ordre de lecture.</li>
+  <li><strong><code>oldestId</code> :</strong> l'identifiant du premier message après le <code>reverse</code>, donc le plus ancien de la page. C'est le prochain curseur. <code>?.</code> et <code>?? null</code> gèrent une page vide.</li>
+</ul>
+
+<div class="note">
+  <p><strong>Pourquoi un curseur plutôt qu'un numéro de page ?</strong> Avec « page 2 = messages 51 à 100 », il y a un problème si Ana envoie 3 messages pendant que tu lis. Tout se décale de 3, et la page 2 répéterait 3 messages déjà affichés. Avec « avant le message 345 », l'arrivée de nouveaux messages ne change rien : 345 reste 345.</p>
+</div>
 
 <!-- ============================================================ -->
 <h2 id="parcours">Le parcours complet d'un clic sur une conversation</h2>
@@ -564,18 +712,30 @@ return row !== null                // une ligne existe → tu l'as bloqué</code
       → donneDiscussion
           → chercheParticipationPrivee + firstOrFail  (tu en fais partie ? sinon 404)
           → marqueConversationCommeLueEtPrevient      (lu + coches bleues chez l'autre)
-          → 100 derniers messages, remis dans l'ordre
+          → chargeMessages : 50 derniers messages (+ hasMore, oldestId)
           → aBloque, construitVueMessage
       → en-tête présent : partials/chat-panel
-  → message.js remplace le panneau et met à jour l'adresse avec history.pushState</code></pre>
+  → message.js remplace le panneau et met à jour l'adresse avec history.pushState
+
+Clic sur « Afficher les messages précédents »
+  → message.js : fetch('/conversations/12/messages?before=345')
+  → donneMessagesPrecedents : contrôle d'accès, chargeMessages(before = 345)
+  → JSON { html, hasMore, oldestId, dropFirstSeparator }
+  → message.js insère les bulles en haut sans faire sauter l'écran</code></pre>
 
 <!-- ============================================================ -->
 <h2 id="remarques">Ce qui a été remarqué</h2>
 
+<div class="note">
+  <p><strong>Corrigé depuis la première version de ce document :</strong></p>
+  <p>• <strong>La suppression prévient maintenant l'auteur :</strong> <code>supprimeConversation</code> utilise <code>marqueConversationCommeLueEtPrevient</code>, et les coches de l'autre passent au bleu en direct.</p>
+  <p>• <strong>Les identifiants non numériques sont refusés :</strong> grâce à <code>.where('id', ID_NUMERIQUE)</code> dans les routes, <code>/conversations/abc</code> donne une 404 et plus une erreur 500.</p>
+  <p>• <strong>L'historique n'est plus coupé :</strong> au-delà des 100 derniers messages, rien n'était accessible. La pagination permet maintenant de tout remonter.</p>
+</div>
+
 <div class="warn">
-  <p><strong>La suppression ne prévient pas l'auteur :</strong> <code>supprimeConversation</code> utilise <code>marqueConversationCommeLue</code>, et non la version <code>...EtPrevient</code>. Les messages passent donc à « lu » en base, mais l'autre personne ne voit pas ses coches devenir bleues en direct. Ce n'est un problème que si ce n'est pas voulu.</p>
-  <p><strong>Un identifiant non numérique n'est pas validé :</strong> pour <code>/conversations/abc</code>, <code>Number('abc')</code> donne <code>NaN</code>. PostgreSQL refuserait probablement cette valeur, ce qui donnerait une erreur 500 au lieu d'une 404. La page Utilisateurs a un validateur pour ce genre de cas, mais pas cette route.</p>
-  <p><strong>Le compteur du profil ne suit pas la même règle :</strong> cette page cache les messages antérieurs à <code>removedAt</code>, alors que <code>compteMessages</code>, dans le contrôleur de profil, les compte encore.</p>
+  <p><strong>Toujours d'actualité, le compteur du profil :</strong> cette page cache les messages antérieurs à <code>removedAt</code>, alors que <code>compteMessages</code>, dans le contrôleur de profil, les compte encore.</p>
+  <p><strong>Deux requêtes pour l'autre participant :</strong> <code>donneMessagesPrecedents</code> relit la participation de l'autre à chaque clic. C'est sans gravité, une requête simple et indexée, mais on pourrait garder son identifiant dans le bouton.</p>
 </div>
 
 </main>

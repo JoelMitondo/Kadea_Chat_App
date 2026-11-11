@@ -46,13 +46,16 @@
   <p><strong>Le parcours d'un message</strong>, résumé par le commentaire en tête du fichier : formulaire → route → ce contrôleur (validation, droits, base de données) → réponse à l'expéditeur + événement temps réel vers les autres participants.</p>
   <p><strong>Une seule méthode fait le vrai travail d'envoi :</strong> <code>envoieMessage</code>. Les méthodes privée et groupe vérifient seulement que tu es membre, puis lui passent la main.</p>
   <p><strong>Le serveur fabrique le HTML de la bulle :</strong> le navigateur reçoit une bulle déjà prête et n'a qu'à l'insérer.</p>
+  <p><strong>Les droits sont dans une policy :</strong> « seul l'auteur peut modifier ou supprimer » et « on ne peut pas écrire à quelqu'un qui nous a bloqué » sont rangés dans <code>app/policies/conversation_policy.ts</code>. Le contrôleur demande seulement à Bouncer.</p>
 </div>
+<p class="file">Mis à jour le 06/11/2026 pour suivre les corrections P0, P1 et P2 : policies Bouncer, statut « reçu », texte effacé à la suppression, outils <code>donneDernierMessage</code> et <code>donneTypeMessage</code>, et alias <code>#services/...</code>.</p>
 
 <nav class="toc">
   <strong>Sommaire</strong>
   <ol>
     <li><a href="#routes">Les routes</a></li>
     <li><a href="#imports">Les imports</a></li>
+    <li><a href="#policy">La policy Bouncer (conversation_policy.ts)</a></li>
     <li><a href="#prive">enregistreMessagePrive et enregistreMessageGroupe</a></li>
     <li><a href="#modifier">modifieMessage</a></li>
     <li><a href="#supprimer">supprimeMessage</a></li>
@@ -79,7 +82,7 @@
 <p>Attention : dans les deux premières routes, <code>:id</code> est l'identifiant de la <strong>conversation</strong>. Dans les deux dernières, c'est celui du <strong>message</strong>.</p>
 
 <!-- ============================================================ -->
-<h2 id="imports">1. Les imports (lignes 5 à 35)</h2>
+<h2 id="imports">1. Les imports (lignes 1 à 31)</h2>
 
 <pre><code>import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
@@ -90,13 +93,18 @@ import { DateTime } from 'luxon'</code></pre>
   <li><strong><code>DateTime</code> :</strong> Luxon, pour la date de suppression.</li>
 </ul>
 
-<pre><code>import type User from '#models/user'
+<pre><code>import User from '#models/user'
+import ConversationPolicy from '#policies/conversation_policy'
 import Conversation from '#models/conversation'
 import Message from '#models/message'
 import MessageAttachment from '#models/message_attachment'
 import MessageStatus from '#models/message_status'
-import MessageType from '#models/message_type'
 import UserConversation from '#models/user_conversation'</code></pre>
+<ul>
+  <li><strong><code>User</code> n'est plus un <code>import type</code> :</strong> le contrôleur l'interroge maintenant (<code>User.query()</code>) pour savoir quels destinataires sont en ligne (étape 2 de l'envoi).</li>
+  <li><strong><code>ConversationPolicy</code> :</strong> les règles d'autorisation, expliquées <a href="#policy">juste après</a>.</li>
+  <li><strong><code>MessageType</code> a disparu des imports :</strong> le type de message est maintenant obtenu par <code>donneTypeMessage</code>, dans <code>chat_service.ts</code>. Le tableau ci-dessous en parle quand même, car la table existe toujours.</li>
+</ul>
 <div class="table-wrap">
 <table>
   <tr><th>Modèle</th><th>Une ligne représente</th></tr>
@@ -132,12 +140,62 @@ export const updateMessageValidator = vine.create({
   <li><strong>À la modification :</strong> le texte est obligatoire, au moins 1 caractère après <code>trim</code>. On ne peut pas vider un message en le modifiant.</li>
 </ul>
 
-<pre><code>import { GROUP_TYPE, construitVueMessage, construitApercu, chercheParticipationGroupe,
-         chercheParticipationPrivee, donneHeureDeLaListe, besoinSeparateurDeJour } from '../service/chat_service.ts'
-import { aBloque } from '../service/block_service.ts'
-import { supprimeFichierParLien, envoieDocument, envoieImage } from '../service/cloudinary_service.ts'
-import { previensMessageModifie, previensNouveauMessage, type ConversationKind } from '../service/realtime_service.ts'</code></pre>
+<pre><code>import {
+  GROUP_TYPE, STATUS_DELIVERED, STATUS_SENT, construitVueMessage, construitApercu,
+  chercheParticipationGroupe, chercheParticipationPrivee, donneDernierMessage, donneTypeMessage,
+  donneHeureDeLaListe, besoinSeparateurDeJour,
+} from '#services/chat_service'
+import { supprimeFichierParLien, envoieDocument, envoieImage } from '#services/cloudinary_service'
+import { previensMessageModifie, previensNouveauMessage, type ConversationKind } from '#services/realtime_service'</code></pre>
 <p>Les outils des autres fichiers, expliqués là où ils servent. <code>ConversationKind</code> est un type qui vaut <code>'private' | 'group'</code>.</p>
+<ul>
+  <li><strong><code>#services/...</code> :</strong> un alias, comme <code>#models</code>. Il remplace l'ancien <code>'../service/....ts'</code>, depuis que le dossier s'appelle <code>app/services</code>.</li>
+  <li><strong><code>STATUS_SENT</code> et <code>STATUS_DELIVERED</code> :</strong> les constantes <code>'sent'</code> (envoyé) et <code>'delivered'</code> (reçu) pour la colonne <code>status</code> de <code>message_statuses</code>.</li>
+  <li><strong><code>aBloque</code> n'est plus importé ici :</strong> c'est la policy qui l'utilise.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="policy">La policy Bouncer : <span class="file">app/policies/conversation_policy.ts</span></h2>
+<p><strong>Bouncer</strong> est le système d'autorisation d'AdonisJS. Une <strong>policy</strong> est une classe qui rassemble les règles « qui a le droit de faire quoi » sur une ressource. Avant, chaque règle était un <code>if</code> écrit dans le contrôleur. Maintenant, elle a un nom et une place à part.</p>
+<pre><code>export default class ConversationPolicy extends BasePolicy {
+  modifierMessage(user: User, message: Message) {
+    if (message.userId !== user.id) {
+      return AuthorizationResponse.deny('Vous ne pouvez modifier que vos propres messages.')
+    }
+    return true
+  }
+
+  supprimerMessage(user: User, message: Message) {
+    if (message.userId !== user.id) {
+      return AuthorizationResponse.deny('Vous ne pouvez supprimer que vos propres messages.')
+    }
+    return true
+  }
+
+  async ecrireA(user: User, otherUserId: User['id']) {
+    if (await aBloque(otherUserId, user.id)) {
+      return AuthorizationResponse.deny("Impossible d'envoyer ce message à cet utilisateur.")
+    }
+    return true
+  }
+}</code></pre>
+<ul>
+  <li><strong>Chaque méthode est une règle.</strong> Le premier paramètre est toujours l'utilisateur connecté, que Bouncer fournit tout seul. Les suivants sont ce qu'on lui passe.</li>
+  <li><strong><code>return true</code> :</strong> autorisé.</li>
+  <li><strong><code>AuthorizationResponse.deny('...')</code> :</strong> refusé, avec un message en français.</li>
+  <li><strong><code>ecrireA</code> est <code>async</code> :</strong> elle interroge la base (<code>aBloque</code>). Une règle peut donc faire des requêtes.</li>
+</ul>
+<p>Côté contrôleur, une seule ligne :</p>
+<pre><code>await bouncer.with(ConversationPolicy).authorize('modifierMessage', message)</code></pre>
+<ul>
+  <li><strong><code>bouncer</code></strong> est dans le contexte (<code>HttpContext</code>), grâce au middleware <span class="file">app/middleware/initialize_bouncer_middleware.ts</span>.</li>
+  <li><strong><code>.with(ConversationPolicy)</code></strong> choisit la policy, et <strong><code>.authorize('modifierMessage', message)</code></strong> appelle la règle.</li>
+  <li><strong>Si la règle refuse,</strong> <code>authorize</code> <strong>lance une erreur</strong> <code>E_AUTHORIZATION_FAILURE</code>. La suite du contrôleur n'est pas exécutée : pas besoin de <code>if</code> ni de <code>return</code>.</li>
+  <li><strong>Cette erreur arrive dans <span class="file">app/exceptions/handler.ts</span></strong>, qui reprend le message de la policy et met le code <strong>403</strong>. Le JavaScript reçoit donc toujours <code>{ message: '...' }</code> en 403, comme avant.</li>
+</ul>
+<div class="note">
+  <p><strong>Pourquoi 404 pour l'appartenance, mais 403 dans la policy ?</strong> <code>chercheParticipationPrivee</code> / <code>Groupe</code> restent dans le contrôleur et renvoient une 404 : on ne révèle pas à un non-membre qu'une conversation existe. La policy décide ensuite de ce qu'un <strong>membre</strong> a le droit de faire, et un refus est alors une 403.</p>
+</div>
 
 <!-- ============================================================ -->
 <h2 id="prive">2. <code>enregistreMessagePrive</code> et <code>enregistreMessageGroupe</code></h2>
@@ -168,7 +226,7 @@ import { previensMessageModifie, previensNouveauMessage, type ConversationKind }
 <!-- ============================================================ -->
 <h2 id="modifier">3. <code>modifieMessage</code> : modifier son message</h2>
 
-<pre><code>async modifieMessage({ auth, params, request, response, view }: HttpContext) {
+<pre><code>async modifieMessage({ auth, bouncer, params, request, response, view }: HttpContext) {
   const user = auth.getUserOrFail()
   const { content } = await request.validateUsing(updateMessageValidator)
   const message = await Message.findOrFail(params.id)</code></pre>
@@ -177,14 +235,13 @@ import { previensMessageModifie, previensNouveauMessage, type ConversationKind }
   <li><strong><code>Message.findOrFail(params.id)</code> :</strong> cherche le message par son identifiant, ou renvoie une <strong>404</strong> s'il n'existe pas.</li>
 </ul>
 
-<pre><code>  if (message.userId !== user.id) {
-    return response.forbidden({ message: 'Vous ne pouvez modifier que vos propres messages.' })
-  }
+<pre><code>  // Règle d'autorisation : app/policies/conversation_policy.ts (403 si ce n'est pas l'auteur)
+  await bouncer.with(ConversationPolicy).authorize('modifierMessage', message)
   if (message.isDeleted) {
     return response.badRequest({ message: 'Ce message a été supprimé.' })
   }</code></pre>
 <ul>
-  <li><strong>Vérification des droits :</strong> seul l'auteur peut modifier. Sinon, code <strong>403</strong> (<code>forbidden</code>). C'est la vraie protection : le bouton « Modifier » caché dans la page ne suffit pas, car on peut envoyer la requête à la main.</li>
+  <li><strong>Vérification des droits :</strong> seul l'auteur peut modifier. Sinon, la règle <code>modifierMessage</code> de la <a href="#policy">policy</a> refuse, et la réponse est un <strong>403</strong>. C'est la vraie protection : le bouton « Modifier » caché dans la page ne suffit pas, car on peut envoyer la requête à la main.</li>
   <li><strong>Message supprimé :</strong> on ne modifie pas un message supprimé. Code <strong>400</strong> (<code>badRequest</code>).</li>
 </ul>
 
@@ -210,18 +267,17 @@ import { previensMessageModifie, previensNouveauMessage, type ConversationKind }
 <!-- ============================================================ -->
 <h2 id="supprimer">4. <code>supprimeMessage</code> : supprimer son message</h2>
 
-<pre><code>async supprimeMessage({ auth, params, response, view }: HttpContext) {
+<pre><code>async supprimeMessage({ auth, bouncer, params, response, view }: HttpContext) {
   const user = auth.getUserOrFail()
   const message = await Message.findOrFail(params.id)
 
-  if (message.userId !== user.id) {
-    return response.forbidden({ message: 'Vous ne pouvez supprimer que vos propres messages.' })
-  }</code></pre>
-<p>Même début que la modification : le message doit exister (sinon 404) et t'appartenir (sinon 403).</p>
+  await bouncer.with(ConversationPolicy).authorize('supprimerMessage', message)</code></pre>
+<p>Même début que la modification : le message doit exister (sinon 404) et t'appartenir (sinon la règle <code>supprimerMessage</code> refuse, donc 403).</p>
 
-<pre><code>  message.merge({ isDeleted: true, deletedAt: DateTime.now() })
+<pre><code>  message.merge({ isDeleted: true, deletedAt: DateTime.now(), content: null })
   await message.save()</code></pre>
-<p><strong>Suppression « douce »</strong> (<em>soft delete</em>) : la ligne reste en base, on la marque seulement comme supprimée avec la date. <code>merge</code> copie les deux valeurs dans l'objet, et <code>save</code> les enregistre. C'est pourquoi les autres voient « Ce message a été supprimé » au lieu d'un trou dans la discussion.</p>
+<p><strong>Suppression « douce »</strong> (<em>soft delete</em>) : la ligne reste en base, marquée comme supprimée avec la date. C'est pourquoi les autres voient « Ce message a été supprimé » à sa place, au lieu d'un trou dans la discussion. <code>merge</code> copie les valeurs dans l'objet, et <code>save</code> les enregistre.</p>
+<p><strong>Nouveau : <code>content: null</code>.</strong> Le <strong>texte</strong> est aussi effacé de la base. Avant, il restait stocké, simplement caché à l'affichage : quelqu'un ayant accès à la base pouvait encore le lire. Maintenant, rien du contenu supprimé n'est conservé. Seule la place du message reste, pour garder l'ordre de la discussion.</p>
 
 <pre><code>  const attachments = await MessageAttachment.query().where('messageId', message.id)
   for (const file of attachments) {
@@ -249,7 +305,7 @@ import { previensMessageModifie, previensNouveauMessage, type ConversationKind }
   membership: UserConversation,
   kind: ConversationKind
 ) {
-  const { auth, request, response, view, logger } = ctx
+  const { auth, bouncer, request, response, view, logger } = ctx
   const user = auth.getUserOrFail()
   const { content, attachment } = await request.validateUsing(sendMessageValidator)
   const conversationId = membership.conversationId</code></pre>
@@ -275,12 +331,23 @@ import { previensMessageModifie, previensNouveauMessage, type ConversationKind }
 <p>Tous les <strong>autres</strong> participants : une personne en privé, plusieurs dans un groupe. Cette liste servira trois fois : le blocage, les statuts « non lu » et le temps réel.</p>
 
 <pre><code>if (kind === 'private' &amp;&amp; otherMemberships.length &gt; 0) {
-  const isBlocked = await aBloque(otherMemberships[0].userId, user.id)
-  if (isBlocked) {
-    return response.forbidden({ message: "Impossible d'envoyer ce message à cet utilisateur." })
-  }
+  await bouncer.with(ConversationPolicy).authorize('ecrireA', otherMemberships[0].userId)
 }</code></pre>
-<p><strong><code>aBloque(bloqueur, bloqué)</code></strong> (de <span class="file">block_service.ts</span>) cherche une ligne dans <code>blocked_users</code> et renvoie <code>true</code> si elle existe. Attention à l'ordre : on demande si <strong>l'autre t'a bloqué</strong>. Dans ce cas, code 403. Le message d'erreur reste vague volontairement : il ne dit pas « cette personne vous a bloqué ». Le blocage ne s'applique qu'aux conversations privées.</p>
+<p>La règle <strong><code>ecrireA</code></strong> de la <a href="#policy">policy</a> appelle <strong><code>aBloque(bloqueur, bloqué)</code></strong> (de <span class="file">block_service.ts</span>), qui cherche une ligne dans <code>blocked_users</code> et renvoie <code>true</code> si elle existe. Attention à l'ordre : on demande si <strong>l'autre t'a bloqué</strong>. Dans ce cas, la règle refuse et la réponse est un 403. Le message d'erreur reste vague volontairement : il ne dit pas « cette personne vous a bloqué ». Le blocage ne s'applique qu'aux conversations privées.</p>
+
+<pre><code>// Qui est en ligne en ce moment ? Pour eux, le message arrive tout de suite (statut « reçu »).
+// Les autres le recevront à leur prochaine connexion (voir marqueMessagesCommeRecus).
+const onlineRecipients = await User.query()
+  .whereIn('id', otherMemberships.map((other) =&gt; other.userId))
+  .where('isOnline', true)
+  .select('id')
+const onlineIds = new Set(onlineRecipients.map((recipient) =&gt; recipient.id))</code></pre>
+<p><strong>Nouveau : qui est en ligne ?</strong> C'est la base du statut « reçu » (deux coches grises).</p>
+<ul>
+  <li>Parmi les destinataires, on garde ceux dont <code>isOnline</code> est vrai. Cette colonne est tenue à jour par <span class="file">start/transmit.ts</span> quand une page s'ouvre ou se ferme.</li>
+  <li><strong><code>new Set(...)</code> :</strong> un ensemble d'identifiants. <code>onlineIds.has(id)</code> répond très vite à « est-il en ligne ? », sans parcourir un tableau à chaque fois.</li>
+  <li>Ceux qui sont en ligne recevront le message <strong>tout de suite</strong>, en temps réel. Leur statut peut donc être créé directement à « reçu » (voir l'étape 5).</li>
+</ul>
 
 <h3>Étape 3 : envoyer le fichier vers Cloudinary</h3>
 <pre><code>let messageTypeName = 'texte'
@@ -310,18 +377,34 @@ const extension = (attachment?.extname ?? '').toLowerCase()</code></pre>
   <li><strong>Le fichier part avant la base de données :</strong> si Cloudinary échoue, rien n'a encore été enregistré, et on répond simplement par une erreur 422.</li>
 </ul>
 
-<pre><code>const messageType = await MessageType.firstOrCreate(
-  { type: messageTypeName },
-  { type: messageTypeName }
-)</code></pre>
-<p><strong><code>firstOrCreate(recherche, création)</code></strong> cherche le type (<code>'texte'</code>, <code>'images'</code> ou <code>'document'</code>) et le crée s'il n'existe pas encore. On obtient son <code>id</code> pour le message.</p>
+<pre><code>const messageType = await donneTypeMessage(messageTypeName)</code></pre>
+<p><strong><code>donneTypeMessage</code></strong> vient de <span class="file">chat_service.ts</span> :</p>
+<pre><code>export function donneTypeMessage(type: string) {
+  return MessageType.firstOrCreate({ type }, { type })
+}</code></pre>
+<p><strong><code>firstOrCreate(recherche, création)</code></strong> cherche le type (<code>'texte'</code>, <code>'images'</code> ou <code>'document'</code>) et le crée s'il n'existe pas encore. On obtient son <code>id</code> pour le message. Le seeder crée normalement ces types, mais <code>firstOrCreate</code> protège d'une base toute neuve. Les fonctions sœurs <code>donneTypeConversation</code> et <code>donneRole</code> font la même chose pour les types de conversation et les rôles.</p>
 
 <h3>Étape 4 : le message précédent</h3>
-<pre><code>const previousMessage = await Message.query()
-  .where('conversationId', conversationId)
-  .orderBy('createdAt', 'desc')
-  .orderBy('id', 'desc')
-  .first()</code></pre>
+<pre><code>const previousMessage = await donneDernierMessage(conversationId)</code></pre>
+<p><strong><code>donneDernierMessage</code></strong> vient de <span class="file">chat_service.ts</span>. Cette requête était écrite plusieurs fois dans le code, elle est maintenant au même endroit :</p>
+<pre><code>export function donneDernierMessage(
+  conversationId: number,
+  options: { withAuthor?: boolean; client?: TransactionClientContract } = {}
+) {
+  const query = Message.query({ client: options.client })
+    .where('conversationId', conversationId)
+    .orderBy('id', 'desc')
+  if (options.withAuthor) {
+    query.preload('user')
+  }
+  return query.first()
+}</code></pre>
+<ul>
+  <li><strong>Tri par <code>id</code> décroissant :</strong> le plus grand identifiant est le plus récent.</li>
+  <li><strong><code>withAuthor</code> (facultatif) :</strong> charge l'auteur, pour l'aperçu « Jo : ... » d'un groupe.</li>
+  <li><strong><code>client</code> (facultatif) :</strong> pour lire à l'intérieur d'une transaction.</li>
+  <li><strong><code>= {}</code> :</strong> si on ne passe rien, les options sont vides.</li>
+</ul>
 <p>Le dernier message <strong>avant</strong> celui qu'on va créer (ou <code>null</code>). Il sert à décider si un séparateur de jour (« Aujourd'hui ») doit être affiché avant la nouvelle bulle. Il faut le lire <strong>avant</strong> la création, sinon on trouverait le nouveau message lui-même.</p>
 
 <h3>Étape 5 : l'enregistrement dans une transaction</h3>
@@ -366,11 +449,21 @@ try {
         messageId: newMessage.id,
         userId: other.userId,
         isRead: false,
-        status: 'sent',
+        status: onlineIds.has(other.userId) ? STATUS_DELIVERED : STATUS_SENT,
       })),
       { client: trx }
     )</code></pre>
-<p><strong>3. Un statut « non lu » par destinataire.</strong> <code>map</code> fabrique une ligne par autre participant, et <code>createMany</code> les insère toutes. Ce sont ces lignes qui alimentent les compteurs de non-lus et les coches : quand le destinataire ouvre la conversation, son statut passe à <code>isRead: true</code>. L'auteur n'a pas de statut pour son propre message.</p>
+<p><strong>3. Un statut « non lu » par destinataire.</strong> <code>map</code> fabrique une ligne par autre participant, et <code>createMany</code> les insère toutes. Ce sont ces lignes qui alimentent les compteurs de non-lus et les coches. L'auteur n'a pas de statut pour son propre message.</p>
+<p>La colonne <code>status</code> suit le trajet du message :</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Statut</th><th>Quand</th><th>Coches chez l'auteur</th></tr>
+  <tr><td><code>'sent'</code> (envoyé)</td><td>Le destinataire était hors ligne à l'envoi</td><td>✓ une coche grise</td></tr>
+  <tr><td><code>'delivered'</code> (reçu)</td><td>Il était en ligne (<code>onlineIds.has</code>), ou il s'est reconnecté depuis</td><td>✓✓ deux coches grises</td></tr>
+  <tr><td><code>'read'</code> (lu)</td><td>Il a ouvert la conversation</td><td>✓✓ deux coches bleues</td></tr>
+</table>
+</div>
+<p>Pour un destinataire hors ligne, le passage de <code>'sent'</code> à <code>'delivered'</code> se fait à sa prochaine connexion, par <code>marqueMessagesCommeRecus</code> (voir le fichier sur le temps réel).</p>
 
 <pre><code>    await UserConversation.query({ client: trx })
       .where('conversationId', conversationId)
@@ -387,8 +480,9 @@ try {
 <p>Si la transaction échoue, la base a tout annulé, mais le fichier est déjà sur Cloudinary. On le supprime pour ne pas laisser de fichier orphelin (sans fichier, <code>fileUrl</code> vaut <code>null</code> et la fonction ne fait rien). <code>throw error</code> relance l'erreur pour que la requête soit bien traitée comme un échec.</p>
 
 <h3>Étape 6 : répondre et prévenir</h3>
-<pre><code>await message.load('attachments')</code></pre>
-<p>Charge le fichier joint du nouveau message : <code>construitVueMessage</code> en a besoin pour dessiner la bulle.</p>
+<pre><code>await message.load('attachments')
+await message.load('statuses')</code></pre>
+<p>Charge le fichier joint <strong>et les statuts</strong> du nouveau message. <code>construitVueMessage</code> a besoin des deux pour dessiner la bulle : le fichier, et les coches. Si tous les destinataires étaient en ligne, la bulle s'affiche chez toi directement avec deux coches grises, grâce à <code>isDelivered</code>.</p>
 
 <pre><code>const showSeparator = besoinSeparateurDeJour(previousMessage, message, membership)
 const data = await this.construitReponseMessage(message, user.id, view, showSeparator)</code></pre>
@@ -457,18 +551,14 @@ await previensNouveauMessage({
   <li><strong><code>showSeparator = false</code> :</strong> facultatif. Seul l'envoi d'un nouveau message peut demander un séparateur.</li>
 </ul>
 
-<pre><code>  const lastMessage = await Message.query()
-    .where('conversationId', message.conversationId)
-    .orderBy('createdAt', 'desc')
-    .orderBy('id', 'desc')
-    .first()</code></pre>
-<p>Le message le plus récent de la conversation, pour savoir si celui qu'on traite est le dernier.</p>
+<pre><code>  const lastMessage = await donneDernierMessage(message.conversationId)</code></pre>
+<p>Le message le plus récent de la conversation, avec le même outil qu'à l'étape 4, pour savoir si celui qu'on traite est le dernier.</p>
 
 <pre><code>  const html = await view.render('partials/message-item', {
     message: construitVueMessage(message, userId),
     showSeparator,
   })</code></pre>
-<p><strong><code>construitVueMessage</code></strong> (de <span class="file">chat_service.ts</span>) transforme le message en objet simple pour la vue (<code>isMine</code>, <code>isRead</code>, <code>isEdited</code>, <code>time</code>, <code>dayLabel</code>, <code>attachment</code>...). Puis <code>view.render</code> fabrique le HTML avec <code>partials/message-item.edge</code>, qui contient simplement :</p>
+<p><strong><code>construitVueMessage</code></strong> (de <span class="file">chat_service.ts</span>) transforme le message en objet simple pour la vue (<code>isMine</code>, <code>isRead</code>, <code>isDelivered</code>, <code>isEdited</code>, <code>time</code>, <code>dayLabel</code>, <code>attachment</code>...). Puis <code>view.render</code> fabrique le HTML avec <code>partials/message-item.edge</code>, qui contient simplement :</p>
 <pre><code>@if(showSeparator)
   @!component('components/day-separator', { label: message.dayLabel })
 @end
@@ -500,10 +590,11 @@ await previensNouveauMessage({
       → chercheParticipationPrivee + firstOrFail     (tu en fais partie ? sinon 404)
   → envoieMessage
       1. texte ou fichier ?                          (sinon 422)
-      2. autres participants + aBloque               (bloqué ? 403)
+      2. autres participants + policy ecrireA       (bloqué ? 403)
+         + qui est en ligne ? (onlineIds)
       3. fichier → Cloudinary                        (échec ? 422)
       4. message précédent
-      5. transaction : message + fichier + statuts "non lu" + dernier message
+      5. transaction : message + fichier + statuts (sent ou delivered) + dernier message
          (échec ? annulation + suppression du fichier sur Cloudinary)
       6. bulle HTML (construitReponseMessage)
          + temps réel vers les autres (previensNouveauMessage)
@@ -511,11 +602,19 @@ await previensNouveauMessage({
 
 <!-- ============================================================ -->
 <h2 id="remarques">Ce qui a été remarqué</h2>
+
+<div class="note">
+  <p><strong>Corrigé depuis la première version de ce document :</strong></p>
+  <p>• <strong>Identifiants non numériques :</strong> les routes portent maintenant <code>.where('id', ID_NUMERIQUE)</code>. <code>/conversations/abc/messages</code> ou <code>/messages/abc</code> donnent une 404, et plus une erreur 500.</p>
+  <p>• <strong>Le commentaire en double</strong> au-dessus de <code>envoieMessage</code> a été retiré.</p>
+  <p>• <strong>Le texte d'un message supprimé</strong> n'est plus conservé en base (<code>content: null</code>).</p>
+  <p>• <strong>Les droits</strong> sont regroupés dans une policy au lieu d'être des <code>if</code> répétés.</p>
+</div>
+
 <div class="warn">
-  <p><strong>Suppression du message, pas de transaction :</strong> dans <code>supprimeMessage</code>, le message est marqué supprimé, puis le fichier est effacé de Cloudinary, puis de la base. Si la suppression Cloudinary échoue, <code>supprimeFichierParLien</code> renvoie <code>false</code> sans erreur, mais la ligne en base est quand même supprimée : le fichier peut rester sur Cloudinary sans plus être référencé.</p>
-  <p><strong>Un message déjà supprimé peut être « resupprimé » :</strong> <code>supprimeMessage</code> ne vérifie pas <code>isDeleted</code> (contrairement à <code>modifieMessage</code>). Ce n'est pas grave, mais <code>deletedAt</code> est alors remplacé par une nouvelle date.</p>
-  <p><strong>Identifiant non numérique :</strong> comme dans <code>conversations_controller</code>, <code>Number(ctx.params.id)</code> peut donner <code>NaN</code> pour une adresse comme <code>/conversations/abc/messages</code>, ce qui donnerait probablement une erreur 500 au lieu d'une 404.</p>
-  <p><strong>Commentaire en double :</strong> au-dessus de <code>envoieMessage</code>, deux blocs <code>/** ... */</code> se suivent ; le premier peut être retiré.</p>
+  <p><strong>Toujours d'actualité, la suppression sans transaction :</strong> dans <code>supprimeMessage</code>, le message est marqué supprimé, puis le fichier est effacé de Cloudinary, puis de la base. Si la suppression Cloudinary échoue, <code>supprimeFichierParLien</code> renvoie <code>false</code> sans erreur, mais la ligne en base est quand même supprimée. Le fichier peut donc rester sur Cloudinary sans plus être référencé.</p>
+  <p><strong>Un message déjà supprimé peut être « resupprimé » :</strong> <code>supprimeMessage</code> ne vérifie toujours pas <code>isDeleted</code>, contrairement à <code>modifieMessage</code>. Ce n'est pas grave, mais <code>deletedAt</code> est alors remplacé par une nouvelle date.</p>
+  <p><strong>« En ligne » ne veut pas dire « page ouverte » :</strong> <code>isOnline</code> repose sur la connexion temps réel. Si elle vient de tomber sans que les 8 secondes de délai soient passées, un message peut être marqué « reçu » alors qu'il n'est pas encore arrivé. C'est un cas rare, et il se corrige à la reconnexion.</p>
 </div>
 
 </main>

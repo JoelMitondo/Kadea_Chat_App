@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Utilisateurs et recherche expliqués</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1f2328; --muted:#59636e; --line:#d8dee4; --code-bg:#f1f3f5; --accent:#2563eb; --note-bg:#eef4ff; --warn-bg:#fff6e5; --warn-line:#e0a400; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15181c; --fg:#e6e8eb; --muted:#9aa4ae; --line:#30363d; --code-bg:#1f242a; --accent:#6ea8ff; --note-bg:#17233a; --warn-bg:#2b2412; --warn-line:#b88a12; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 80px; }
+  h1 { font-size:1.9rem; line-height:1.25; margin:0 0 8px; }
+  h2 { font-size:1.4rem; margin:48px 0 12px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:1.1rem; margin:28px 0 8px; }
+  p, li { max-width:72ch; }
+  a { color:var(--accent); }
+  .subtitle, .file { color:var(--muted); }
+  .file { font-size:0.9rem; }
+  code { font:0.9em/1.5 ui-monospace,"Cascadia Code",Consolas,monospace; background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; margin:12px 0; }
+  pre code { background:none; padding:0; font-size:0.85rem; }
+  .table-wrap { overflow-x:auto; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; font-size:0.93rem; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); }
+  .note, .warn { border-radius:8px; padding:12px 16px; margin:16px 0; }
+  .note { background:var(--note-bg); border-left:4px solid var(--accent); }
+  .warn { background:var(--warn-bg); border-left:4px solid var(--warn-line); }
+  .note p, .warn p { margin:6px 0; }
+  .toc { border:1px solid var(--line); border-radius:8px; padding:12px 20px; }
+  .toc ol { margin:6px 0; padding-left:20px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Utilisateurs, recherche et blocage expliqués ligne par ligne</h1>
+<p class="subtitle"><code>users_controller.ts</code> · <code>search_controller.ts</code> · <code>blocks_controller.ts</code> · <code>validators/user_list.ts</code> et <code>search.ts</code> · <code>pages/users.edge</code>, <code>partials/users-list.edge</code>, <code>pages/search.edge</code> · <code>users.js</code></p>
+
+<p>Trois fonctions pour <strong>trouver</strong> des gens et des messages, et pour s'en <strong>protéger</strong> :</p>
+<ul>
+  <li><strong>la page Utilisateurs</strong>, pour chercher quelqu'un et lancer une discussion ;</li>
+  <li><strong>la recherche</strong> dans ses propres messages ;</li>
+  <li><strong>le blocage</strong> d'une personne.</li>
+</ul>
+
+<div class="note">
+  <p><strong>Trois techniques à retenir dans ce lot :</strong></p>
+  <p>• <strong>La pagination</strong> avec <code>paginate()</code> : on ne charge jamais tous les utilisateurs.</p>
+  <p>• <strong>La recherche en direct</strong> avec le « debounce » et un numéro de requête qui ignore les réponses arrivées en retard.</p>
+  <p>• <strong>Une recherche limitée à ses propres conversations</strong>, grâce à une jointure sur <code>user_conversations</code>.</p>
+</div>
+
+<nav class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li><a href="#routes">Les routes et les validateurs</a></li>
+    <li><a href="#liste">donnePageUtilisateurs : la liste paginée</a></li>
+    <li><a href="#discuter">ouvreDiscussion : le bouton « Discuter »</a></li>
+    <li><a href="#vueusers">La page Utilisateurs et users-list.edge</a></li>
+    <li><a href="#usersjs">users.js : recherche en direct et fenêtre « Voir plus »</a></li>
+    <li><a href="#recherche">search_controller.ts : chercher dans ses messages</a></li>
+    <li><a href="#decoupe">decoupeAutourDuMot : surligner le mot trouvé</a></li>
+    <li><a href="#blocage">blocks_controller.ts : bloquer et débloquer</a></li>
+    <li><a href="#parcours">Les parcours complets</a></li>
+    <li><a href="#remarques">Ce qui a été remarqué</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="routes">1. Les routes et les validateurs</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Requête</th><th>Méthode</th><th>Particularité</th></tr>
+  <tr><td><code>GET /users?q=…&amp;page=…</code></td><td><code>Users.donnePageUtilisateurs</code></td><td>Page entière, ou seulement la liste pour le JavaScript</td></tr>
+  <tr><td><code>POST /users/:id/chat</code></td><td><code>Users.ouvreDiscussion</code></td><td><code>.where('id', ID_UUID)</code></td></tr>
+  <tr><td><code>POST /users/:id/block</code></td><td><code>Blocks.bloque</code></td><td><code>.where('id', ID_UUID)</code></td></tr>
+  <tr><td><code>POST /users/:id/unblock</code></td><td><code>Blocks.debloque</code></td><td><code>.where('id', ID_UUID)</code></td></tr>
+  <tr><td><code>GET /search?q=…</code></td><td><code>Search.donnePageRecherche</code></td><td></td></tr>
+</table>
+</div>
+<p>Toutes sont dans le groupe <code>middleware.auth()</code>. Les identifiants d'utilisateur sont des <strong>UUID</strong> (par exemple <code>3f2a9c1e-…</code>), d'où le matcher <code>ID_UUID</code>.</p>
+
+<pre><code>// app/validators/user_list.ts
+export const searchUsersValidator = vine.create({
+  q: vine.string().trim().maxLength(100).optional(),
+  page: vine.number().min(1).optional(),
+})
+
+export const chatWithUserValidator = vine.create({
+  id: vine.string().uuid(),
+})
+
+// app/validators/search.ts
+export const searchMessagesValidator = vine.create({
+  q: vine.string().trim().maxLength(100).optional(),
+})</code></pre>
+<ul>
+  <li><strong><code>q</code></strong> : le texte cherché, facultatif, 100 caractères au plus.</li>
+  <li><strong><code>page</code></strong> : un nombre au moins égal à 1. VineJS convertit <code>"2"</code> (venu de l'adresse) en <code>2</code>.</li>
+  <li><strong><code>chatWithUserValidator</code></strong> vérifie qu'un identifiant est un vrai UUID. Il est utilisé ici et par les groupes (retrait d'un membre). Le commentaire rappelle qu'un identifiant invalide ferait sinon planter PostgreSQL.</li>
+  <li><strong>Comment <code>validateUsing</code> lit-il <code>?q=marie</code> ?</strong> Pour une requête <code>GET</code>, il n'y a pas de corps. <code>request.validateUsing</code> valide <code>request.all()</code>, qui rassemble le corps <strong>et</strong> la « query string » (ce qui suit le <code>?</code>).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="liste">2. <code>donnePageUtilisateurs</code> : la liste paginée</h2>
+
+<pre><code>const USERS_PER_PAGE = 20
+
+async donnePageUtilisateurs({ auth, request, view }: HttpContext) {
+  const currentUser = auth.getUserOrFail()
+  const { q, page } = await request.validateUsing(searchUsersValidator)
+  const search = q ?? ''</code></pre>
+<p>20 personnes par page. <code>search</code> vaut le texte cherché, ou une chaîne vide s'il n'y en a pas. C'est plus simple à manipuler qu'<code>undefined</code>.</p>
+
+<pre><code>  const query = User.query().whereNot('id', currentUser.id).orderBy('fullName', 'asc')
+
+  if (search !== '') {
+    query.whereILike('fullName', `%${protegeCaracteresRecherche(search)}%`)
+  }</code></pre>
+<ul>
+  <li><strong>Tous les utilisateurs sauf moi</strong>, par ordre alphabétique.</li>
+  <li><strong>On construit la requête par étapes :</strong> <code>query</code> n'est pas encore exécutée (pas d'<code>await</code>), et on y ajoute le filtre seulement s'il y a une recherche.</li>
+  <li><strong><code>whereILike('fullName', '%marie%')</code></strong> : le nom contient « marie », quelle que soit la casse (Marie, MARIE…). Les <code>%</code> veulent dire « n'importe quoi avant et après ».</li>
+  <li><strong><code>protegeCaracteresRecherche</code></strong> empêche qu'un <code>%</code> ou un <code>_</code> tapé serve de joker (voir le fichier sur les services).</li>
+</ul>
+
+<pre><code>  const paginator = await query.paginate(page ?? 1, USERS_PER_PAGE)</code></pre>
+<p><strong><code>paginate(numéroDePage, parPage)</code></strong> exécute <strong>deux</strong> requêtes :</p>
+<ol>
+  <li>un <code>COUNT</code> pour connaître le nombre total de résultats, et donc le nombre de pages ;</li>
+  <li>la page demandée, avec <code>LIMIT 20 OFFSET 20 × (page − 1)</code>. Pour la page 3, la base saute 40 lignes et en prend 20.</li>
+</ol>
+<p>Il renvoie un objet « paginateur » qui contient les lignes et des informations comme <code>currentPage</code> et <code>lastPage</code>. Même avec 10 000 inscrits, on ne charge que 20 personnes.</p>
+
+<pre><code>  const users = paginator.all().map((person) =&gt; ({
+    id: person.id,
+    fullName: person.fullName,
+    initials: donneInitiales(person.fullName),
+    avatarUrl: person.avatarUrl,
+    email: person.email,
+    isOnline: person.isOnline,
+    createdAt: formateDate(person.createdAt),
+  }))</code></pre>
+<p><code>paginator.all()</code> donne les lignes de la page. On ne garde que ce que la vue affiche, en préparant les initiales et la date lisible.</p>
+
+<pre><code>  const buildUrl = (pageNumber: number) =&gt;
+    `/users?q=${encodeURIComponent(search)}&amp;page=${pageNumber}`
+
+  const data = {
+    users,
+    search,
+    pagination: {
+      currentPage: paginator.currentPage,
+      lastPage: paginator.lastPage,
+      previousUrl: paginator.currentPage &gt; 1 ? buildUrl(paginator.currentPage - 1) : null,
+      nextUrl: paginator.currentPage &lt; paginator.lastPage ? buildUrl(paginator.currentPage + 1) : null,
+    },
+  }</code></pre>
+<ul>
+  <li><strong><code>buildUrl</code></strong> fabrique l'adresse d'une page <strong>en gardant la recherche en cours</strong>. Sinon, cliquer sur « Suivant » pendant une recherche « marie » afficherait la page 2 de <strong>tous</strong> les utilisateurs.</li>
+  <li><strong><code>encodeURIComponent(search)</code></strong> protège les caractères spéciaux dans une adresse. « Jean &amp; Marie » deviendrait sinon <code>?q=Jean &amp; Marie</code>, et le <code>&amp;</code> serait pris pour le début d'un nouveau paramètre.</li>
+  <li><strong><code>previousUrl</code> / <code>nextUrl</code></strong> valent <code>null</code> sur la première et la dernière page. La vue n'affiche alors pas le lien correspondant.</li>
+</ul>
+
+<pre><code>  if (request.header('x-requested-with') === 'XMLHttpRequest') {
+    return view.render('partials/users-list', data)
+  }
+  return view.render('pages/users', data)
+}</code></pre>
+<p>Le même principe que l'ouverture d'une conversation. Pour la recherche en direct (<code>fetch</code> avec <code>X-Requested-With</code>), on renvoie <strong>seulement la liste</strong> (<code>partials/users-list</code>), que le script place dans la page. Sinon (adresse tapée, rechargement, lien de pagination), on renvoie la page entière, qui <strong>inclut la même partial</strong>. Le HTML d'une ligne est donc écrit une seule fois.</p>
+
+<!-- ============================================================ -->
+<h2 id="discuter">3. <code>ouvreDiscussion</code> : le bouton « Discuter »</h2>
+<pre><code>async ouvreDiscussion({ auth, params, response, session }: HttpContext) {
+  const currentUser = auth.getUserOrFail()
+  const { id } = await chatWithUserValidator.validate({ id: params.id })
+
+  if (id === currentUser.id) {
+    session.flash('error', 'Vous ne pouvez pas discuter avec vous-même.')
+    return response.redirect().toRoute('users')
+  }
+
+  const otherUser = await User.findOrFail(id)
+  const conversation = await chercheOuCreeConversationPrivee(currentUser, otherUser)
+
+  return response.redirect().toRoute('conversations.show', { id: conversation.id })
+}</code></pre>
+<ul>
+  <li><strong><code>chatWithUserValidator.validate({ id: params.id })</code></strong> : on valide un objet fabriqué à la main, puisque l'identifiant vient de l'adresse et pas du corps de la requête.</li>
+  <li><strong>Pas de discussion avec soi-même.</strong> Sa propre ligne n'apparaît pas dans la liste, mais une requête modifiée à la main pourrait le tenter.</li>
+  <li><strong><code>User.findOrFail(id)</code></strong> : 404 si la personne n'existe pas (compte supprimé entre-temps).</li>
+  <li><strong><code>chercheOuCreeConversationPrivee</code></strong> renvoie la conversation existante, ou la crée (voir le fichier sur les services, avec le double <code>whereHas</code>).</li>
+  <li><strong>Une redirection vers <code>/conversations/:id</code></strong> : la page Messages s'ouvre directement sur cette conversation. Si elle avait été supprimée de ma liste (<code>removedAt</code>), elle reste visible car c'est celle qu'on ouvre (voir le fichier sur les conversations).</li>
+  <li><strong>Pourquoi un <code>POST</code></strong> et pas un simple lien ? Parce que l'action peut <strong>créer</strong> une conversation en base, et une requête <code>GET</code> ne doit jamais rien modifier. Le <code>POST</code> est aussi protégé par le jeton CSRF.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="vueusers">4. La page Utilisateurs et <code>users-list.edge</code></h2>
+
+<h3><code>pages/users.edge</code></h3>
+<pre><code>&lt;form id="users-search-form" action="/users" method="GET" role="search" data-no-loader&gt;
+  &lt;input id="users-search" name="q" value="{{ search }}" ...&gt;
+&lt;/form&gt;
+
+&lt;div id="users-results"&gt;
+  @include('partials/users-list')
+&lt;/div&gt;
+
+&lt;dialog id="user-modal"&gt; ... la fenêtre « Voir plus » ... &lt;/dialog&gt;
+
+@vite(['resources/js/users.js'])</code></pre>
+<ul>
+  <li><strong>Un vrai formulaire <code>GET</code></strong> : sans JavaScript, appuyer sur Entrée chargerait <code>/users?q=marie</code>, et la page fonctionnerait quand même. Le JavaScript améliore l'expérience, mais n'est pas indispensable.</li>
+  <li><strong><code>value="{{ search }}"</code></strong> : après un rechargement, le champ garde le texte cherché.</li>
+  <li><strong><code>data-no-loader</code></strong> : pas de chargeur plein écran pour ce formulaire (voir <code>loader.js</code>, lot 6).</li>
+  <li><strong><code>@include('partials/users-list')</code></strong> : la liste. C'est le même fichier que celui renvoyé seul au JavaScript.</li>
+</ul>
+
+<h3><code>partials/users-list.edge</code></h3>
+<pre><code>@if(users.length === 0)
+  @if(search !== '')
+    &lt;p&gt;Aucun utilisateur ne correspond à « {{ search }} ».&lt;/p&gt;
+  @else
+    &lt;p&gt;Aucun autre utilisateur n'a encore créé de compte.&lt;/p&gt;
+  @end
+@else
+  @each(person in users)
+    @!component('components/user-avatar', { ..., online: person.isOnline, userId: person.id })
+    &lt;p data-presence-label="{{ person.id }}"&gt;&lt;span data-presence-text&gt;{{ person.isOnline ? 'En ligne' : 'Hors ligne' }}&lt;/span&gt;&lt;/p&gt;
+
+    &lt;button type="button" data-user-details
+            data-name="{{ person.fullName }}" data-email="{{ person.email }}"
+            data-avatar="{{ person.avatarUrl }}" data-initials="{{ person.initials }}"
+            data-created="{{ person.createdAt }}" data-online="{{ person.isOnline }}"
+            data-presence-user="{{ person.id }}"&gt;Voir plus&lt;/button&gt;
+
+    &lt;form action="{{ route('users.chat', { id: person.id }) }}" method="POST"&gt;
+      {{ csrfField() }}
+      &lt;button type="submit"&gt;Discuter&lt;/button&gt;
+    &lt;/form&gt;
+  @end
+
+  @if(pagination.lastPage &gt; 1)
+    ... « ← Précédent » · Page 2 / 5 · « Suivant → » ...
+  @end
+@end</code></pre>
+<ul>
+  <li><strong>Deux messages vides différents :</strong> « aucun résultat pour cette recherche », ou « personne d'autre n'est inscrit ».</li>
+  <li><strong>Les attributs <code>data-presence-…</code></strong> permettent au temps réel de mettre à jour la puce verte et le texte « En ligne » <strong>sans recharger</strong> : <code>realtime.js</code> retrouve les éléments par l'identifiant de l'utilisateur (voir le fichier sur le temps réel).</li>
+  <li><strong>« Voir plus » ne fait aucune requête :</strong> toutes les informations sont déjà rangées dans les attributs <code>data-…</code> du bouton. <code>users.js</code> les lit pour remplir la fenêtre.</li>
+  <li><strong>Les données sont échappées</strong> par <code>{{ }}</code>, y compris dans les attributs. Un nom contenant <code>"</code> ou <code>&lt;</code> ne peut pas casser le HTML.</li>
+  <li><strong>La pagination n'apparaît que s'il y a plus d'une page.</strong> Les liens sont de simples <code>&lt;a href&gt;</code>, qui rechargent la page.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="usersjs">5. <code>users.js</code> : recherche en direct et fenêtre « Voir plus »</h2>
+
+<pre><code>document.body.dataset.loaderFetch = 'off'
+
+let formulaire = document.getElementById('users-search-form')
+let champ = document.getElementById('users-search')
+let resultats = document.getElementById('users-results')
+let modale = document.getElementById('user-modal')</code></pre>
+<p><strong><code>loaderFetch = 'off'</code></strong> écrit <code>data-loader-fetch="off"</code> sur <code>&lt;body&gt;</code>. <code>loader.js</code>, qui affiche un chargeur pendant les requêtes, lit cet attribut et ne s'affiche pas. Avec une requête à chaque pause de frappe, le chargeur clignoterait sans arrêt.</p>
+
+<h3>La recherche, avec deux protections</h3>
+<pre><code>let minuteur = null
+let numeroRecherche = 0
+
+async function rechercher() {
+  let texte = champ.value.trim()
+
+  numeroRecherche = numeroRecherche + 1
+  let monNumero = numeroRecherche
+
+  let reponse
+  try {
+    reponse = await fetch('/users?q=' + encodeURIComponent(texte), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+  } catch (erreurReseau) {
+    kcNotifier.erreur('Impossible de contacter le serveur. Vérifiez votre connexion.')
+    return
+  }
+  if (!reponse.ok) {
+    kcNotifier.erreur('La recherche a échoué. Veuillez réessayer.')
+    return
+  }
+
+  let html = await reponse.text()
+
+  if (monNumero !== numeroRecherche) { return }
+
+  resultats.innerHTML = html
+  history.replaceState(null, '', texte === '' ? '/users' : '/users?q=' + encodeURIComponent(texte))
+}</code></pre>
+<ul>
+  <li><strong>L'en-tête <code>X-Requested-With</code></strong> dit au serveur « c'est le JavaScript ». Il renvoie alors seulement la liste.</li>
+  <li><strong><code>reponse.text()</code></strong> : la réponse est du <strong>HTML</strong>, pas du JSON. On l'insère directement avec <code>innerHTML</code>. C'est sans risque, car ce HTML vient de notre serveur et Edge a déjà échappé les données.</li>
+  <li><strong>Le numéro de recherche, contre les réponses en retard :</strong>
+    <ol>
+      <li>Je tape « ma ». La recherche n°1 part.</li>
+      <li>Je continue : « marie ». La recherche n°2 part.</li>
+      <li>La n°2 (moins de résultats) répond <strong>avant</strong> la n°1.</li>
+      <li>Sans le numéro, la n°1 arriverait ensuite et remplacerait les bons résultats par ceux de « ma ».</li>
+    </ol>
+    Chaque recherche note son numéro dans <code>monNumero</code>. Quand la réponse arrive, si <code>numeroRecherche</code> a augmenté entre-temps, une recherche plus récente existe, et on jette la réponse.</li>
+  <li><strong><code>history.replaceState</code></strong> met à jour l'adresse (<code>/users?q=marie</code>) <strong>sans</strong> recharger la page et <strong>sans</strong> ajouter d'entrée dans l'historique. On peut recharger ou partager la page avec la recherche, et le bouton « Retour » ne repasse pas par chaque lettre tapée. <code>pushState</code>, lui, aurait ajouté une entrée à chaque recherche.</li>
+</ul>
+
+<pre><code>champ.addEventListener('input', function () {
+  clearTimeout(minuteur)
+  minuteur = setTimeout(rechercher, 300)
+})
+
+formulaire.addEventListener('submit', function (evenement) {
+  evenement.preventDefault()
+  clearTimeout(minuteur)
+  rechercher()
+})</code></pre>
+<ul>
+  <li><strong>Le « debounce »,</strong> décrit dans le commentaire du fichier : à chaque touche, on annule le minuteur et on en relance un de 300 ms. La recherche ne part que quand on s'arrête de taper. Pour « marie », cela fait 1 requête au lieu de 5.</li>
+  <li><strong>La touche Entrée</strong> déclenche <code>submit</code>. On bloque le rechargement (<code>preventDefault</code>), on annule le minuteur en cours et on cherche <strong>tout de suite</strong>.</li>
+</ul>
+
+<h3>La fenêtre « Voir plus »</h3>
+<pre><code>let imageAvatar = document.getElementById('user-modal-avatar')
+
+imageAvatar.addEventListener('error', function () {
+  imageAvatar.classList.add('hidden')
+})
+
+function ouvrirDetails(bouton) {
+  document.getElementById('user-modal-name').textContent = bouton.dataset.name
+  document.getElementById('user-modal-email').textContent = bouton.dataset.email
+  document.getElementById('user-modal-created').textContent = bouton.dataset.created
+  document.getElementById('user-modal-initials').textContent = bouton.dataset.initials
+
+  if (bouton.dataset.avatar) {
+    imageAvatar.src = bouton.dataset.avatar
+    imageAvatar.classList.remove('hidden')
+  } else {
+    imageAvatar.removeAttribute('src')
+    imageAvatar.classList.add('hidden')
+  }
+
+  let statut = document.getElementById('user-modal-status')
+  if (bouton.dataset.online === 'true') {
+    statut.textContent = 'En ligne'
+    statut.className = 'mt-1 text-sm font-medium text-success'
+  } else {
+    statut.textContent = 'Hors ligne'
+    statut.className = 'mt-1 text-sm text-fg-subtle'
+  }
+
+  modale.showModal()
+}</code></pre>
+<ul>
+  <li><strong>Une seule fenêtre pour toutes les personnes :</strong> on la remplit avec les données du bouton cliqué, puis on l'ouvre.</li>
+  <li><strong><code>bouton.dataset.name</code></strong> lit l'attribut <code>data-name</code>. Le JavaScript transforme les noms avec tiret en camelCase : <code>data-user-details</code> devient <code>dataset.userDetails</code>.</li>
+  <li><strong><code>textContent</code> et non <code>innerHTML</code> :</strong> le texte est inséré <strong>comme du texte</strong>, jamais interprété comme du HTML. Même un nom piégé ne pourrait rien exécuter.</li>
+  <li><strong>L'écouteur <code>error</code> sur l'image</strong> la cache si elle ne se charge pas, et les initiales restent visibles. C'est un écouteur posé en JavaScript, donc autorisé par la CSP, contrairement à un attribut <code>onerror</code> dans le HTML.</li>
+  <li><strong><code>dataset.online === 'true'</code></strong> : un attribut <code>data-…</code> est toujours du <strong>texte</strong>. Edge a écrit <code>true</code> ou <code>false</code>, qu'on compare donc à la chaîne <code>'true'</code>.</li>
+</ul>
+
+<pre><code>document.addEventListener('click', function (evenement) {
+  let boutonDetails = evenement.target.closest('[data-user-details]')
+  if (boutonDetails !== null) {
+    ouvrirDetails(boutonDetails)
+    return
+  }
+  if (evenement.target.closest('#user-modal [data-modal-close]') !== null) {
+    modale.close()
+    return
+  }
+  if (evenement.target === modale) {
+    modale.close()
+  }
+})</code></pre>
+<ul>
+  <li><strong>La délégation d'événements :</strong> un seul écouteur sur le <strong>document</strong> au lieu d'un par bouton. C'est indispensable ici : la recherche <strong>remplace</strong> la liste (<code>innerHTML</code>), et des écouteurs posés sur les anciens boutons disparaîtraient avec eux. Les nouveaux boutons fonctionnent sans rien faire de plus.</li>
+  <li><strong><code>closest('[data-user-details]')</code></strong> remonte depuis l'élément cliqué (par exemple l'icône <code>&lt;svg&gt;</code> à l'intérieur du bouton) jusqu'au bouton lui-même. Il renvoie <code>null</code> si le clic n'était pas dans un tel bouton.</li>
+  <li><strong>La fermeture :</strong> le bouton « Fermer » de la fenêtre, ou un clic sur le fond sombre (<code>target === modale</code>, voir le lot 4).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="recherche">6. <code>search_controller.ts</code> : chercher dans ses messages</h2>
+
+<h3>Le début</h3>
+<pre><code>const RESULTS_LIMIT = 50
+
+async donnePageRecherche({ auth, request, view }: HttpContext) {
+  const user = auth.getUserOrFail()
+  const { q } = await request.validateUsing(searchMessagesValidator)
+  const search = q ?? ''
+
+  if (search.length &lt; 2) {
+    return view.render('pages/search', { search, results: [], hasSearched: false })
+  }</code></pre>
+<ul>
+  <li><strong>Au plus 50 résultats</strong>, les plus récents.</li>
+  <li><strong>Moins de 2 caractères :</strong> on affiche seulement le champ. Chercher « a » renverrait presque tous les messages, pour rien. <code>hasSearched: false</code> permet à la vue d'afficher une invitation à chercher, et non « aucun résultat ».</li>
+</ul>
+
+<h3>La requête</h3>
+<pre><code>  const rows = await db
+    .from('messages')
+    .join('user_conversations as me', 'me.conversation_id', 'messages.conversation_id')
+    .join('conversations', 'conversations.id', 'messages.conversation_id')
+    .join('conversation_types', 'conversation_types.id', 'conversations.conversation_type_id')
+    .join('users as sender', 'sender.id', 'messages.user_id')
+    .where('me.user_id', user.id)
+    .where('messages.is_deleted', false)
+    .whereILike('messages.content', `%${protegeCaracteresRecherche(search)}%`)
+    .where((query) =&gt; {
+      query.whereNull('me.removed_at').orWhereRaw('messages.created_at &gt; me.removed_at')
+    })
+    .orderBy('messages.created_at', 'desc')
+    .limit(RESULTS_LIMIT)
+    .select(
+      'messages.id', 'messages.content', 'messages.created_at', 'messages.conversation_id',
+      'conversations.title', 'conversation_types.type', 'sender.full_name as sender_name'
+    )</code></pre>
+<p>C'est la requête la plus riche du projet, écrite avec <code>db.from</code> (le constructeur de requêtes SQL) plutôt qu'avec un modèle, car elle rassemble des colonnes de cinq tables.</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Ligne</th><th>Rôle</th></tr>
+  <tr><td><code>join('user_conversations as me', ...)</code> + <code>where('me.user_id', user.id)</code></td><td><strong>La sécurité :</strong> on ne garde que les messages des conversations dont <strong>je</strong> fais partie. <code>as me</code> donne un surnom à la table, pour lire « ma participation ».</td></tr>
+  <tr><td><code>join('conversations', ...)</code></td><td>Pour le titre (nom du groupe)</td></tr>
+  <tr><td><code>join('conversation_types', ...)</code></td><td>Pour savoir si c'est un groupe ou une conversation privée</td></tr>
+  <tr><td><code>join('users as sender', ...)</code></td><td>Pour le nom de l'auteur du message (<code>sender</code>)</td></tr>
+  <tr><td><code>where('messages.is_deleted', false)</code></td><td>Pas les messages supprimés</td></tr>
+  <tr><td><code>whereILike('messages.content', '%mot%')</code></td><td>Le texte contient le mot, sans tenir compte de la casse</td></tr>
+  <tr><td><code>where((query) =&gt; ...)</code></td><td>La règle de <code>removedAt</code> (voir plus bas)</td></tr>
+  <tr><td><code>orderBy(... 'desc').limit(50)</code></td><td>Les 50 plus récents</td></tr>
+  <tr><td><code>select(...)</code></td><td>Seulement les colonnes utiles. <code>'sender.full_name as sender_name'</code> renomme la colonne pour qu'elle ne se confonde pas avec d'autres.</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>Pourquoi des noms complets</strong> (<code>messages.content</code>, <code>me.user_id</code>) ? Plusieurs tables ont une colonne <code>id</code> ou <code>user_id</code>. Écrire seulement <code>user_id</code> serait ambigu, et PostgreSQL refuserait la requête.</li>
+  <li><strong>Les parenthèses de <code>where((query) =&gt; { ... })</code> :</strong> la fonction regroupe deux conditions entre parenthèses en SQL : <code>AND (me.removed_at IS NULL OR messages.created_at &gt; me.removed_at)</code>. Sans ce regroupement, le <code>OR</code> s'appliquerait à toute la requête, et on trouverait des messages d'autres conversations.</li>
+  <li><strong>La règle de <code>removedAt</code></strong>, expliquée par le commentaire : si j'ai supprimé une conversation de ma liste, je ne cherche que dans les messages arrivés <strong>après</strong>. Les anciens sont cachés partout ailleurs, ils ne doivent pas réapparaître ici.</li>
+  <li><strong><code>orWhereRaw('messages.created_at &gt; me.removed_at')</code></strong> : on compare deux <strong>colonnes</strong>. <code>where('a', '&gt;', 'b')</code> comparerait la colonne <code>a</code> au <strong>texte</strong> <code>'b'</code>, d'où le passage par du SQL brut. Il n'y a aucune valeur de l'utilisateur dedans, donc aucun risque d'injection.</li>
+</ul>
+
+<h3>Le nom des conversations privées</h3>
+<pre><code>  const privateIds = rows
+    .filter((row) =&gt; row.type !== GROUP_TYPE)
+    .map((row) =&gt; row.conversation_id as number)
+
+  const otherNames = new Map&lt;number, string&gt;()
+
+  if (privateIds.length &gt; 0) {
+    const others = await UserConversation.query()
+      .whereIn('conversationId', privateIds)
+      .whereNot('userId', user.id)
+      .preload('user')
+
+    for (const other of others) {
+      otherNames.set(other.conversationId, other.user.fullName)
+    }
+  }</code></pre>
+<ul>
+  <li><strong>Le problème :</strong> une conversation privée n'a pas de titre. Son nom affiché est celui de <strong>l'autre</strong> personne.</li>
+  <li>On rassemble les identifiants des conversations privées trouvées, puis on charge <strong>en une seule requête</strong> l'autre participant de chacune (<code>whereNot('userId', user.id)</code>).</li>
+  <li><strong>Une <code>Map</code></strong> de la forme <code>12 → 'Jo Kabila'</code> permet ensuite de retrouver chaque nom instantanément.</li>
+  <li><strong>Pourquoi pas une requête par résultat ?</strong> Avec 50 résultats, ce serait 50 requêtes. C'est le problème « N+1 », évité ici.</li>
+  <li><code>if (privateIds.length &gt; 0)</code> évite une requête inutile quand tous les résultats viennent de groupes.</li>
+</ul>
+
+<h3>La préparation des résultats</h3>
+<pre><code>  const results = rows.map((row) =&gt; {
+    const isGroup = row.type === GROUP_TYPE
+    const date = DateTime.fromJSDate(row.created_at)
+    const parts = this.decoupeAutourDuMot(row.content as string, search)
+
+    return {
+      isGroup,
+      conversationName: isGroup
+        ? (row.title ?? 'Groupe sans nom')
+        : (otherNames.get(row.conversation_id) ?? 'Conversation'),
+      senderName: row.sender_name as string,
+      when: `${donneLibelleDuJour(date)} · ${formateHeure(date)}`,
+      url: isGroup ? `/groups/${row.conversation_id}` : `/conversations/${row.conversation_id}`,
+      before: parts.before,
+      match: parts.match,
+      after: parts.after,
+    }
+  })
+
+  return view.render('pages/search', { search, results, hasSearched: true })
+}</code></pre>
+<ul>
+  <li><strong><code>DateTime.fromJSDate(row.created_at)</code></strong> : avec <code>db.from</code>, les dates arrivent en objets <code>Date</code> classiques, et non en <code>DateTime</code> de Luxon comme avec un modèle. On les convertit pour utiliser les fonctions de date de <code>chat_service.ts</code>.</li>
+  <li><strong><code>when</code></strong> donne par exemple « Hier · 14:05 », avec le libellé du jour et l'heure à Kinshasa.</li>
+  <li><strong><code>url</code></strong> : un clic sur le résultat ouvre le groupe ou la conversation qui contient le message.</li>
+  <li><strong><code>as string</code> / <code>as number</code></strong> : <code>db.from</code> renvoie des lignes sans type précis, et on indique le type à TypeScript.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="decoupe">7. <code>decoupeAutourDuMot</code> : surligner le mot trouvé</h2>
+<pre><code>private decoupeAutourDuMot(content: string, search: string) {
+  const index = content.toLowerCase().indexOf(search.toLowerCase())
+
+  if (index === -1) {
+    return { before: content.slice(0, 120), match: '', after: '' }
+  }
+
+  const start = Math.max(0, index - 40)
+  const end = Math.min(content.length, index + search.length + 80)
+
+  return {
+    before: (start &gt; 0 ? '…' : '') + content.slice(start, index),
+    match: content.slice(index, index + search.length),
+    after: content.slice(index + search.length, end) + (end &lt; content.length ? '…' : ''),
+  }
+}</code></pre>
+<p>Prenons le message <em>« Bonjour à tous, n'oubliez pas la réunion de demain à 10 h dans la salle B »</em>, avec la recherche « RÉUNION ».</p>
+<ol>
+  <li><strong>Trouver le mot sans tenir compte de la casse :</strong> on met tout en minuscules des deux côtés, et <code>indexOf</code> donne la position du mot (ou <code>-1</code>).</li>
+  <li><strong>Un extrait autour du mot :</strong> au plus 40 caractères avant et 80 après. <code>Math.max(0, …)</code> et <code>Math.min(longueur, …)</code> empêchent de sortir du texte.</li>
+  <li><strong>Trois morceaux :</strong> <code>before</code> (« Bonjour à tous, n'oubliez pas la »), <code>match</code> (« réunion », écrit comme <strong>dans le message</strong>, pas comme dans la recherche, grâce à <code>slice</code> sur le texte d'origine) et <code>after</code> (« de demain à 10 h… »).</li>
+  <li><strong>Des points de suspension « … »</strong> sont ajoutés seulement si le texte a été coupé de ce côté.</li>
+</ol>
+<p>La vue assemble : <code>{{ result.before }}&lt;mark&gt;{{ result.match }}&lt;/mark&gt;{{ result.after }}</code>. <code>&lt;mark&gt;</code> est la balise HTML du surlignage.</p>
+<div class="note">
+  <p><strong>Pourquoi découper côté serveur au lieu d'insérer <code>&lt;mark&gt;</code> dans le texte ?</strong> Pour pouvoir garder <code>{{ }}</code>, qui échappe le HTML, sur les trois morceaux. Si on fabriquait la chaîne <code>"…&lt;mark&gt;réunion&lt;/mark&gt;…"</code> en JavaScript, il faudrait l'afficher avec <code>{{{ }}}</code> (sans échappement). Un message contenant <code>&lt;script&gt;</code> serait alors interprété. Avec les trois morceaux, seul le <code>&lt;mark&gt;</code> écrit dans la vue est du vrai HTML.</p>
+  <p><strong>Le cas <code>index === -1</code></strong> (« ne devrait pas arriver », dit le commentaire) peut se produire avec certains caractères spéciaux. La base et JavaScript n'ont pas toujours exactement les mêmes règles de minuscules. On affiche alors simplement le début du message.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="blocage">8. <code>blocks_controller.ts</code> : bloquer et débloquer</h2>
+<pre><code>async bloque({ auth, params, request, response, session }: HttpContext) {
+  const me = auth.getUserOrFail()
+  const { id } = await chatWithUserValidator.validate({ id: params.id })
+
+  if (id === me.id) {
+    return response.unprocessableEntity({ message: 'Vous ne pouvez pas vous bloquer vous-même.' })
+  }
+
+  await User.findOrFail(id)
+  await bloqueUtilisateur(me.id, id)
+
+  if (request.accepts(['html', 'json']) === 'json') {
+    return response.ok({ message: 'Utilisateur bloqué.' })
+  }
+  session.flash('success', 'Utilisateur bloqué.')
+  return response.redirect().back()
+}</code></pre>
+<ul>
+  <li><strong>On ne se bloque pas soi-même</strong> (422).</li>
+  <li><strong><code>User.findOrFail(id)</code></strong> : 404 si la personne n'existe pas. On évite de créer un blocage vers un compte inexistant.</li>
+  <li><strong><code>bloqueUtilisateur</code></strong> utilise <code>firstOrCreate</code> : bloquer deux fois ne crée pas de doublon (voir le fichier sur les services).</li>
+  <li><strong>Deux façons de répondre :</strong>
+    <ul>
+      <li>en JSON pour le bouton de la discussion, qui passe par <code>fetch</code> dans <code>message.js</code> ;</li>
+      <li>en redirection avec message flash pour un formulaire classique. <code>redirect().back()</code> renvoie sur la page d'où vient la requête.</li>
+    </ul>
+  </li>
+</ul>
+<pre><code>async debloque({ auth, params, request, response, session }: HttpContext) {
+  const me = auth.getUserOrFail()
+  const { id } = await chatWithUserValidator.validate({ id: params.id })
+
+  await debloqueUtilisateur(me.id, id)
+  ... même réponse JSON ou redirection ...
+}</code></pre>
+<p>Débloquer supprime la ligne. Pas besoin de vérifier que la personne existe : supprimer un blocage qui n'existe pas ne fait simplement rien.</p>
+
+<h3>Où sont les boutons ?</h3>
+<ul>
+  <li><strong>Dans une conversation privée</strong> (<code>chat-panel.edge</code>) : un bouton « Bloquer » (<code>data-block-user</code>), ou « Débloquer » si <code>chat.blockedByMe</code>. <code>message.js</code> les gère avec <code>changerBlocage</code> : confirmation, <code>POST</code> vers <code>/users/:id/block</code> ou <code>/unblock</code>, notification, puis rechargement du panneau pour afficher le bandeau orange et le bon bouton.</li>
+  <li><strong>Dans les paramètres</strong> : la liste des personnes bloquées, avec un formulaire classique « Débloquer » chacune (lot 4).</li>
+</ul>
+
+<h3>Ce que fait vraiment un blocage</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>Si Ana bloque Jo…</th><th>Effet</th></tr>
+  <tr><td>Jo écrit à Ana en privé</td><td><strong>Refusé</strong> (403) par la règle <code>ecrireA</code> de la policy, avec le message volontairement vague « Impossible d'envoyer ce message à cet utilisateur. »</td></tr>
+  <tr><td>Ana écrit à Jo en privé</td><td>Autorisé : seul celui qui est bloqué ne peut plus écrire</td></tr>
+  <tr><td>Ana et Jo sont dans le même groupe</td><td>Aucun effet : le blocage ne concerne que les conversations privées</td></tr>
+  <tr><td>Les anciens messages</td><td>Ils restent visibles des deux côtés</td></tr>
+  <tr><td>Ce que voit Ana</td><td>Un bandeau orange et un bouton « Débloquer » dans la conversation</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="parcours">9. Les parcours complets</h2>
+<pre><code>Ana cherche « mar » dans Utilisateurs
+  → users.js : debounce 300 ms → recherche n°3
+  → fetch('/users?q=mar', X-Requested-With)
+  → donnePageUtilisateurs : sauf Ana, ILIKE '%mar%', paginate(1, 20)
+  → partials/users-list (HTML seul)
+  → n°3 toujours la plus récente ? → innerHTML + replaceState('/users?q=mar')
+
+Ana clique « Discuter » avec Marie
+  → POST /users/&lt;uuid&gt;/chat (formulaire, CSRF)
+  → ouvreDiscussion → chercheOuCreeConversationPrivee → redirection /conversations/42
+
+Ana cherche « réunion » dans ses messages
+  → GET /search?q=réunion
+  → jointures : ses conversations seulement, pas les messages supprimés ni ceux d'avant removedAt
+  → 50 plus récents → noms des conversations privées en 1 requête
+  → extrait découpé en 3 → &lt;mark&gt; dans la vue → clic → la conversation</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="remarques">10. Ce qui a été remarqué</h2>
+
+<div class="note">
+  <p><strong>Ce qui est bien fait</strong>, à mettre en avant :</p>
+  <p>• <strong>La pagination</strong>, et des adresses de page qui gardent la recherche en cours.</p>
+  <p>• <strong>La recherche en direct</strong> avec debounce, protection contre les réponses en retard, et adresse mise à jour sans encombrer l'historique.</p>
+  <p>• <strong>Un seul fichier pour une ligne d'utilisateur</strong>, qu'elle soit affichée au chargement ou après une recherche.</p>
+  <p>• <strong>La recherche de messages limitée à ses conversations</strong>, qui respecte <code>removedAt</code> et les messages supprimés, sans problème N+1.</p>
+  <p>• <strong>Le surlignage sans jamais désactiver l'échappement</strong>, et <code>textContent</code> dans la fenêtre « Voir plus ».</p>
+</div>
+
+<div class="warn">
+  <p><strong>1. L'adresse e-mail de chaque inscrit est visible par tous.</strong> La liste écrit <code>data-email="{{ person.email }}"</code> pour chaque personne, et n'importe quel utilisateur connecté peut parcourir toutes les pages pour récupérer toutes les adresses. C'est un choix fonctionnel, mais discutable pour la vie privée (et au regard des lois sur les données personnelles). On pourrait ne plus afficher l'e-mail, ou seulement aux personnes avec qui on a déjà une conversation.</p>
+  <p><strong>2. La recherche dans les messages ne passera pas bien à l'échelle.</strong> <code>ILIKE '%mot%'</code> commence par un <code>%</code> : aucun index classique ne peut servir, et PostgreSQL lit <strong>tous</strong> les messages des conversations concernées. Avec beaucoup de messages, un index « trigramme » (extension <code>pg_trgm</code>, index <code>GIN</code> sur <code>messages.content</code>) rendrait la recherche rapide.</p>
+  <p><strong>3. <code>page</code> accepte un nombre à virgule.</strong> <code>vine.number().min(1)</code> laisse passer <code>?page=1.5</code>, ce qui donne un décalage bizarre (la page commence au 11ᵉ utilisateur). Il suffit d'ajouter <code>.withoutDecimals()</code>, comme dans <code>olderMessagesValidator</code>.</p>
+  <p><strong>4. Le blocage est à sens unique.</strong> Celui qui bloque peut toujours écrire à la personne bloquée, qui ne peut pas lui répondre. Si c'est voulu, il faudrait l'expliquer dans la confirmation (« Il ne pourra plus vous envoyer de nouveaux messages » le dit à moitié). Sinon, la règle <code>ecrireA</code> pourrait aussi vérifier <code>aBloque(user.id, otherUserId)</code>.</p>
+  <p><strong>5. Dans <code>users.js</code>, le message d'erreur ne tient pas compte du numéro de recherche.</strong> Si une ancienne recherche échoue alors qu'une plus récente a réussi, une notification d'erreur s'affiche pour rien. Il suffit de déplacer le test <code>monNumero !== numeroRecherche</code> avant les messages d'erreur.</p>
+</div>
+
+</main>
+</body>
+</html>

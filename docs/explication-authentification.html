@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inscription et connexion expliquées</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1f2328; --muted:#59636e; --line:#d8dee4; --code-bg:#f1f3f5; --accent:#2563eb; --note-bg:#eef4ff; --warn-bg:#fff6e5; --warn-line:#e0a400; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#15181c; --fg:#e6e8eb; --muted:#9aa4ae; --line:#30363d; --code-bg:#1f242a; --accent:#6ea8ff; --note-bg:#17233a; --warn-bg:#2b2412; --warn-line:#b88a12; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:32px 16px 80px; }
+  h1 { font-size:1.9rem; line-height:1.25; margin:0 0 8px; }
+  h2 { font-size:1.4rem; margin:48px 0 12px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:1.1rem; margin:28px 0 8px; }
+  p, li { max-width:72ch; }
+  a { color:var(--accent); }
+  .subtitle, .file { color:var(--muted); }
+  .file { font-size:0.9rem; }
+  code { font:0.9em/1.5 ui-monospace,"Cascadia Code",Consolas,monospace; background:var(--code-bg); padding:1px 5px; border-radius:4px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:12px 14px; overflow-x:auto; margin:12px 0; }
+  pre code { background:none; padding:0; font-size:0.85rem; }
+  .table-wrap { overflow-x:auto; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; font-size:0.93rem; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); }
+  .note, .warn { border-radius:8px; padding:12px 16px; margin:16px 0; }
+  .note { background:var(--note-bg); border-left:4px solid var(--accent); }
+  .warn { background:var(--warn-bg); border-left:4px solid var(--warn-line); }
+  .note p, .warn p { margin:6px 0; }
+  .toc { border:1px solid var(--line); border-radius:8px; padding:12px 20px; }
+  .toc ol { margin:6px 0; padding-left:20px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Inscription, connexion et mot de passe oublié expliqués ligne par ligne</h1>
+<p class="subtitle"><code>inscriptions_controller.ts</code> · <code>new_account_controller.ts</code> · <code>session_controller.ts</code> · <code>forgo_passwords_controller.ts</code> · validateurs · <code>app/mails/*</code> · <code>views/emails/*</code> · <code>pages/auth/*</code> · <code>resources/js/auth</code> et <code>utilitaires</code></p>
+
+<p>Ce fichier suit les trois parcours d'une personne qui n'est pas encore connectée : <strong>créer un compte</strong> (en deux étapes, avec confirmation de l'e-mail), <strong>se connecter / se déconnecter</strong>, et <strong>retrouver l'accès</strong> avec un mot de passe oublié.</p>
+
+<div class="note">
+  <p><strong>L'idée qui relie tout :</strong> un lien envoyé par e-mail prouve que la personne a accès à cette boîte. Le lien contient un code secret de 25 caractères. Ce code est envoyé en clair dans l'e-mail, mais la base n'en garde qu'une <strong>version hachée</strong>, comme un mot de passe. Pour vérifier un lien, on compare le code reçu au hash.</p>
+</div>
+
+<nav class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li><a href="#routes">Les routes et les tables</a></li>
+    <li><a href="#user">Le modèle User et withAuthFinder</a></li>
+    <li><a href="#inscription">Inscription, étape 1 : inscriptions_controller.ts</a></li>
+    <li><a href="#mail">Les e-mails : app/mails et views/emails</a></li>
+    <li><a href="#compte">Inscription, étape 2 : new_account_controller.ts</a></li>
+    <li><a href="#session">Connexion et déconnexion : session_controller.ts</a></li>
+    <li><a href="#oubli">Mot de passe oublié : forgo_passwords_controller.ts</a></li>
+    <li><a href="#vues">Les pages et le JavaScript</a></li>
+    <li><a href="#parcours">Les parcours complets</a></li>
+    <li><a href="#remarques">Ce qui a été remarqué</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="routes">1. Les routes et les tables</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Requête</th><th>Méthode</th><th>Protection</th></tr>
+  <tr><td><code>GET /register</code></td><td><code>Inscriptions.donnePageInscription</code></td><td>aucune</td></tr>
+  <tr><td><code>POST /register</code></td><td><code>Inscriptions.enregistreInscription</code></td><td><code>limiteEnvoiEmail</code></td></tr>
+  <tr><td><code>GET /signup/:id/:code</code></td><td><code>NewAccount.donnePageCreationCompte</code></td><td><code>guest</code></td></tr>
+  <tr><td><code>POST /signup/:id/:code</code></td><td><code>NewAccount.enregistreCompte</code></td><td><code>guest</code></td></tr>
+  <tr><td><code>GET /login</code></td><td><code>Session.donnePageConnexion</code></td><td><code>guest</code></td></tr>
+  <tr><td><code>POST /login</code></td><td><code>Session.connecte</code></td><td><code>guest</code> + <code>limiteConnexion</code></td></tr>
+  <tr><td><code>POST /logout</code></td><td><code>Session.deconnecte</code></td><td><code>auth</code></td></tr>
+  <tr><td><code>GET /forgoPassword</code></td><td><code>ForgoPasswords.donnePageMotDePasseOublie</code></td><td><code>guest</code></td></tr>
+  <tr><td><code>POST /forgoPassword</code></td><td><code>ForgoPasswords.enregistreDemandeReinitialisation</code></td><td><code>guest</code> + <code>limiteEnvoiEmail</code></td></tr>
+  <tr><td><code>GET /forgoPassword/:id/:code</code></td><td><code>ForgoPasswords.donnePageNouveauMotDePasse</code></td><td><code>guest</code></td></tr>
+  <tr><td><code>POST /forgoPassword/:id/:code</code></td><td><code>ForgoPasswords.enregistreNouveauMotDePasse</code></td><td><code>guest</code></td></tr>
+</table>
+</div>
+<p>Les limites d'essais (<code>limiteConnexion</code>, <code>limiteEnvoiEmail</code>) et les middlewares <code>guest</code> / <code>auth</code> sont expliqués dans le fichier sur le socle.</p>
+
+<p><strong>Trois tables :</strong></p>
+<div class="table-wrap">
+<table>
+  <tr><th>Table</th><th>Une ligne représente</th><th>Durée de vie</th></tr>
+  <tr><td><code>inscriptions</code> (<code>Inscription</code>)</td><td>Une demande d'inscription <strong>pas encore confirmée</strong> : nom, date de naissance, e-mail, code haché, <code>expiredAt</code></td><td>48 heures au plus, supprimée à la confirmation</td></tr>
+  <tr><td><code>users</code> (<code>User</code>)</td><td>Un vrai compte</td><td>Jusqu'à sa suppression</td></tr>
+  <tr><td><code>forgo_passwords</code> (<code>ForgoPassword</code>)</td><td>Une demande de mot de passe oublié : <code>userId</code>, e-mail, code haché, <code>expiredAt</code></td><td>1 heure au plus, supprimée à l'utilisation</td></tr>
+</table>
+</div>
+<p>Les modèles <code>Inscription</code> et <code>ForgoPassword</code> sont vides (<code>export default class Inscription extends InscriptionSchema {}</code>) : leurs colonnes sont décrites dans <code>database/schema.ts</code>, généré à partir des migrations. L'e-mail est <strong>unique</strong> dans les deux tables : une seule demande en attente par adresse.</p>
+
+<div class="note">
+  <p><strong>Pourquoi une table <code>inscriptions</code> séparée ?</strong> Le commentaire de <code>new_account_controller.ts</code> l'explique : le vrai compte n'est créé <strong>qu'après</strong> le clic sur le lien. Tant que l'e-mail n'est pas confirmé, il n'existe aucune ligne dans <code>users</code>, donc il est impossible de se connecter. Les demandes abandonnées ne polluent pas la table des comptes.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="user">2. Le modèle <code>User</code> et <code>withAuthFinder</code></h2>
+<pre><code>import hash from '@adonisjs/core/services/hash'
+import { compose } from '@adonisjs/core/helpers'
+import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
+
+export default class User extends compose(UserSchema, withAuthFinder(hash)) {
+  @hasMany(() =&gt; Conversation, { foreignKey: 'createdById' })
+  declare createdConversations: HasMany&lt;typeof Conversation&gt;
+  ...
+}</code></pre>
+<ul>
+  <li><strong><code>compose(UserSchema, withAuthFinder(hash))</code> :</strong> un « mixin ». La classe hérite des colonnes de <code>UserSchema</code> <strong>et</strong> reçoit en plus les capacités de <code>withAuthFinder</code>. Une classe JavaScript ne peut hériter que d'une seule classe, et <code>compose</code> permet d'en empiler plusieurs.</li>
+  <li><strong>Ce que <code>withAuthFinder</code> ajoute,</strong> d'après le commentaire du fichier :
+    <ol>
+      <li><strong><code>User.verifyCredentials(email, password)</code></strong> : cherche l'utilisateur par e-mail et compare le mot de passe à son hash.</li>
+      <li><strong>Le hachage automatique</strong> : avant chaque enregistrement, si <code>password</code> a changé, il est remplacé par son hash (scrypt, voir <code>config/hash.ts</code>). C'est pourquoi le code écrit simplement <code>user.password = payload.password</code>, sans jamais appeler <code>hash.make</code> pour un mot de passe.</li>
+    </ol>
+  </li>
+  <li><strong>Les relations</strong> (<code>messages</code>, <code>conversations</code>, <code>participations</code>, <code>blocksInitiated</code>…) permettent de naviguer d'un utilisateur vers ses données. Elles ne servent pas dans ce lot.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="inscription">3. Inscription, étape 1 : <code>inscriptions_controller.ts</code></h2>
+<p>Le commentaire en tête résume le rôle du fichier : on garde les informations dans la table temporaire <code>inscriptions</code>, et on envoie le lien de confirmation.</p>
+
+<h3>Les imports</h3>
+<pre><code>import mail from '@adonisjs/mail/services/main'
+import logger from '@adonisjs/core/services/logger'
+import { inscriptionValidator } from '#validators/inscription'
+import Inscription from '#models/inscription'
+import { DateTime } from 'luxon'
+import { genereCodeUnique } from '#services/code_generation'
+import hash from '@adonisjs/core/services/hash'
+import { publicUrl } from '#config/app'
+import { AGE_MINIMUM, APP_TIMEZONE, estMajeur } from '#services/chat_service'
+import ConfirmationEmailMail from '#mails/confirmation_email_mail'</code></pre>
+<p><code>mail</code> pour envoyer l'e-mail, <code>hash</code> pour hacher le code, <code>publicUrl</code> (de <code>config/app.ts</code>) pour fabriquer un lien absolu, et l'e-mail lui-même, <code>ConfirmationEmailMail</code>.</p>
+
+<h3>Le validateur</h3>
+<pre><code>const email = () =&gt; vine.string().email().maxLength(254)
+const name = () =&gt; vine.string().trim().minLength(2).maxLength(50)
+
+export const inscriptionValidator = vine.create({
+  first_name: name(),
+  last_name: name(),
+  email: email().unique({ table: 'users', column: 'email' }),
+  email_confirmation: email().sameAs('email'),
+  birth_date: vine.date(),
+})</code></pre>
+<ul>
+  <li><strong><code>const email = () =&gt; ...</code> :</strong> une petite fonction qui fabrique la règle. On l'appelle deux fois (<code>email()</code>), et chaque appel crée une règle neuve. Réutiliser le même objet pour deux champs pourrait mélanger leurs réglages.</li>
+  <li><strong><code>.email()</code></strong> vérifie le format. <strong><code>maxLength(254)</code></strong> est la longueur maximale d'une adresse e-mail selon la norme.</li>
+  <li><strong><code>.unique({ table: 'users', column: 'email' })</code></strong> fait une requête en base. Si un compte existe déjà avec cet e-mail, la validation échoue. On ne peut pas créer deux comptes avec la même adresse.</li>
+  <li><strong><code>sameAs('email')</code></strong> : la confirmation doit être identique. Ça évite une faute de frappe qui enverrait le lien chez quelqu'un d'autre.</li>
+  <li><strong><code>vine.date()</code></strong> vérifie que c'est une vraie date. Grâce à <code>start/validator.ts</code>, elle devient un <code>DateTime</code> de Luxon.</li>
+</ul>
+
+<h3><code>donnePageInscription</code></h3>
+<pre><code>async donnePageInscription({ view }: HttpContext) {
+  return view.render('pages/auth/register')
+}</code></pre>
+<p>Affiche simplement le formulaire.</p>
+
+<h3><code>enregistreInscription</code></h3>
+<pre><code>async enregistreInscription({ request, response, session }: HttpContext) {
+  const payload = await request.validateUsing(inscriptionValidator)
+
+  if (!estMajeur(payload.birth_date)) {
+    return response.unprocessableEntity({
+      errors: [{ field: 'birth_date', message: `Vous devez avoir au moins ${AGE_MINIMUM} ans pour vous inscrire` }],
+    })
+  }</code></pre>
+<ul>
+  <li>Validation, puis vérification de l'âge avec <code>estMajeur</code> (de <code>chat_service.ts</code>).</li>
+  <li><strong>Avant tout le reste,</strong> comme le dit le commentaire : inutile de générer un code ou d'écrire en base pour une personne mineure.</li>
+  <li><strong>Le format <code>{ errors: [{ field, message }] }</code></strong> est celui des erreurs de validation. Le formulaire affiche donc l'erreur <strong>sous le champ date de naissance</strong>, au bon endroit.</li>
+</ul>
+
+<pre><code>  const fullName = `${payload.first_name} ${payload.last_name}`
+  const inscriptionExpire = DateTime.now().plus({ days: 2 })
+  const codeAleatoire = await genereCodeUnique(Inscription)</code></pre>
+<p>Le nom complet est assemblé une fois pour toutes, puisque le modèle <code>User</code> n'a qu'une colonne <code>fullName</code>. Le lien expirera dans 2 jours. Le code de 25 caractères est tiré avec <code>crypto</code> (voir le fichier sur les services).</p>
+
+<pre><code>  const identite = await Inscription.updateOrCreate(
+    { email: payload.email },
+    {
+      codeAleatoire: await hash.make(codeAleatoire),
+      fullName: fullName,
+      birthDate: payload.birth_date,
+      expiredAt: inscriptionExpire,
+    }
+  )</code></pre>
+<ul>
+  <li><strong><code>updateOrCreate(recherche, valeurs)</code></strong> cherche une inscription avec cet e-mail. Si elle existe, elle est <strong>mise à jour</strong>. Sinon, elle est <strong>créée</strong>.</li>
+  <li><strong>Pourquoi ?</strong> Le commentaire l'explique : l'e-mail est unique dans <code>inscriptions</code>. Si la personne s'inscrit une deuxième fois (premier e-mail perdu), un simple <code>create</code> violerait la contrainte d'unicité, d'où une erreur 500. Ici, on remplace l'ancienne demande, et l'ancien lien cesse de fonctionner puisque le hash a changé.</li>
+  <li><strong><code>await hash.make(codeAleatoire)</code></strong> : seul le hash est stocké. Le code en clair reste dans la variable, pour l'e-mail.</li>
+</ul>
+
+<pre><code>  try {
+    const activationLink = `${publicUrl}/signup/${identite.id}/${codeAleatoire}`
+    const expiresAt = inscriptionExpire.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
+
+    await mail.send(new ConfirmationEmailMail({ email: payload.email, fullName }, activationLink, expiresAt))</code></pre>
+<ul>
+  <li><strong>Le lien</strong> contient l'<strong>identifiant</strong> de l'inscription (pour la retrouver) et le <strong>code</strong> en clair (pour prouver qu'on a reçu l'e-mail), par exemple <code>https://…/signup/12/K7Q2…</code>.</li>
+  <li><strong>Pourquoi l'identifiant ?</strong> Le code est haché, et un hash scrypt ne peut pas servir à chercher une ligne (<code>WHERE code = ?</code>), car chaque hash contient un « sel » aléatoire. On retrouve donc la ligne par son identifiant, puis on vérifie le code avec <code>hash.verify</code>.</li>
+  <li><strong><code>toFormat("dd/MM/yyyy 'à' HH:mm")</code></strong> : les apostrophes entourent un texte à écrire tel quel (« à »). Le résultat ressemble à « 08/11/2026 à 14:30 », à l'heure de Kinshasa.</li>
+  <li><strong><code>mail.send(...)</code></strong> envoie l'e-mail par Brevo (voir <a href="#mail">point 4</a>).</li>
+</ul>
+
+<pre><code>    if (request.accepts(['html', 'json']) === 'json') {
+      return response.created({ message: 'Compte créé.' })
+    }
+    session.flash('success', 'Votre compte a été créé. Vérifiez votre e-mail.')
+    return response.redirect().toRoute('home')
+  } catch (error) {
+    logger.error({ err: error }, "Erreur lors de l'envoi de l'e-mail de confirmation")
+    return response.status(500).json({ success: false, message: "Échec de l'envoi de l'e-mail" })
+  }
+}</code></pre>
+<ul>
+  <li><strong>Deux façons de répondre :</strong> le formulaire porte <code>data-ajax</code>, donc il est envoyé par <code>fetch</code> avec <code>Accept: application/json</code>. On répond en JSON (201), et le script affiche le message de <code>data-success</code>. Si le JavaScript était désactivé, le formulaire partirait normalement : on redirige vers l'accueil avec un message flash.</li>
+  <li><strong>Si l'envoi de l'e-mail échoue</strong> (Brevo indisponible, clé invalide), l'erreur est notée dans les logs et la réponse est une 500 avec un message clair. L'inscription reste en base : un nouvel essai la remplacera grâce à <code>updateOrCreate</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="mail">4. Les e-mails : <code>app/mails</code> et <code>views/emails</code></h2>
+
+<h3>La classe de l'e-mail</h3>
+<pre><code>import { BaseMail } from '@adonisjs/mail'
+
+export default class ConfirmationEmailMail extends BaseMail {
+  subject = 'Confirmation de votre adresse e-mail - Kadea Chat'
+
+  constructor(
+    private recipient: { email: string; fullName: string },
+    private activationLink: string,
+    private expiresAt: string
+  ) {
+    super()
+  }
+
+  prepare() {
+    this.message.to(this.recipient.email).htmlView('emails/confirmation_email', {
+      fullName: this.recipient.fullName,
+      email: this.recipient.email,
+      activationLink: this.activationLink,
+      expiresAt: this.expiresAt,
+    })
+  }
+}</code></pre>
+<ul>
+  <li><strong>Une classe par e-mail</strong>, qui hérite de <code>BaseMail</code>. Le contrôleur n'a qu'à écrire <code>mail.send(new ConfirmationEmailMail(...))</code>.</li>
+  <li><strong><code>subject</code></strong> : l'objet de l'e-mail.</li>
+  <li><strong><code>private recipient: ...</code> dans le constructeur</strong> est un raccourci de TypeScript : il déclare la propriété et la remplit en une fois. Sans lui, il faudrait écrire <code>this.recipient = recipient</code>. <code>super()</code> appelle le constructeur de <code>BaseMail</code>, ce qui est obligatoire dans une classe qui hérite.</li>
+  <li><strong><code>prepare()</code></strong> est appelée par AdonisJS au moment de l'envoi. Elle fixe le destinataire (<code>to</code>) et le contenu HTML, fabriqué avec une <strong>vue Edge</strong>, comme une page.</li>
+  <li><strong>L'expéditeur</strong> n'est pas écrit ici : il vient de <code>config/mail.ts</code> (<code>MAIL_FROM_ADDRESS</code>, <code>MAIL_FROM_NAME</code>).</li>
+  <li><code>ReinitialisationMotDePasseMail</code> est construite exactement pareil, avec <code>resetLink</code> et la vue <code>emails/reinitialisation_mot_de_passe</code>.</li>
+</ul>
+
+<h3>La vue de l'e-mail</h3>
+<pre><code>{{-- Les {{ }} échappent le HTML : un nom contenant des balises (&lt;script&gt;, &lt;a&gt;...)
+     s'affiche comme du texte et ne s'exécute jamais. --}}
+&lt;div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;"&gt;
+  &lt;h2&gt;Bonjour {{ fullName }},&lt;/h2&gt;
+  ...
+  &lt;a href="{{ activationLink }}" style="background-color: #2e7d32; ..."&gt;Confirmer mon e-mail&lt;/a&gt;
+  ...
+&lt;/div&gt;</code></pre>
+<ul>
+  <li><strong>Les styles sont écrits dans chaque balise</strong> (<code>style="..."</code>) : beaucoup de logiciels de messagerie ignorent les feuilles de style. C'est la règle pour tout e-mail HTML.</li>
+  <li><strong>L'échappement</strong>, rappelé par le commentaire : <code>{{ fullName }}</code> transforme <code>&lt;</code> en <code>&amp;lt;</code>. Quelqu'un qui s'inscrirait avec le nom <code>&lt;a href="piege"&gt;Cliquez&lt;/a&gt;</code> ne pourrait pas glisser un faux lien dans l'e-mail. C'était un des correctifs de sécurité P0.</li>
+</ul>
+
+<h3><code>config/mail.ts</code></h3>
+<pre><code>default: env.get('MAIL_MAILER'),
+from: { address: env.get('MAIL_FROM_ADDRESS'), name: env.get('MAIL_FROM_NAME') },
+globals: { brandName: 'Kadea Chat' },
+mailers: {
+  brevo: transports.brevo({ key: env.get('BREVO_API_KEY'), baseUrl: 'https://api.brevo.com/v3' }),
+},</code></pre>
+<p>Un seul moyen d'envoi : <strong>Brevo</strong>, par son API HTTP avec une clé secrète. C'est plus fiable sur un hébergeur comme Render que le protocole SMTP, souvent bloqué. <code>globals</code> rend <code>brandName</code> disponible dans toutes les vues d'e-mail.</p>
+
+<!-- ============================================================ -->
+<h2 id="compte">5. Inscription, étape 2 : <code>new_account_controller.ts</code></h2>
+<p>La personne clique sur le lien reçu. Le commentaire en tête rappelle l'essentiel : le lien prouve que l'adresse existe, et le vrai compte n'est créé qu'ici.</p>
+
+<h3>L'outil commun : <code>chercheInscription</code></h3>
+<pre><code>private async chercheInscription(id: string, code: string): Promise&lt;
+  | { error: null; inscription: Inscription }
+  | { error: 'signupLinkInvalid' | 'signupLinkExpired'; inscription: null }
+&gt; {</code></pre>
+<p>Le type de retour est une <strong>union discriminée</strong>. La fonction renvoie <strong>soit</strong> <code>{ error: null, inscription }</code>, <strong>soit</strong> <code>{ error: '...', inscription: null }</code>. Après <code>if (result.error) { return ... }</code>, TypeScript <strong>sait</strong> que <code>result.inscription</code> n'est pas <code>null</code>. Le nom de l'erreur est aussi une clé de <code>ERROR_PAGES</code>, ce qui permet d'écrire <code>ERROR_PAGES[result.error]</code>.</p>
+
+<pre><code>  const inscriptionId = Number(id)
+  if (!Number.isInteger(inscriptionId) || inscriptionId &lt;= 0) {
+    return { error: 'signupLinkInvalid', inscription: null }
+  }
+
+  const inscription = await Inscription.find(inscriptionId)
+  if (!inscription) {
+    return { error: 'signupLinkInvalid', inscription: null }
+  }</code></pre>
+<ul>
+  <li><strong>Vérifier l'identifiant à la main :</strong> cette route n'a pas de matcher <code>ID_NUMERIQUE</code>. Le commentaire l'explique : sans ce contrôle, <code>/signup/abc/…</code> ferait planter PostgreSQL (erreur 500). <code>Number.isInteger</code> refuse <code>NaN</code>, <code>1.5</code>, etc.</li>
+  <li><strong><code>Inscription.find(id)</code></strong> renvoie la ligne ou <code>null</code>. Contrairement à <code>findOrFail</code>, ça permet d'afficher une page d'erreur <strong>adaptée</strong>, au lieu de la 404 générique.</li>
+</ul>
+
+<pre><code>  const isValid = await hash.verify(inscription.codeAleatoire, code)
+  if (!isValid) {
+    return { error: 'signupLinkInvalid', inscription: null }
+  }
+
+  if (DateTime.now() &gt; inscription.expiredAt!) {
+    await inscription.delete()
+    return { error: 'signupLinkExpired', inscription: null }
+  }
+
+  return { error: null, inscription }
+}</code></pre>
+<ul>
+  <li><strong><code>hash.verify(hashStocké, codeReçu)</code></strong> refait le calcul et compare. On ne peut pas « déhacher » un hash, seulement vérifier qu'un code donne le même résultat.</li>
+  <li><strong>Lien expiré :</strong> on supprime la demande au passage, pour faire le ménage en base. Le <code>!</code> après <code>expiredAt</code> dit à TypeScript que la valeur n'est pas vide. Une migration l'a rendue obligatoire (<code>alter_expired_at_not_null</code>).</li>
+  <li><strong>Trois cas d'erreur, deux pages :</strong> identifiant absurde, ligne introuvable ou mauvais code donnent tous « lien invalide ». On ne dit pas à un curieux si l'identifiant existe.</li>
+</ul>
+
+<h3><code>donnePageCreationCompte</code> (GET)</h3>
+<pre><code>async donnePageCreationCompte(ctx: HttpContext) {
+  const { view, params } = ctx
+  const result = await this.chercheInscription(params.id, params.code)
+
+  if (result.error) {
+    return affichePageErreur(ctx, ERROR_PAGES[result.error])
+  }
+
+  const inscription = result.inscription
+  return view.render('pages/auth/signup', {
+    code: params.code,
+    id: params.id,
+    user: {
+      full_name: inscription.fullName,
+      birth_date: inscription.birthDate ? formateDate(inscription.birthDate) : '',
+      email: inscription.email,
+    },
+  })
+}</code></pre>
+<ul>
+  <li><strong>Lien invalide ou expiré :</strong> la page d'erreur du site, avec des boutons adaptés (« Recommencer l'inscription »…). Ces pages sont dans <code>error_page.ts</code> (voir le fichier sur le socle).</li>
+  <li><strong>Lien valide :</strong> la page <code>signup.edge</code>, avec les informations déjà connues en <strong>lecture seule</strong> (nom, date de naissance, e-mail) et les champs à remplir (mot de passe, téléphone).</li>
+  <li><strong><code>id</code> et <code>code</code></strong> sont renvoyés à la vue pour fabriquer l'adresse du formulaire : <code>action="/signup/{{ id }}/{{ code }}"</code>. Le code est donc revérifié à l'envoi.</li>
+  <li><strong><code>formateDate</code></strong> : le commentaire du code explique qu'avant, la date s'affichait au format brut <code>1998-04-12T00:00:00…</code>.</li>
+</ul>
+
+<h3><code>enregistreCompte</code> (POST)</h3>
+<pre><code>async enregistreCompte(ctx: HttpContext) {
+  const { request, response, auth, params } = ctx
+  const payload = await request.validateUsing(confirmationCompteValidator)
+
+  const result = await this.chercheInscription(params.id, params.code)
+  if (result.error) {
+    return affichePageErreur(ctx, ERROR_PAGES[result.error])
+  }
+  const inscription = result.inscription</code></pre>
+<p>Le validateur, dans <span class="file">app/validators/user.ts</span> :</p>
+<pre><code>const password = () =&gt; vine.string().minLength(8).maxLength(50)
+
+export const confirmationCompteValidator = vine.create({
+  password: password(),
+  phone_number: vine.string().trim().optional(),
+  avatar_url: vine.string().trim().url({ protocols: ['http', 'https'], require_protocol: true }).optional(),
+  bio: vine.string().trim().maxLength(500).optional(),
+})</code></pre>
+<p>Le mot de passe fait de 8 à 50 caractères. Le reste est facultatif. <strong>Le lien est revérifié</strong> avec <code>chercheInscription</code> : la page a pu rester ouverte pendant que le lien expirait.</p>
+
+<pre><code>  const existingUser = await User.findBy('email', inscription.email)
+  if (existingUser) {
+    await inscription.delete()
+    return affichePageErreur(ctx, ERROR_PAGES.accountAlreadyExists)
+  }</code></pre>
+<p>Le commentaire du code décrit le cas : un compte a pu être créé avec cet e-mail <strong>entre-temps</strong>. Par exemple, deux inscriptions successives, et le premier lien utilisé après le second. Sans cette vérification, la contrainte d'unicité de <code>users.email</code> provoquerait une erreur 500. On supprime la demande devenue inutile et on affiche « Compte déjà créé ».</p>
+
+<pre><code>  const userData = {
+    fullName: inscription.fullName,
+    birthDate: inscription.birthDate,
+    email: inscription.email,
+    emailVerifiedAt: DateTime.now(),
+    password: payload.password,
+    phoneNumber: payload.phone_number,
+    avatarUrl: payload.avatar_url,
+    bio: payload.bio,
+  }
+  const user = await User.create(userData)
+
+  await inscription.delete()
+
+  await auth.use('web').login(user)
+  response.redirect().toRoute('messages')
+}</code></pre>
+<ul>
+  <li><strong>Les informations vérifiées viennent de l'inscription</strong>, pas du formulaire. Même si quelqu'un modifiait les champs en lecture seule de la page, le nom, la date et l'e-mail enregistrés sont ceux de l'étape 1, déjà validés.</li>
+  <li><strong><code>emailVerifiedAt: DateTime.now()</code></strong> : on note quand l'e-mail a été confirmé.</li>
+  <li><strong><code>password: payload.password</code></strong> est écrit en clair dans l'objet, mais <code>withAuthFinder</code> le <strong>hache automatiquement</strong> avant l'enregistrement.</li>
+  <li><strong>La demande est supprimée :</strong> le lien ne peut servir qu'une fois.</li>
+  <li><strong><code>auth.use('web').login(user)</code></strong> connecte directement la personne. Pas besoin de retaper son mot de passe juste après l'avoir choisi. Puis direction la messagerie.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="session">6. Connexion et déconnexion : <code>session_controller.ts</code></h2>
+
+<pre><code>async donnePageConnexion({ view }: HttpContext) {
+  return view.render('pages/auth/login')
+}
+
+async connecte({ request, auth, response }: HttpContext) {
+  const { email, password } = await request.validateUsing(loginValidator)
+  const user = await User.verifyCredentials(email, password)
+
+  await auth.use('web').login(user)
+  response.redirect().toRoute('messages')
+}</code></pre>
+<ul>
+  <li><strong><code>loginValidator</code></strong> : <code>{ email: email(), password: password() }</code>, un e-mail valide et un mot de passe de 8 à 50 caractères.</li>
+  <li><strong><code>User.verifyCredentials(email, password)</code></strong> vient de <code>withAuthFinder</code>. Elle cherche l'utilisateur par e-mail et compare le mot de passe à son hash. En cas d'échec (e-mail inconnu <strong>ou</strong> mauvais mot de passe), elle lance <code>E_INVALID_CREDENTIALS</code>. Elle ne dit volontairement pas lequel des deux est faux, et elle prend le même temps dans les deux cas : un attaquant ne peut pas découvrir quels e-mails sont inscrits.</li>
+  <li><strong>Ce que voit l'utilisateur en cas d'échec :</strong> le formulaire de connexion est un formulaire classique (pas <code>data-ajax</code>). AdonisJS garde les champs tapés <strong>sauf</strong> le mot de passe (<code>flashExcept</code>), range le message dans le flash <code>error</code> et renvoie sur la page précédente. Le message, traduit dans <code>handler.ts</code> (« Adresse e-mail ou mot de passe incorrect. »), s'affiche en notification grâce à <code>components/toasts.edge</code>. L'e-mail reste rempli.</li>
+  <li><strong><code>auth.use('web').login(user)</code></strong> range l'identifiant de l'utilisateur dans la session. AdonisJS <strong>régénère</strong> aussi l'identifiant de session à ce moment. Ça protège contre la « fixation de session » : un attaquant qui aurait imposé un cookie de session avant la connexion ne peut pas le réutiliser après.</li>
+  <li><strong>5 essais par minute</strong> au plus, grâce à <code>limiteConnexion</code> sur la route.</li>
+</ul>
+
+<pre><code>async deconnecte({ auth, response }: HttpContext) {
+  await auth.use('web').logout()
+  response.redirect().toRoute('session.create')
+}</code></pre>
+<p><code>logout()</code> retire l'utilisateur de la session, puis redirige vers la page de connexion (la route nommée <code>session.create</code>, c'est-à-dire <code>GET /login</code>). C'est un <code>POST</code> protégé par CSRF, donc un lien piégé ne peut pas te déconnecter.</p>
+
+<!-- ============================================================ -->
+<h2 id="oubli">7. Mot de passe oublié : <code>forgo_passwords_controller.ts</code></h2>
+<p>Le commentaire en tête décrit les 3 étapes : donner son e-mail, cliquer sur le lien, choisir un nouveau mot de passe. Le lien ne sert qu'une fois.</p>
+
+<h3>Les validateurs</h3>
+<pre><code>export const forgoPassewordValidator = vine.create({ email: email() })
+
+export const newPassewordValidator = vine.create({
+  password: password().confirmed(),
+})</code></pre>
+<p><strong><code>confirmed()</code></strong> exige un champ <code>password_confirmation</code> identique dans le formulaire. Le validateur a ses propres messages en français (« Les deux mots de passe ne correspondent pas. »).</p>
+
+<h3>Étape 1 : <code>enregistreDemandeReinitialisation</code></h3>
+<pre><code>async enregistreDemandeReinitialisation({ request, response, session }: HttpContext) {
+  const { email } = await request.validateUsing(forgoPassewordValidator)
+
+  const user = await User.findBy('email', email)
+
+  if (user) {
+    const codeAleatoire = await genereCodeUnique(ForgoPassword)
+    const expiration = DateTime.now().plus({ hours: 1 })
+    const identite = await ForgoPassword.updateOrCreate(
+      { email: user.email },
+      { userId: user.id, codeAleatoire: await hash.make(codeAleatoire), expiredAt: expiration }
+    )</code></pre>
+<ul>
+  <li><strong>Seulement si le compte existe :</strong> on crée la demande et on envoie l'e-mail.</li>
+  <li><strong>1 heure de validité</strong>, bien moins que les 48 heures de l'inscription. Un lien qui permet de prendre le contrôle d'un compte doit vivre le moins longtemps possible.</li>
+  <li><strong><code>updateOrCreate</code></strong> : une nouvelle demande remplace la précédente, et l'ancien lien cesse de fonctionner.</li>
+</ul>
+
+<pre><code>    try {
+      const resetLink = `${publicUrl}/forgoPassword/${identite.id}/${codeAleatoire}`
+      const expiresAt = expiration.setZone(APP_TIMEZONE).toFormat("dd/MM/yyyy 'à' HH:mm")
+      await mail.send(new ReinitialisationMotDePasseMail({ email: identite.email, fullName: user.fullName }, resetLink, expiresAt))
+    } catch (error) {
+      logger.error({ err: error }, "Erreur lors de l'envoi de l'e-mail de réinitialisation")
+      if (request.accepts(['html', 'json']) === 'json') {
+        return response.internalServerError({ message: "Échec de l'envoi de l'e-mail de réinitialisation" })
+      }
+      session.flash('error', "Échec de l'envoi de l'e-mail de réinitialisation")
+      return response.redirect().back()
+    }
+  }</code></pre>
+<p>Le même principe que pour l'inscription : le lien contient l'identifiant et le code en clair. En cas d'échec d'envoi, la réponse est en JSON pour le script, ou une notification pour un formulaire classique.</p>
+
+<pre><code>  const message = 'Si cette adresse correspond à un compte, un e-mail de réinitialisation vient de vous être envoyé.'
+  if (request.accepts(['html', 'json']) === 'json') {
+    return response.ok({ message })
+  }
+  session.flash('success', message)
+  return response.redirect().toRoute('home')
+}</code></pre>
+<p><strong>La même réponse, que le compte existe ou non.</strong> Le commentaire l'explique : on ne révèle pas quels e-mails sont inscrits. Sinon, n'importe qui pourrait tester une liste d'adresses pour savoir qui utilise Kadea Chat. C'est pourquoi le message commence par « Si cette adresse correspond à un compte… ».</p>
+
+<h3>L'outil commun : <code>chercheDemandeValide</code></h3>
+<pre><code>private async chercheDemandeValide(id: string, code: string) {
+  const requestId = Number(id)
+  if (!Number.isInteger(requestId) || requestId &lt;= 0) {
+    return null
+  }
+  const recuperation = await ForgoPassword.find(requestId)
+  if (!recuperation) {
+    return null
+  }
+  if (recuperation.expiredAt! &lt; DateTime.now()) {
+    await recuperation.delete()
+    return null
+  }
+  const isValid = await hash.verify(recuperation.codeAleatoire, code)
+  return isValid ? recuperation : null
+}</code></pre>
+<p>La même logique que <code>chercheInscription</code> : identifiant valide, ligne trouvée, pas expirée (supprimée au passage sinon), code correct. Elle renvoie la demande, ou <code>null</code> dans tous les cas d'échec. On ne distingue pas les erreurs.</p>
+
+<h3>Étape 2 : <code>donnePageNouveauMotDePasse</code></h3>
+<pre><code>async donnePageNouveauMotDePasse({ params, view }: HttpContext) {
+  const recuperation = await this.chercheDemandeValide(params.id, params.code)
+  return view.render('pages/auth/updatePassword', {
+    id: params.id,
+    code: params.code,
+    lienValide: recuperation !== null,
+  })
+}</code></pre>
+<p>Une seule vue pour les deux cas : <code>updatePassword.edge</code> utilise <code>@if(lienValide)</code> pour afficher <strong>soit</strong> le formulaire, <strong>soit</strong> « Lien invalide ou expiré » avec un bouton « Refaire une demande ».</p>
+
+<h3>Étape 3 : <code>enregistreNouveauMotDePasse</code></h3>
+<pre><code>async enregistreNouveauMotDePasse({ request, response, auth, params }: HttpContext) {
+  const payload = await request.validateUsing(newPassewordValidator)
+
+  const recuperation = await this.chercheDemandeValide(params.id, params.code)
+  if (!recuperation) {
+    return response.badRequest({ message: 'Lien de récupération invalide ou expiré.' })
+  }
+
+  const user = await User.findOrFail(recuperation.userId)
+  user.password = payload.password
+  await user.save()
+
+  await recuperation.delete()
+
+  await auth.use('web').login(user)
+
+  if (request.accepts(['html', 'json']) === 'json') {
+    return response.ok({ message: 'Votre mot de passe a été modifié.' })
+  }
+  return response.redirect().toRoute('messages')
+}</code></pre>
+<ul>
+  <li><strong>Le lien est revérifié</strong> au moment de l'envoi, pas seulement à l'affichage de la page.</li>
+  <li><strong><code>user.password = payload.password</code></strong> puis <code>save()</code> : <code>withAuthFinder</code> hache le nouveau mot de passe tout seul.</li>
+  <li><strong><code>recuperation.delete()</code></strong> : le lien ne sert qu'une fois.</li>
+  <li><strong>Connexion directe</strong>, puis le script redirige vers <code>/messages</code> grâce à l'attribut <code>data-redirect</code> du formulaire.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="vues">8. Les pages et le JavaScript</h2>
+
+<h3>Deux façons d'écrire un formulaire</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>Page</th><th>Type</th><th>Comment les erreurs s'affichent</th></tr>
+  <tr><td><code>login.edge</code></td><td>Classique, avec les composants <code>@form</code>, <code>@field.root</code> et <code>@!input.control</code></td><td>Rechargement de la page. Erreurs de validation sous les champs (<code>@!field.error</code>, qui lit <code>inputErrorsBag</code>), mauvais identifiants en notification</td></tr>
+  <tr><td><code>register.edge</code></td><td><code>data-ajax</code></td><td>Sans recharger : <code>notifications.js</code> lit <code>errors[]</code> et place chaque message sous son champ</td></tr>
+  <tr><td><code>signup.edge</code></td><td>Classique</td><td>Rechargement de la page</td></tr>
+  <tr><td><code>forgoPassword.edge</code></td><td><code>data-ajax</code></td><td>Notification avec le texte de <code>data-success</code></td></tr>
+  <tr><td><code>updatePassword.edge</code></td><td><code>data-ajax</code> + <code>data-redirect="/messages"</code></td><td>Notification, puis redirection</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong><code>{{ csrfField() }}</code></strong> est présent dans chaque formulaire : le champ caché du jeton CSRF. Le composant <code>@form</code> l'ajoute lui-même.</li>
+  <li><strong>Les attributs <code>data-ajax</code></strong> sont gérés par un seul écouteur, dans <code>notifications.js</code>, pour tout le site :
+    <ul>
+      <li>il bloque l'envoi normal ;</li>
+      <li>il désactive le bouton et affiche <code>data-loading-text</code> ;</li>
+      <li>il envoie le formulaire avec <code>fetch</code> et <code>Accept: application/json</code> ;</li>
+      <li>en cas de succès, il affiche <code>data-success</code> ;</li>
+      <li>en cas d'erreur, il place les messages sous les champs ou en notification (419, 429, 401…).</li>
+    </ul>
+  Ce fichier sera expliqué avec le lot 6.</li>
+  <li><strong><code>autocomplete</code></strong> (<code>username</code>, <code>current-password</code>, <code>new-password</code>) aide les gestionnaires de mots de passe du navigateur à proposer ou enregistrer le bon mot de passe.</li>
+</ul>
+
+<h3>La vérification en direct de l'inscription</h3>
+<p>La chaîne de chargement : <code>layouts/auth.edge</code> charge <code>resources/js/compiles/auth.js</code>, qui importe <code>auth/register.js</code>, qui appelle <code>verificationChampsInscription()</code> de <code>utilitaires/verification.js</code>.</p>
+<pre><code>// utilitaires/validation.js
+export function validerNomEnTempsReel(selecteurOuElement, selecteurFeedback) {
+  const inputElement = typeof selecteurOuElement === 'string'
+    ? document.querySelector(selecteurOuElement)
+    : selecteurOuElement
+  ...
+  const regexNom = /^[a-zA-ZÀ-ÿ\s\-]+$/
+
+  inputElement.addEventListener('input', (event) =&gt; {
+    // affiche « Format valide ✓ » en vert ou un message en rouge, sous le champ
+  })
+
+  return function () {
+    const valeurFinale = inputElement.value.trim()
+    if (valeurFinale !== '' &amp;&amp; regexNom.test(valeurFinale)) {
+      return valeurFinale
+    }
+    return false
+  }
+}</code></pre>
+<ul>
+  <li><strong>Le modèle du fichier</strong>, décrit dans son commentaire : chaque fonction <strong>écoute la frappe</strong> pour afficher un message, puis <strong>renvoie une autre fonction</strong> qui donne le résultat final. C'est une <strong>fermeture</strong> (closure) : la fonction renvoyée se souvient de <code>inputElement</code> et de <code>regexNom</code>, même après la fin de <code>validerNomEnTempsReel</code>.</li>
+  <li><strong>Le paramètre accepte un sélecteur ou un élément</strong> : <code>typeof ... === 'string'</code> fait la différence.</li>
+  <li><strong>La regex des noms</strong> : des lettres (accents compris, de <code>À</code> à <code>ÿ</code>), des espaces et des tirets, rien d'autre. <code>^...$</code> veut dire « du début à la fin », et <code>+</code> « au moins un ».</li>
+  <li><strong>Les fonctions sœurs</strong> font la même chose pour l'e-mail (<code>validerEmailEnTempsReel</code>, regex <code>/^[^\s@]+@[^\s@]+\.[^\s@]+$/</code>) et pour la confirmation de l'e-mail (<code>validerCorrespondanceEmailEnTempsReel</code>).</li>
+</ul>
+<pre><code>// utilitaires/verification.js
+export function verificationChampsInscription() {
+  const form = document.getElementById('registerForm')
+  if (!form) { return }
+  const btnSubmit = document.getElementById('btnSumitInscription')
+
+  const getNom = validerNomEnTempsReel('#last_name')
+  const getPrenom = validerNomEnTempsReel('#first_name')
+  const getEmail = validerEmailEnTempsReel('#email')
+  const getEmailConfirm = validerCorrespondanceEmailEnTempsReel('#email', '#email_confirmation')
+
+  function validerEtAfficherBouton() {
+    const estValide = getNom() &amp;&amp; getPrenom() &amp;&amp; getEmail() &amp;&amp; getEmailConfirm()
+    // montre le bouton "Créer mon compte" si tout est valide, le cache sinon
+  }
+  form.addEventListener('input', validerEtAfficherBouton)
+  ...
+}</code></pre>
+<ul>
+  <li><strong><code>if (!form) { return }</code> :</strong> <code>auth.js</code> est chargé sur <strong>toutes</strong> les pages du layout <code>auth</code> (connexion, mot de passe oublié…). Sur ces pages, il n'y a pas de <code>registerForm</code>, et la fonction s'arrête sans erreur.</li>
+  <li><strong>Le bouton « Créer mon compte » est caché</strong> (<code>class="hidden"</code>) tant que les quatre champs ne sont pas valides.</li>
+  <li><strong>Un seul écouteur <code>input</code> sur le formulaire</strong> : l'événement <code>input</code> d'un champ « remonte » jusqu'au formulaire (bubbling). Un écouteur suffit pour tous les champs.</li>
+  <li><strong>Le commentaire de <code>validation.js</code> le rappelle :</strong> cette vérification <strong>aide</strong> l'utilisateur, mais <strong>ne protège rien</strong>. N'importe qui peut envoyer la requête sans passer par la page. Le serveur revérifie tout avec <code>inscriptionValidator</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="parcours">9. Les parcours complets</h2>
+
+<h3>Ana crée son compte</h3>
+<pre><code>1. GET /register → formulaire. register.js montre le bouton quand nom, prénom et e-mails sont valides.
+2. POST /register (fetch, data-ajax)
+     → limiteEnvoiEmail (5 par quart d'heure et par IP)
+     → inscriptionValidator : e-mail pas déjà dans users, confirmation identique
+     → estMajeur ? sinon 422 sous « date de naissance »
+     → code de 25 caractères, hash dans inscriptions (updateOrCreate), expiration dans 48 h
+     → e-mail Brevo : https://…/signup/12/K7Q2…
+     → 201 → notification « Un e-mail de confirmation vient de vous être envoyé »
+3. Ana clique dans l'e-mail : GET /signup/12/K7Q2…
+     → chercheInscription : id valide ? ligne ? hash.verify ? pas expirée ?
+     → signup.edge : nom, date et e-mail en lecture seule, mot de passe et téléphone à remplir
+4. POST /signup/12/K7Q2…
+     → confirmationCompteValidator, chercheInscription de nouveau, compte déjà existant ?
+     → User.create (mot de passe haché automatiquement), inscription supprimée
+     → auth.login → /messages</code></pre>
+
+<h3>Jo a oublié son mot de passe</h3>
+<pre><code>1. POST /forgoPassword (e-mail) → s'il a un compte : code haché, valable 1 h, e-mail avec le lien
+   → dans tous les cas : « Si cette adresse correspond à un compte… »
+2. GET /forgoPassword/7/X9…  → lien valide ? formulaire : page « Lien invalide ou expiré »
+3. POST /forgoPassword/7/X9… → mot de passe + confirmation, lien revérifié
+   → nouveau mot de passe (haché), demande supprimée, auth.login → /messages</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="remarques">10. Ce qui a été remarqué</h2>
+
+<div class="note">
+  <p><strong>Ce qui est bien fait</strong>, à mettre en avant :</p>
+  <p>• <strong>Le compte n'est créé qu'après la confirmation de l'e-mail.</strong></p>
+  <p>• <strong>Les codes des liens</strong> sont tirés avec <code>crypto</code>, stockés hachés, utilisables une seule fois et limités dans le temps (48 h et 1 h).</p>
+  <p>• <strong>Le mot de passe oublié ne révèle pas</strong> quels e-mails sont inscrits, et la connexion ne dit pas lequel de l'e-mail ou du mot de passe est faux.</p>
+  <p>• <strong>Les cas limites sont gérés proprement :</strong> nouvelle inscription avec le même e-mail, compte créé entre-temps, lien expiré, identifiant non numérique. Chacun a sa page d'erreur au lieu d'une erreur 500.</p>
+  <p>• <strong>Les mots de passe sont hachés automatiquement</strong> par <code>withAuthFinder</code>, la session est régénérée à la connexion, et les e-mails échappent les noms.</p>
+</div>
+
+<div class="warn">
+  <p><strong>1. L'inscription révèle si un e-mail a déjà un compte.</strong> La règle <code>.unique({ table: 'users' })</code> renvoie une erreur « déjà utilisé » pour une adresse inscrite, alors que le mot de passe oublié fait tout pour ne pas le révéler. C'est un compromis courant, au profit du confort de l'utilisateur. Pour être cohérent, on pourrait répondre toujours « Un e-mail vous a été envoyé », et envoyer à l'adresse déjà inscrite un e-mail « Vous avez déjà un compte ».</p>
+  <p><strong>2. La vérification en direct refuse les noms avec une apostrophe.</strong> La regex <code>/^[a-zA-ZÀ-ÿ\s\-]+$/</code> n'accepte pas <code>'</code>. Des noms courants comme <strong>N'Diaye</strong>, <strong>N'Golo</strong> ou <strong>O'Brien</strong> affichent une erreur, et le bouton « Créer mon compte » reste caché. Le serveur, lui, les accepte. Il suffirait d'ajouter <code>'</code> (et <code>’</code>) dans la regex.</p>
+  <p><strong>3. Le validateur de création de compte accepte <code>avatar_url</code> et <code>bio</code>,</strong> que le formulaire <code>signup.edge</code> n'envoie pas. Quelqu'un qui modifierait la requête pourrait mettre l'adresse de n'importe quelle image comme photo de profil. La CSP l'empêcherait de s'afficher, puisque seuls Cloudinary et i.ibb.co sont autorisés. Le plus propre est de retirer ces deux champs du validateur et de laisser la photo se gérer depuis le profil.</p>
+  <p><strong>4. Pas de confirmation du mot de passe à la création du compte</strong>, alors que le mot de passe oublié et les paramètres en demandent une. Une faute de frappe oblige à passer par « mot de passe oublié ». On pourrait ajouter <code>.confirmed()</code> et un champ <code>password_confirmation</code>.</p>
+  <p><strong>5. Changer de mot de passe ne déconnecte pas les autres appareils.</strong> Après « mot de passe oublié », une session ouverte ailleurs, par exemple par quelqu'un qui aurait volé le mot de passe, reste valable jusqu'à son expiration (2 heures). Avec des sessions stockées en base, on pourrait les supprimer toutes.</p>
+  <p><strong>6. Un petit écart de temps de réponse :</strong> le mot de passe oublié envoie un e-mail seulement si le compte existe. La réponse est donc un peu plus lente dans ce cas, et un attaquant patient pourrait le mesurer. Envoyer l'e-mail en arrière-plan (file d'attente) ferait disparaître cet écart. C'est un point avancé, rarement traité dans un projet de formation.</p>
+</div>
+
+</main>
+</body>
+</html>
