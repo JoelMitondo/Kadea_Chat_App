@@ -101,6 +101,7 @@ Projet de fin de formation · Kadea Academy
 | Fichiers | **Cloudinary** | Stockage des images et documents |
 | E-mails | **Brevo** | Confirmation d'inscription, mot de passe oublié |
 | Tests | **Japa** | Tests unitaires et fonctionnels |
+| Assistance IA | **Claude** (Anthropic) | Correction et vérification |
 
 ---
 
